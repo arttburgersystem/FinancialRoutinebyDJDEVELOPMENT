@@ -188,6 +188,7 @@ function getCatKey(profile, tipo){
   return profile+'_'+tipo;
 }
 var MESES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+var TAXAS_DEFAULT={ifood:30,rappi:27,food99:27,delivery:0,credito:2.5,debito:1.2,pix:0,dinheiro:0,vale:3,outros:0};
 
 var BANCOS_ARTT_DEFAULT=[
   {id:'banco_stone',     nome:'Stone',        saldo:0, cor:'#00a86b', profile:'artt'},
@@ -213,6 +214,9 @@ var state={
   bancos: initBancos(),
   transferencias: lsGet('transferencias',[]),
   receitas: lsGet('receitas',[]),
+  vendas: lsGet('vendas',[]),
+  vendasData: today(),
+  taxas: lsGet('taxas',TAXAS_DEFAULT),
   orcamentos: lsGet('orcamentos',[]),
   cmv: lsGet('cmv',{artt:30,pessoal:0}),
   catManager: null,
@@ -276,7 +280,7 @@ function fbPut(path,data){
 
 function loadFromFirebase(){
   setState({syncStatus:'syncing'});
-  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias')])
+  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias'),fbGet('/vendas')])
     .then(function(results){
       var contas=objToArr(results[0]);
       var metas=objToArr(results[1]);
@@ -284,14 +288,15 @@ function loadFromFirebase(){
       var bancosRaw=results[3];
       var bancos=(bancosRaw&&Object.keys(bancosRaw).length>0)?objToArr(bancosRaw):state.bancos;
       var transferencias=objToArr(results[4]);
-      lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);
-      setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,syncStatus:'ok'});
+      var vendas=objToArr(results[5]);
+      lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);lsSet('vendas',vendas);
+      setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,vendas:vendas,syncStatus:'ok'});
     })
     .catch(function(e){
       console.error(e);
       setState({syncStatus:'error'});
       showToast('Erro ao conectar ao Firebase. Usando dados locais.','error');
-      setState({contas:lsGet('contas',[]),metas:lsGet('metas',[]),receitas:lsGet('receitas',[])});
+      setState({contas:lsGet('contas',[]),metas:lsGet('metas',[]),receitas:lsGet('receitas',[]),vendas:lsGet('vendas',[])});
     });
 }
 
@@ -300,13 +305,14 @@ function scheduleSave(){
   clearTimeout(syncTimer);
   syncTimer=setTimeout(function(){
     setState({syncStatus:'syncing'});
-    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);
+    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);
     Promise.all([
       fbPut('/contas',arrToObj(state.contas)),
       fbPut('/metas',arrToObj(state.metas)),
       fbPut('/receitas',arrToObj(state.receitas)),
       fbPut('/bancos',arrToObj(state.bancos)),
       fbPut('/transferencias',arrToObj(state.transferencias)),
+      fbPut('/vendas',arrToObj(state.vendas||[])),
     ]).then(function(){setState({syncStatus:'ok'});})
       .catch(function(e){console.error(e);setState({syncStatus:'error'});showToast('Erro ao salvar no Firebase','error');});
   },1500);
@@ -334,6 +340,41 @@ function deleteReceita(id){
   showToast('Receita removida','error');
 }
 function updateReceita(r){var rs=state.receitas.map(function(x){return x.id===r.id?r:x;});lsSet('receitas',rs);setState({receitas:rs,receitaModal:null});scheduleSave();showToast('Receita atualizada!');}
+function saveVenda(v){
+  var taxas=state.taxas||TAXAS_DEFAULT;
+  var vendas=(state.vendas||[]);
+  var existe=vendas.find(function(x){return x.id===v.id;});
+  var novasVendas=existe?vendas.map(function(x){return x.id===v.id?v:x;}):vendas.concat([v]);
+  var APPS_MAP={ifood:'iFood',rappi:'Rappi',food99:'99Food',delivery:'Delivery Próprio'};
+  var PDV_LABEL={dinheiro:'PDV Dinheiro',pix:'PDV Pix',debito:'PDV Débito',credito:'PDV Crédito',vale:'PDV Vale Alim.',outros:'PDV Outros'};
+  var recGeradas=[];
+  Object.keys(v.apps||{}).forEach(function(k){
+    var bruto=v.apps[k]||0;if(!bruto)return;
+    var taxa=(taxas[k]||0)/100;
+    var liquido=Math.round(bruto*(1-taxa)*100)/100;
+    recGeradas.push({id:'rec_vnd_'+v.data+'_'+k,descricao:(APPS_MAP[k]||k)+' — '+fmtDate(v.data),valor:liquido,data:v.data,categoria:APPS_MAP[k]||k,profile:'artt',banco:'',notas:'Bruto '+fmtMoney(bruto)+' | Taxa '+(taxas[k]||0)+'%',venda_id:v.id});
+  });
+  Object.keys(v.pdv||{}).forEach(function(k){
+    var bruto=v.pdv[k]||0;if(!bruto)return;
+    var taxa=(taxas[k]||0)/100;
+    var liquido=Math.round(bruto*(1-taxa)*100)/100;
+    recGeradas.push({id:'rec_vnd_'+v.data+'_pdv_'+k,descricao:(PDV_LABEL[k]||k)+' — '+fmtDate(v.data),valor:liquido,data:v.data,categoria:'Vendas PDV',profile:'artt',banco:'',notas:'Bruto '+fmtMoney(bruto)+' | Taxa '+(taxas[k]||0)+'%',venda_id:v.id});
+  });
+  var receitas=(state.receitas||[]).filter(function(r){return r.venda_id!==v.id;}).concat(recGeradas);
+  lsSet('vendas',novasVendas);lsSet('receitas',receitas);
+  setState({vendas:novasVendas,receitas:receitas});
+  scheduleSave();
+  showToast(existe?'Vendas atualizadas!':'Vendas lançadas!');
+}
+function deleteVenda(id){
+  var vendas=(state.vendas||[]).filter(function(v){return v.id!==id;});
+  var receitas=(state.receitas||[]).filter(function(r){return r.venda_id!==id;});
+  lsSet('vendas',vendas);lsSet('receitas',receitas);
+  setState({vendas:vendas,receitas:receitas});
+  scheduleSave();
+  showToast('Lançamento removido','error');
+}
+
 function addOrcamento(o){var os=(state.orcamentos||[]).concat([o]);lsSet('orcamentos',os);setState({orcamentos:os,orcamentoModal:null});showToast('Orçamento definido!');}
 
 function addProfile(p){
@@ -473,6 +514,7 @@ function renderSidebar(){
     {id:'dashboard',label:'Visão geral',icon:'📊',section:'principal'},
     {id:'bancos',label:'Bancos',icon:'🏦',section:'financeiro'},
     {id:'dre',label:'DRE',icon:'📋',section:'financeiro'},
+    {id:'vendas',label:'Vendas do Dia',icon:'🛒',section:'financeiro',onlyProfile:'artt'},
     {id:'receitas',label:'Receitas',icon:'💵',section:'financeiro'},
     {id:'pagar',label:'Despesas',icon:'💸',section:'financeiro'},
     {id:'receber',label:'Contas a receber',icon:'💰',section:'financeiro'},
@@ -519,7 +561,7 @@ function renderSidebar(){
 
   var sections=['principal','financeiro','planejamento','integração'];
   var navEl=div('nav',sections.map(function(sec){
-    var items=nav.filter(function(n){return n.section===sec;});
+    var items=nav.filter(function(n){return n.section===sec&&(!n.onlyProfile||n.onlyProfile===state.profile);});
     return div('',[
       div('nav-section',sec),
       ...items.map(function(n){
@@ -550,7 +592,7 @@ function renderSidebar(){
 // ── TOPBAR ────────────────────────────────────────────────────────────────────
 function renderTopbar(){
   var pf=PROFILES.find(function(p){return p.id===state.profile;});
-  var titles={dashboard:'Visão geral',bancos:'Bancos e Contas',receitas:'Receitas',dre:'DRE — Resultado',pagar:'Despesas',receber:'Contas a receber',fluxo:'Fluxo de caixa',orcamento:'Orçamento vs Realizado',planejamento:'Metas e Objetivos',alertas:'Alertas',exportar:'Relatórios e Exportação'};
+  var titles={dashboard:'Visão geral',bancos:'Bancos e Contas',receitas:'Receitas',dre:'DRE — Resultado',vendas:'Vendas do Dia',pagar:'Despesas',receber:'Contas a receber',fluxo:'Fluxo de caixa',orcamento:'Orçamento vs Realizado',planejamento:'Metas e Objetivos',alertas:'Alertas',exportar:'Relatórios e Exportação'};
   var dataAtual=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
   var tag=el('span',{class:'tag',style:{background:pf.color+'22',color:pf.color}},pf.label);
   var searchBtn=el('button',{class:'btn-ghost',style:{padding:'6px 12px',fontSize:'13px'},onclick:function(){setState({buscaModal:true,buscaBusca:''});}}, '🔍 Buscar');
@@ -1122,7 +1164,7 @@ function render(){
   var root=document.getElementById('app');
   root.innerHTML='';
 
-  var pages={dashboard:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,pagar:renderPagar,receber:renderReceber,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar};
+  var pages={dashboard:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar};
   var pageContent=(pages[state.page]||renderDashboard)();
   var content=div('content',[pageContent]);
   var main=div('main',[renderTopbar(),content]);
@@ -1166,6 +1208,7 @@ function render(){
 <script src="js/modal-perfil.js"></script>
 <script src="js/page-dre.js"></script>
 <script src="js/page-orcamento.js"></script>
+<script src="js/page-vendas.js"></script>
 <script>
 // ── TEMA ──────────────────────────────────────────────────────────────────────
 (function(){if(lsGet('theme','dark')==='light')document.body.classList.add('theme-light');})();

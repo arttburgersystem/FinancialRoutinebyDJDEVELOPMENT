@@ -162,7 +162,7 @@ function renderVendas(){
     showToast('Taxas salvas! Reabra o lançamento para recalcular.');
   }
 
-  var taxPanel=div('card',{marginBottom:'14px'},[
+  var taxPanel=div('card',[
     div('card-title','⚙ Configurar taxas por canal'),
     el('p',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'14px',lineHeight:'1.6'}},'As taxas são usadas para calcular o valor líquido que entra no seu caixa. Altere conforme os contratos vigentes.'),
     el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'20px'}},[

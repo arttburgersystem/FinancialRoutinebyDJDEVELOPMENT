@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Financial Routine — DJ DEVELOPMENT</title>
+<style>
+:root{--bg:#0d0d0d;--bg2:#161616;--bg3:#1e1e1e;--bg4:#252525;--border:#2e2e2e;--border2:#3a3a3a;--text:#f0ede8;--text2:#a09d98;--text3:#6b6866;--gold:#c9a84c;--gold2:#e8c96a;--gold-dim:rgba(201,168,76,0.12);--red:#e05252;--red-dim:rgba(224,82,82,0.12);--green:#4caf82;--green-dim:rgba(76,175,130,0.12);--blue:#5b9bd5;--blue-dim:rgba(91,155,213,0.12);--purple:#9b7fe8;--radius:10px;--radius-sm:6px}
+body.theme-light{--bg:#f5f4f1;--bg2:#ffffff;--bg3:#eeecea;--bg4:#e5e3df;--border:#dddbd7;--border2:#ccc9c4;--text:#1a1916;--text2:#5a5754;--text3:#9a9794;--gold:#a07830;--gold2:#c9a84c;--gold-dim:rgba(160,120,48,0.10);--red:#c0392b;--red-dim:rgba(192,57,43,0.10);--green:#27805a;--green-dim:rgba(39,128,90,0.10);--blue:#2860a8;--blue-dim:rgba(40,96,168,0.10);--purple:#6c4ec2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5;min-height:100vh}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+button{cursor:pointer;border:none;outline:none;font-family:inherit}
+input,select,textarea{font-family:inherit;outline:none}
+
+/* SYNC BADGE */
+.sync-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg3)}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.sync-dot.syncing{background:var(--gold);animation:pulse .8s infinite}
+.sync-dot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* LAYOUT */
+.app{display:flex;min-height:100vh}
+.sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto}
+.sidebar-logo{padding:20px 18px 16px;border-bottom:1px solid var(--border)}
+.logo-name{font-size:18px;font-weight:800;color:var(--gold);letter-spacing:-0.5px}
+.logo-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.profile-switcher{padding:12px 12px 8px;border-bottom:1px solid var(--border)}
+.profile-btn{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);background:var(--bg3);border:1px solid var(--border);color:var(--text);font-size:13px;font-weight:500;transition:all .15s}
+.profile-btn:hover{border-color:var(--gold)}
+.profile-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.profile-dropdown{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);margin-top:4px;overflow:hidden}
+.profile-option{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;font-size:12px;color:var(--text2);transition:background .1s}
+.profile-option:hover{background:var(--bg4);color:var(--text)}
+.profile-option.active{color:var(--gold)}
+.nav{flex:1;padding:10px 0}
+.nav-section{padding:6px 14px 4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 14px;color:var(--text2);cursor:pointer;transition:all .15s;font-size:13px;border-left:2px solid transparent}
+.nav-item:hover{color:var(--text);background:var(--bg3)}
+.nav-item.active{color:var(--gold);background:var(--gold-dim);border-left-color:var(--gold)}
+.sidebar-footer{padding:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+
+/* MAIN */
+.main{margin-left:220px;flex:1;min-height:100vh;display:flex;flex-direction:column}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-title{font-size:16px;font-weight:600}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.topbar-date{font-size:12px;color:var(--text3)}
+.btn-primary{background:var(--gold);color:#0d0d0d;border-radius:var(--radius-sm);padding:7px 14px;font-size:13px;font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary:hover{background:var(--gold2)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:var(--radius-sm);padding:7px 12px;font-size:13px;transition:all .15s}
+.btn-ghost:hover{border-color:var(--border2);color:var(--text)}
+.content{padding:24px;flex:1}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:12px}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+.kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi-card.green::before{background:var(--green)}
+.kpi-card.red::before{background:var(--red)}
+.kpi-card.gold::before{background:var(--gold)}
+.kpi-card.blue::before{background:var(--blue)}
+.kpi-label{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.kpi-value{font-size:20px;font-weight:700;line-height:1.2}
+.kpi-value.green{color:var(--green)}.kpi-value.red{color:var(--red)}.kpi-value.gold{color:var(--gold)}
+.kpi-sub{font-size:11px;color:var(--text3);margin-top:4px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+
+/* TABLE */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead th{text-align:left;padding:8px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);border-bottom:1px solid var(--border)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:hover{background:var(--bg3)}
+tbody tr:last-child{border-bottom:none}
+td{padding:10px 12px;font-size:13px;color:var(--text2);vertical-align:middle}
+td.text-main{color:var(--text);font-weight:500}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.badge.pago,.badge.recebido{background:var(--green-dim);color:var(--green)}
+.badge.pendente{background:var(--gold-dim);color:var(--gold)}
+.badge.vencido,.badge.urgente{background:var(--red-dim);color:var(--red)}
+.badge.previsto{background:var(--blue-dim);color:var(--blue)}
+.badge-cat{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);width:100%;max-width:480px;padding:24px;max-height:90vh;overflow-y:auto}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
+.modal-close{background:none;color:var(--text3);font-size:22px;line-height:1;padding:0 4px}
+.modal-close:hover{color:var(--text)}
+.form-group{margin-bottom:14px}
+.form-label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:6px}
+.form-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;color:var(--text);font-size:13px;transition:border-color .15s}
+.form-input:focus{border-color:var(--gold)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+
+/* ALERT */
+.alert{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:var(--radius-sm);margin-bottom:8px;font-size:13px}
+.alert.danger{background:var(--red-dim);border:1px solid rgba(224,82,82,.25)}
+.alert.warning{background:var(--gold-dim);border:1px solid rgba(201,168,76,.25)}
+.alert-title{font-weight:600;margin-bottom:2px}
+.alert-sub{font-size:12px;color:var(--text2)}
+
+/* MISC */
+.action-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap}
+.search-wrap{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 12px;display:flex;align-items:center;gap:8px;width:220px}
+.search-wrap input{background:none;border:none;color:var(--text);font-size:13px;width:100%}
+.search-wrap input::placeholder{color:var(--text3)}
+.filter-row{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.chip.active{border-color:var(--gold);color:var(--gold);background:var(--gold-dim)}
+.chip:hover:not(.active){border-color:var(--border2);color:var(--text2)}
+.progress-bar{height:5px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden}
+.progress-fill{height:100%;border-radius:2px;transition:width .4s}
+.empty{text-align:center;padding:36px 20px;color:var(--text3)}
+.empty-icon{font-size:28px;margin-bottom:8px}
+.empty-title{font-size:14px;font-weight:600;color:var(--text2);margin-bottom:4px}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;font-size:13px;z-index:999;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.toast.success{border-color:var(--green)}.toast.error{border-color:var(--red)}.toast.info{border-color:var(--blue)}
+.page-header{margin-bottom:20px}
+.page-header h1{font-size:20px;font-weight:700}
+.page-header p{font-size:13px;color:var(--text3);margin-top:3px}
+.btn-icon{background:none;border:none;color:var(--text3);padding:4px 6px;border-radius:4px;cursor:pointer;transition:all .15s;font-size:13px}
+.btn-icon:hover{color:var(--red);background:var(--red-dim)}
+.btn-icon.edit:hover{color:var(--gold);background:var(--gold-dim)}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+pre{font-size:11px;color:var(--text2);background:var(--bg3);padding:12px;border-radius:6px;overflow:auto;max-height:260px;line-height:1.6;white-space:pre-wrap;word-break:break-all}
+.export-card{background:linear-gradient(135deg,rgba(201,168,76,.08),rgba(201,168,76,.02));border:1px solid var(--gold);border-radius:var(--radius);padding:18px;margin-bottom:14px}
+.export-card h3{font-size:14px;font-weight:700;color:var(--gold);margin-bottom:8px}
+.export-card p{font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:14px}
+
+/* ── PIN SCREEN ─────────────────────────────────────────────────────────────── */
+#pin-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column}
+.pin-box{display:flex;flex-direction:column;align-items:center;width:320px}
+.pin-logo{font-size:26px;font-weight:900;color:var(--gold);letter-spacing:-1px;margin-bottom:2px}
+.pin-dev{font-size:10px;font-weight:700;letter-spacing:3px;color:var(--text3);text-transform:uppercase;margin-bottom:32px}
+.pin-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;text-align:center}
+.pin-subtitle{font-size:12px;color:var(--text3);margin-bottom:24px;text-align:center;min-height:18px}
+.pin-dots{display:flex;gap:12px;margin-bottom:32px}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border2);background:transparent;transition:all .15s}
+.pin-dot.filled{background:var(--gold);border-color:var(--gold)}
+.pin-dot.error{background:var(--red);border-color:var(--red)}
+.pin-keypad{display:grid;grid-template-columns:repeat(3,72px);gap:10px;margin-bottom:20px}
+.pin-key{height:56px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-size:20px;font-weight:600;font-family:inherit;transition:all .1s;display:flex;align-items:center;justify-content:center}
+.pin-key:hover{background:var(--bg4);border-color:var(--border2)}
+.pin-key:active{background:var(--gold-dim);border-color:var(--gold);transform:scale(.95)}
+.pin-key.del{font-size:16px;color:var(--text2)}
+.pin-key.confirm{background:var(--gold);color:#000;font-weight:800;border-color:var(--gold)}
+.pin-key.confirm:hover{background:var(--gold2)}
+.pin-key.confirm:disabled,.pin-key.confirm[data-disabled]{background:var(--bg3);color:var(--text3);border-color:var(--border);cursor:not-allowed;transform:none}
+.pin-msg{font-size:12px;font-weight:600;min-height:18px;text-align:center}
+.pin-msg.error{color:var(--red)}
+.pin-msg.success{color:var(--green)}
+</style>
+</head>
+<body>
+<div id="pin-overlay"></div>
+<div id="app" style="display:none"></div>
+
+<script>
+// ── CONFIG FIREBASE ───────────────────────────────────────────────────────────
+var FB_URL = 'https://djfinance-b3fd2-default-rtdb.firebaseio.com';
+
+// ── ESTADO ───────────────────────────────────────────────────────────────────
+var PROFILES_DEFAULT=[{id:'pessoal',label:'Pessoal',color:'#9b7fe8',icon:'👤'},{id:'artt',label:'Artt Burger',color:'#c9a84c',icon:'🍔'}];
+var PROFILES=lsGet('profiles',PROFILES_DEFAULT);
+var CATS_DEFAULT = {
+  artt_pagar:    ['Fornecedor','Aluguel','Funcionários','Energia','Internet','Marketing','Impostos','Manutenção','Outros'],
+  artt_receber:  ['Vendas PDV','Delivery','iFood','Franchise Fee','Outros'],
+  artt_receitas: ['Vendas PDV','Delivery','iFood','Rappi','99Food','Cartão de Crédito','Cartão de Débito','Pix','Dinheiro','Franquia','Eventos','Outros'],
+  pes_pagar:     ['Moradia','Alimentação','Saúde','Educação','Transporte','Lazer','Cartão','Outros'],
+  pes_receber:   ['Salário','Pró-labore','Investimento','Outros'],
+  pes_receitas:  ['Salário','Pró-labore','Freelance','Investimento','Aluguel recebido','Comissão','Outros'],
+};
+function getCats(key){ return lsGet('cats_'+key, CATS_DEFAULT[key]); }
+function saveCats(key, arr){ lsSet('cats_'+key, arr); }
+function getCatKey(profile, tipo){
+  if(profile==='artt'&&tipo==='pagar') return 'artt_pagar';
+  if(profile==='artt'&&tipo==='receber') return 'artt_receber';
+  if(profile==='artt'&&tipo==='receitas') return 'artt_receitas';
+  if(profile==='pessoal'&&tipo==='pagar') return 'pes_pagar';
+  if(profile==='pessoal'&&tipo==='receitas') return 'pes_receitas';
+  if(profile==='pessoal'&&tipo==='receber') return 'pes_receber';
+  return profile+'_'+tipo;
+}
+var MESES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+var BANCOS_ARTT_DEFAULT=[
+  {id:'banco_stone',     nome:'Stone',        saldo:0, cor:'#00a86b', profile:'artt'},
+  {id:'banco_mp',        nome:'Mercado Pago', saldo:0, cor:'#00b1ea', profile:'artt'},
+  {id:'banco_cofre',     nome:'Cofre',        saldo:0, cor:'#c9a84c', profile:'artt'},
+  {id:'banco_caixa',     nome:'Caixa',        saldo:0, cor:'#f5a623', profile:'artt'},
+  {id:'banco_sicredi',   nome:'Sicredi',      saldo:0, cor:'#2d8a4e', profile:'artt'},
+];
+
+function initBancos(){
+  var saved=lsGet('bancos',null);
+  if(saved&&saved.length>0)return saved;
+  lsSet('bancos',BANCOS_ARTT_DEFAULT);
+  return BANCOS_ARTT_DEFAULT;
+}
+
+var state={
+  syncStatus: 'idle',
+  profile: lsGet('pf','pessoal'),
+  page: 'dashboard',
+  contas: [],
+  metas: [],
+  bancos: initBancos(),
+  transferencias: lsGet('transferencias',[]),
+  receitas: lsGet('receitas',[]),
+  orcamentos: lsGet('orcamentos',[]),
+  cmv: lsGet('cmv',{artt:30,pessoal:0}),
+  catManager: null,
+  showProfiles: false,
+  modal: null,
+  metaModal: null,
+  bancoModal: null,
+  transfModal: null,
+  receitaModal: null,
+  orcamentoModal: null,
+  perfilModal: null,
+  buscaModal: false,
+  buscaBusca: '',
+  receitasMes: null,
+  receitasCat: '',
+  dreFiltro: {mes:new Date().getMonth(),ano:new Date().getFullYear()},
+  orcamentoMes: null,
+  toast: null,
+  filtro: {pagar:'todos',receber:'todos'},
+  busca: {pagar:'',receber:''},
+  mesSel: new Date().getMonth(),
+};
+
+function lsGet(k,d){try{var v=localStorage.getItem('djf_'+k);return v?JSON.parse(v):d;}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem('djf_'+k,JSON.stringify(v));}catch(e){}}
+
+function setState(patch){Object.assign(state,patch);render();}
+function showToast(msg,type,dur){
+  type=type||'success';dur=dur||2800;
+  setState({toast:{msg:msg,type:type}});
+  setTimeout(function(){setState({toast:null});},dur);
+}
+
+// ── UTILS ────────────────────────────────────────────────────────────────────
+function today(){return new Date().toISOString().split('T')[0];}
+function fmtDate(d){if(!d)return'—';var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+function fmtMoney(v){return'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function diasRestantes(venc){if(!venc)return null;return Math.ceil((new Date(venc)-new Date(today()))/86400000);}
+function statusBadge(item){
+  var d=diasRestantes(item.vencimento);
+  if(item.status==='pago'||item.status==='recebido')return item.status;
+  if(d!==null&&d<0)return'vencido';
+  if(d!==null&&d<=3)return'urgente';
+  return item.status||'pendente';
+}
+function objToArr(obj){if(!obj)return[];return Object.keys(obj).map(function(k){return obj[k];});}
+function arrToObj(arr){var o={};arr.forEach(function(item){o[item.id]=item;});return o;}
+
+// ── FIREBASE REST API ─────────────────────────────────────────────────────────
+function fbGet(path){
+  return fetch(FB_URL+path+'.json')
+    .then(function(r){if(!r.ok)throw new Error('Firebase read error '+r.status);return r.json();});
+}
+function fbPut(path,data){
+  return fetch(FB_URL+path+'.json',{
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(data),
+  }).then(function(r){if(!r.ok)throw new Error('Firebase write error '+r.status);return r.json();});
+}
+
+function loadFromFirebase(){
+  setState({syncStatus:'syncing'});
+  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias')])
+    .then(function(results){
+      var contas=objToArr(results[0]);
+      var metas=objToArr(results[1]);
+      var receitas=objToArr(results[2]);
+      var bancosRaw=results[3];
+      var bancos=(bancosRaw&&Object.keys(bancosRaw).length>0)?objToArr(bancosRaw):state.bancos;
+      var transferencias=objToArr(results[4]);
+      lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);
+      setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,syncStatus:'ok'});
+    })
+    .catch(function(e){
+      console.error(e);
+      setState({syncStatus:'error'});
+      showToast('Erro ao conectar ao Firebase. Usando dados locais.','error');
+      setState({contas:lsGet('contas',[]),metas:lsGet('metas',[]),receitas:lsGet('receitas',[])});
+    });
+}
+
+var syncTimer=null;
+function scheduleSave(){
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(function(){
+    setState({syncStatus:'syncing'});
+    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);
+    Promise.all([
+      fbPut('/contas',arrToObj(state.contas)),
+      fbPut('/metas',arrToObj(state.metas)),
+      fbPut('/receitas',arrToObj(state.receitas)),
+      fbPut('/bancos',arrToObj(state.bancos)),
+      fbPut('/transferencias',arrToObj(state.transferencias)),
+    ]).then(function(){setState({syncStatus:'ok'});})
+      .catch(function(e){console.error(e);setState({syncStatus:'error'});showToast('Erro ao salvar no Firebase','error');});
+  },1500);
+}
+
+// ── AÇÕES ────────────────────────────────────────────────────────────────────
+function addConta(item){var c=state.contas.concat([item]);setState({contas:c,modal:null});scheduleSave();showToast('Lançamento adicionado!');}
+function deleteConta(id){var c=state.contas.filter(function(x){return x.id!==id;});setState({contas:c});scheduleSave();showToast('Removido','error');}
+function updateConta(item){var c=state.contas.map(function(x){return x.id===item.id?item:x;});setState({contas:c,modal:null});scheduleSave();showToast('Atualizado!');}
+function addMeta(m){var ms=state.metas.concat([m]);setState({metas:ms,metaModal:null});scheduleSave();showToast('Meta criada!');}
+function deleteMeta(id){var ms=state.metas.filter(function(x){return x.id!==id;});setState({metas:ms});scheduleSave();showToast('Meta removida','error');}
+function updateMeta(m){var ms=state.metas.map(function(x){return x.id===m.id?m:x;});setState({metas:ms,metaModal:null});scheduleSave();showToast('Meta atualizada!');}
+function addReceita(r){var rs=state.receitas.concat([r]);lsSet('receitas',rs);setState({receitas:rs,receitaModal:null});scheduleSave();showToast('Receita registrada!');}
+function deleteReceita(id){
+  var old=state.receitas.find(function(x){return x.id===id;});
+  var rs=state.receitas.filter(function(x){return x.id!==id;});
+  var bPatch=state.bancos;
+  if(old&&old.banco){
+    bPatch=state.bancos.map(function(b){return b.id===old.banco?Object.assign({},b,{saldo:b.saldo-(old.valor||0)}):b;});
+    lsSet('bancos',bPatch);
+  }
+  lsSet('receitas',rs);
+  setState({receitas:rs,bancos:bPatch});
+  scheduleSave();
+  showToast('Receita removida','error');
+}
+function updateReceita(r){var rs=state.receitas.map(function(x){return x.id===r.id?r:x;});lsSet('receitas',rs);setState({receitas:rs,receitaModal:null});scheduleSave();showToast('Receita atualizada!');}
+function addOrcamento(o){var os=(state.orcamentos||[]).concat([o]);lsSet('orcamentos',os);setState({orcamentos:os,orcamentoModal:null});showToast('Orçamento definido!');}
+
+function addProfile(p){
+  PROFILES=PROFILES.concat([p]);
+  lsSet('profiles',PROFILES);
+  lsSet('pf',p.id);
+  setState({profile:p.id,perfilModal:null,showProfiles:true,page:'dashboard'});
+  showToast('Perfil "'+p.label+'" criado!');
+}
+function updateProfile(p){
+  PROFILES=PROFILES.map(function(x){return x.id===p.id?p:x;});
+  lsSet('profiles',PROFILES);
+  setState({perfilModal:null});
+  showToast('Perfil atualizado!');
+}
+function deleteProfile(id){
+  if(PROFILES.length<=1){showToast('Não é possível excluir o único perfil','error');return;}
+  PROFILES=PROFILES.filter(function(p){return p.id!==id;});
+  lsSet('profiles',PROFILES);
+  var contas=state.contas.filter(function(c){return c.profile!==id;});
+  var receitas=state.receitas.filter(function(r){return r.profile!==id;});
+  var bancos=state.bancos.filter(function(b){return b.profile!==id;});
+  var metas=state.metas.filter(function(m){return m.profile!==id;});
+  var orcamentos=(state.orcamentos||[]).filter(function(o){return o.profile!==id;});
+  lsSet('contas',contas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('metas',metas);lsSet('orcamentos',orcamentos);
+  var nextId=PROFILES[0].id;lsSet('pf',nextId);
+  setState({contas:contas,receitas:receitas,bancos:bancos,metas:metas,orcamentos:orcamentos,profile:nextId,perfilModal:null,showProfiles:false,page:'dashboard'});
+  scheduleSave();
+  showToast('Perfil excluído','error');
+}
+function deleteOrcamento(id){var os=(state.orcamentos||[]).filter(function(x){return x.id!==id;});lsSet('orcamentos',os);setState({orcamentos:os});showToast('Orçamento removido','error');}
+function updateOrcamento(o){var os=(state.orcamentos||[]).map(function(x){return x.id===o.id?o:x;});lsSet('orcamentos',os);setState({orcamentos:os,orcamentoModal:null});showToast('Orçamento atualizado!');}
+
+// ── RECORRÊNCIA ───────────────────────────────────────────────────────────────
+function addPeriodo(d,tipo,n){
+  var dt=new Date(d+'T12:00:00');n=n||1;
+  if(tipo==='diario')dt.setDate(dt.getDate()+n);
+  else if(tipo==='semanal')dt.setDate(dt.getDate()+7*n);
+  else if(tipo==='anual')dt.setFullYear(dt.getFullYear()+n);
+  else dt.setMonth(dt.getMonth()+n);
+  return dt.toISOString().split('T')[0];
+}
+function runRecorrencia(){
+  var limite=new Date();limite.setMonth(limite.getMonth()+2);
+  var limitStr=limite.toISOString().split('T')[0];
+  var recorrentes=state.contas.filter(function(c){return c.recorrente&&!c.gerado_de;});
+  var novas=[];
+  recorrentes.forEach(function(r){
+    var geradas=state.contas.filter(function(c){return c.gerado_de===r.id;});
+    var datas=[r.vencimento].concat(geradas.map(function(c){return c.vencimento;})).filter(Boolean).sort();
+    var ultima=datas[datas.length-1]||r.vencimento;
+    var ocGeradas=geradas.length;
+    var cursor=addPeriodo(ultima,r.recorrencia_tipo,r.recorrencia_intervalo);
+    var iter=0;
+    while(cursor<=limitStr&&iter++<60){
+      if(r.recorrencia_fim==='data'&&r.recorrencia_fim_data&&cursor>r.recorrencia_fim_data)break;
+      if(r.recorrencia_fim==='ocorrencias'&&ocGeradas>=(r.recorrencia_fim_ocorrencias||12))break;
+      var jaExiste=geradas.find(function(c){return c.vencimento===cursor;})||novas.find(function(c){return c.gerado_de===r.id&&c.vencimento===cursor;});
+      if(!jaExiste){
+        novas.push({id:'rec_'+r.id+'_'+cursor,descricao:r.descricao,valor:r.valor,categoria:r.categoria,vencimento:cursor,status:r.tipo==='pagar'?'pendente':'previsto',tipo:r.tipo,profile:r.profile,recorrente:false,gerado_de:r.id,notas:r.notas||'',prioridade:r.prioridade||'normal'});
+        ocGeradas++;
+      }
+      cursor=addPeriodo(cursor,r.recorrencia_tipo,r.recorrencia_intervalo);
+    }
+  });
+  if(novas.length>0){
+    var c=state.contas.concat(novas);lsSet('contas',c);setState({contas:c});scheduleSave();
+    showToast(novas.length+' recorrência(s) gerada(s)','info',3500);
+  }
+}
+
+// ── CSV EXPORT ────────────────────────────────────────────────────────────────
+function toCSV(headers,rows){
+  return[headers.join(',')].concat(rows.map(function(r){return r.map(function(c){return'"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(',');})).join('\n');
+}
+function downloadCSV(content,filename){
+  var blob=new Blob(['﻿'+content],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download=filename;a.click();
+  setTimeout(function(){URL.revokeObjectURL(url);},1000);
+}
+
+function addBanco(b){var bs=state.bancos.concat([b]);lsSet('bancos',bs);setState({bancos:bs,bancoModal:null});scheduleSave();showToast('Banco adicionado!');}
+function deleteBanco(id){var bs=state.bancos.filter(function(x){return x.id!==id;});lsSet('bancos',bs);setState({bancos:bs});scheduleSave();showToast('Banco removido','error');}
+function updateBanco(b){var bs=state.bancos.map(function(x){return x.id===b.id?b:x;});lsSet('bancos',bs);setState({bancos:bs,bancoModal:null});scheduleSave();showToast('Saldo atualizado!');}
+
+// ── HELPERS DOM ──────────────────────────────────────────────────────────────
+function el(tag,attrs,children){
+  var e=document.createElement(tag);
+  if(attrs){Object.keys(attrs).forEach(function(k){
+    if(k==='class'){e.className=attrs[k];}
+    else if(k==='style'&&typeof attrs[k]==='object'){Object.assign(e.style,attrs[k]);}
+    else if(k.startsWith('on')&&typeof attrs[k]==='function'){e[k]=attrs[k];}
+    else if(k==='checked'){e.checked=!!attrs[k];}
+    else{try{e.setAttribute(k,attrs[k]);}catch(ex){}}
+  });}
+  if(children){
+    if(!Array.isArray(children))children=[children];
+    children.forEach(function(c){
+      if(c==null||c===false||c===undefined)return;
+      if(typeof c==='string'||typeof c==='number'||typeof c==='boolean')e.appendChild(document.createTextNode(String(c)));
+      else e.appendChild(c);
+    });
+  }
+  return e;
+}
+function div(cls,children,extraStyle){
+  var e=document.createElement('div');
+  if(cls)e.className=cls;
+  if(extraStyle)Object.assign(e.style,extraStyle);
+  if(children){
+    if(!Array.isArray(children))children=[children];
+    children.forEach(function(c){
+      if(c==null||c===false||c===undefined)return;
+      if(typeof c==='string'||typeof c==='number'||typeof c==='boolean')e.appendChild(document.createTextNode(String(c)));
+      else e.appendChild(c);
+    });
+  }
+  return e;
+}
+function btn(cls,text,onclick){var b=el('button',{class:cls,onclick:onclick});b.innerHTML=text;return b;}
+
+// ── SYNC BADGE ───────────────────────────────────────────────────────────────
+function renderSyncBadge(){
+  var labels={idle:'Firebase',syncing:'Salvando...',ok:'Firebase sincronizado',error:'Erro no sync'};
+  var dotClass='sync-dot'+(state.syncStatus==='syncing'?' syncing':state.syncStatus==='error'?' error':'');
+  return div('sync-badge',[
+    el('div',{class:dotClass}),
+    el('span',{},labels[state.syncStatus]||''),
+  ]);
+}
+
+// ── SIDEBAR ──────────────────────────────────────────────────────────────────
+function renderSidebar(){
+  var pf=PROFILES.find(function(p){return p.id===state.profile;});
+  var nav=[
+    {id:'dashboard',label:'Visão geral',icon:'📊',section:'principal'},
+    {id:'bancos',label:'Bancos',icon:'🏦',section:'financeiro'},
+    {id:'dre',label:'DRE',icon:'📋',section:'financeiro'},
+    {id:'receitas',label:'Receitas',icon:'💵',section:'financeiro'},
+    {id:'pagar',label:'Despesas',icon:'💸',section:'financeiro'},
+    {id:'receber',label:'Contas a receber',icon:'💰',section:'financeiro'},
+    {id:'fluxo',label:'Fluxo de caixa',icon:'📈',section:'financeiro'},
+    {id:'orcamento',label:'Orçamento',icon:'💰',section:'planejamento'},
+    {id:'planejamento',label:'Metas',icon:'🎯',section:'planejamento'},
+    {id:'alertas',label:'Alertas',icon:'🔔',section:'planejamento'},
+    {id:'exportar',label:'Relatórios',icon:'📊',section:'integração'},
+  ];
+  var pagar=state.contas.filter(function(c){return c.profile===state.profile&&c.tipo==='pagar'&&c.status!=='pago';});
+  var alertCount=pagar.filter(function(c){var d=diasRestantes(c.vencimento);return d!==null&&d<=7;}).length;
+
+  var logo=div('sidebar-logo',[div('logo-name','Financial Routine'),div('logo-sub','DJ DEVELOPMENT')]);
+
+  var profBtn=el('button',{class:'profile-btn',onclick:function(){setState({showProfiles:!state.showProfiles});}},
+    [el('div',{class:'profile-dot',style:{background:pf.color}}),
+     el('span',{style:{flex:'1',textAlign:'left'}},pf.label),
+     el('span',{style:{color:'var(--text3)',fontSize:'10px'}},state.showProfiles?'▲':'▼')]
+  );
+  var dropdown=null;
+  if(state.showProfiles){
+    var profileRows=PROFILES.map(function(p){
+      var isActive=state.profile===p.id;
+      var rowMain=el('div',{style:{display:'flex',alignItems:'center',gap:'8px',flex:'1',cursor:'pointer',minWidth:'0'},
+        onclick:function(){lsSet('pf',p.id);setState({profile:p.id,showProfiles:false,page:'dashboard'});}
+      },[
+        el('div',{class:'profile-dot',style:{background:p.color,flexShrink:'0'}}),
+        el('span',{style:{flex:'1',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},p.label),
+        isActive?el('span',{style:{color:'var(--green)',fontWeight:'700',fontSize:'12px'}},'✓'):null,
+      ].filter(Boolean));
+      var editBtn=el('button',{class:'btn-icon edit',title:'Editar perfil',style:{flexShrink:'0'},onclick:function(e){e.stopPropagation();setState({perfilModal:{editItem:Object.assign({},p)},showProfiles:false});}}, '✏️');
+      var delBtn=(!isActive&&PROFILES.length>1)?el('button',{class:'btn-icon',title:'Excluir perfil',style:{flexShrink:'0'},onclick:function(e){
+        e.stopPropagation();
+        if(window.confirm('Excluir o perfil "'+p.label+'"?\n\nTodos os dados deste perfil (contas, receitas, bancos, metas) serão removidos permanentemente.')){deleteProfile(p.id);}
+      }}, '🗑️'):null;
+      return el('div',{class:'profile-option'+(isActive?' active':''),style:{display:'flex',alignItems:'center',gap:'4px',paddingRight:'6px'}},[rowMain,editBtn,delBtn].filter(Boolean));
+    });
+    var addBtn=el('div',{style:{borderTop:'1px solid var(--border)',padding:'6px 8px 2px'}},[
+      el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center'},
+        onclick:function(){setState({perfilModal:{editItem:{}},showProfiles:false});}}, '＋ Novo perfil'),
+    ]);
+    dropdown=div('profile-dropdown',[...profileRows,addBtn]);
+  }
+
+  var sections=['principal','financeiro','planejamento','integração'];
+  var navEl=div('nav',sections.map(function(sec){
+    var items=nav.filter(function(n){return n.section===sec;});
+    return div('',[
+      div('nav-section',sec),
+      ...items.map(function(n){
+        var ni=el('div',{class:'nav-item'+(state.page===n.id?' active':''),onclick:function(){setState({page:n.id});}},
+          [el('span',{},n.icon+' '),el('span',{style:{flex:'1'}},n.label)]
+        );
+        if(n.id==='alertas'&&alertCount>0)ni.appendChild(el('span',{style:{background:'var(--red)',color:'#fff',fontSize:'10px',fontWeight:'700',padding:'1px 5px',borderRadius:'8px'}},String(alertCount)));
+        return ni;
+      }),
+    ]);
+  }));
+
+  var isLight=document.body.classList.contains('theme-light');
+  var themeBtn=el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',color:'var(--text3)'},
+    onclick:function(){
+      var light=document.body.classList.toggle('theme-light');
+      lsSet('theme',light?'light':'dark');
+      render();
+    }
+  },(isLight?'🌙 Tema escuro':'☀️ Tema claro'));
+  var lockBtn=el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',color:'var(--text3)'},
+    onclick:function(){lockApp();}
+  },'🔒 Bloquear sistema');
+  var footer=div('sidebar-footer',[themeBtn,lockBtn,renderSyncBadge()]);
+  return div('sidebar',[logo,div('profile-switcher',[profBtn,dropdown].filter(Boolean)),navEl,footer]);
+}
+
+// ── TOPBAR ────────────────────────────────────────────────────────────────────
+function renderTopbar(){
+  var pf=PROFILES.find(function(p){return p.id===state.profile;});
+  var titles={dashboard:'Visão geral',bancos:'Bancos e Contas',receitas:'Receitas',dre:'DRE — Resultado',pagar:'Despesas',receber:'Contas a receber',fluxo:'Fluxo de caixa',orcamento:'Orçamento vs Realizado',planejamento:'Metas e Objetivos',alertas:'Alertas',exportar:'Relatórios e Exportação'};
+  var dataAtual=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+  var tag=el('span',{class:'tag',style:{background:pf.color+'22',color:pf.color}},pf.label);
+  var searchBtn=el('button',{class:'btn-ghost',style:{padding:'6px 12px',fontSize:'13px'},onclick:function(){setState({buscaModal:true,buscaBusca:''});}}, '🔍 Buscar');
+  return div('topbar',[
+    el('div',{class:'topbar-title'},titles[state.page]||''),
+    div('topbar-right',[el('span',{class:'topbar-date'},dataAtual),searchBtn,tag]),
+  ]);
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function renderDashboard(){
+  var pf=state.profile;
+  var pfC=state.contas.filter(function(c){return c.profile===pf;});
+  var pagar=pfC.filter(function(c){return c.tipo==='pagar';});
+  var receber=pfC.filter(function(c){return c.tipo==='receber';});
+  var totalP=pagar.filter(function(c){return c.status!=='pago';}).reduce(function(a,b){return a+b.valor;},0);
+  var totalR=receber.filter(function(c){return c.status!=='recebido';}).reduce(function(a,b){return a+b.valor;},0);
+  var saldo=totalR-totalP;
+  var vencendo=pagar.filter(function(c){var d=diasRestantes(c.vencimento);return d!==null&&d>=0&&d<=7&&c.status!=='pago';});
+
+  var now=new Date();
+  var mesMesStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  var recMes=state.receitas.filter(function(r){return r.profile===pf&&r.data&&r.data.startsWith(mesMesStr);});
+  var totalRecMes=recMes.reduce(function(a,r){return a+r.valor;},0);
+
+  function kpi(cls,label,value,valueCls,sub){
+    return el('div',{class:'kpi-card '+cls},[el('div',{class:'kpi-label'},label),el('div',{class:'kpi-value '+(valueCls||'')},value),el('div',{class:'kpi-sub'},sub)]);
+  }
+  var kpis=el('div',{class:'kpi-grid',style:{gridTemplateColumns:'repeat(auto-fill,minmax(155px,1fr))'}},[
+    kpi('green','A receber',fmtMoney(totalR),'green',receber.filter(function(c){return c.status!=='recebido';}).length+' lançamentos'),
+    kpi('red','A pagar',fmtMoney(totalP),'red',pagar.filter(function(c){return c.status!=='pago';}).length+' lançamentos'),
+    kpi('gold','Saldo projetado',fmtMoney(saldo),saldo>=0?'green':'red','Receber − Pagar'),
+    kpi('blue','Vencendo 7 dias',String(vencendo.length),vencendo.length>0?'red':'green',vencendo.length>0?fmtMoney(vencendo.reduce(function(a,b){return a+b.valor;},0)):'Tudo em dia'),
+    kpi('green','Receitas ('+MESES[now.getMonth()]+')',fmtMoney(totalRecMes),'green',recMes.length+' lançamentos'),
+  ]);
+
+  var catData={};
+  pagar.forEach(function(c){catData[c.categoria]=(catData[c.categoria]||0)+c.valor;});
+  var catArr=Object.entries(catData).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+  var catCard=div('card',[
+    div('card-title','Gastos por categoria'),
+    catArr.length===0?div('empty',[div('empty-title','Sem dados ainda')]):div('',catArr.map(function(entry){
+      var cat=entry[0],val=entry[1],pct=totalP>0?Math.round((val/totalP)*100):0;
+      var catItem=div('',[
+        el('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'3px'}},[
+          el('span',{style:{fontSize:'12px',color:'var(--text2)'}},cat),
+          el('span',{style:{fontSize:'12px',color:'var(--text)',fontWeight:'600'}},fmtMoney(val)+' ('+pct+'%)'),
+        ]),
+        div('progress-bar',[el('div',{class:'progress-fill',style:{width:pct+'%',background:'var(--gold)'}})])
+      ]);
+      catItem.style.marginBottom='10px';
+      return catItem;
+    })),
+  ]);
+
+  var alertsCard=null;
+  if(vencendo.length>0){
+    alertsCard=div('card',[
+      div('card-title','⚠️ Vencendo em breve'),
+      ...vencendo.map(function(c){
+        var d=diasRestantes(c.vencimento);
+        return el('div',{class:'alert '+(d<=0?'danger':'warning')},[
+          el('span',{},d<=0?'🔴':'🟡'),
+          el('div',{class:'alert-text'},[el('div',{class:'alert-title'},c.descricao),el('div',{class:'alert-sub'},fmtMoney(c.valor)+' · '+(d===0?'Vence hoje':d<0?'Venceu há '+Math.abs(d)+'d':'Vence em '+d+'d')+' · '+fmtDate(c.vencimento))]),
+        ]);
+      }),
+    ]);
+  }
+
+  var pfMetas=state.metas.filter(function(m){return m.profile===pf;});
+  var metasCard=div('card',[
+    div('card-title','Metas'),
+    pfMetas.length===0?div('empty',[div('empty-title','Sem metas'),el('p',{style:{fontSize:'12px',color:'var(--text3)'}},'Vá em Planejamento para adicionar')]):
+    div('',pfMetas.map(function(m){
+      var pct=Math.min(100,Math.round((m.atual/m.meta)*100));
+      var cor=pct>=100?'var(--green)':pct>=60?'var(--gold)':'var(--blue)';
+      var metaItem=div('',[
+        el('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'4px'}},[
+          el('span',{style:{fontSize:'13px',fontWeight:'500',color:'var(--text)'}},m.descricao),
+          el('span',{style:{fontSize:'12px',color:'var(--text3)'}},pct+'%'),
+        ]),
+        div('progress-bar',[el('div',{class:'progress-fill',style:{width:pct+'%',background:cor}})])
+      ]);
+      metaItem.style.marginBottom='14px';
+      return metaItem;
+    })),
+  ]);
+
+  return div('',[kpis,catCard,alertsCard,metasCard].filter(Boolean));
+}
+
+// ── CONTAS A PAGAR ────────────────────────────────────────────────────────────
+function renderPagar(){
+  var items=state.contas.filter(function(c){return c.tipo==='pagar'&&c.profile===state.profile;});
+  var busca=state.busca.pagar||'';
+  var filtro=state.filtro.pagar||'todos';
+  var filtrados=items.filter(function(c){
+    var mb=c.descricao.toLowerCase().includes(busca.toLowerCase())||c.categoria.toLowerCase().includes(busca.toLowerCase());
+    if(filtro==='pendente')return mb&&c.status==='pendente';
+    if(filtro==='pago')return mb&&c.status==='pago';
+    if(filtro==='vencido')return mb&&(c.status==='vencido'||diasRestantes(c.vencimento)<0);
+    return mb;
+  }).sort(function(a,b){return new Date(a.vencimento)-new Date(b.vencimento);});
+
+  var sb=div('search-wrap',[el('span',{},'🔍'),el('input',{placeholder:'Buscar...',value:busca,oninput:function(e){var b=Object.assign({},state.busca);b.pagar=e.target.value;setState({busca:b});}})]);
+  var chips=['todos','pendente','pago','vencido'].map(function(f){return el('button',{class:'chip'+(filtro===f?' active':''),onclick:function(){var fi=Object.assign({},state.filtro);fi.pagar=f;setState({filtro:fi});}},f.charAt(0).toUpperCase()+f.slice(1));});
+
+  var rows=filtrados.length===0
+    ?[el('tr',{},[el('td',{colspan:'7',style:{textAlign:'center',padding:'30px',color:'var(--text3)'}},'Nenhuma conta encontrada')])]
+    :filtrados.map(function(c){
+      var st=statusBadge(c),d=diasRestantes(c.vencimento);
+      return el('tr',{},[
+        el('td',{class:'text-main'},[c.descricao,c.notas?el('span',{style:{fontSize:'11px',color:'var(--text3)',display:'block'}},c.notas):null].filter(Boolean)),
+        el('td',{},c.categoria),
+        el('td',{style:{fontWeight:'600',color:'var(--red)'}},fmtMoney(c.valor)),
+        el('td',{},[fmtDate(c.vencimento),(d!==null&&c.status!=='pago'&&(d<0||d<=3))?el('span',{style:{fontSize:'11px',display:'block',color:d<0?'var(--red)':d===0?'var(--gold)':'#e8a84c'}},d<0?'Atrasado '+Math.abs(d)+'d':d===0?'Hoje':d+'d'):null].filter(Boolean)),
+        el('td',{},[el('span',{class:'badge '+st},st)]),
+        el('td',{style:{textAlign:'center'}},c.recorrente?'✓':''),
+        el('td',{},[
+          c.status!=='pago'?el('button',{class:'btn-icon edit',title:'Marcar pago',onclick:function(){updateConta(Object.assign({},c,{status:'pago'}));}}, '✓'):null,
+          el('button',{class:'btn-icon edit',onclick:function(){setState({modal:{tipo:'pagar',editItem:c}});}}, '✏️'),
+          el('button',{class:'btn-icon',onclick:function(){deleteConta(c.id);}}, '🗑️'),
+        ].filter(Boolean)),
+      ]);
+    });
+
+  return div('',[
+    div('page-header',[el('h1',{},'Despesas'),el('p',{},'Gerencie seus compromissos e vencimentos')]),
+    div('action-row',[el('div',{style:{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}},[sb,div('filter-row',chips)]),el('button',{class:'btn-primary',onclick:function(){setState({modal:{tipo:'pagar',editItem:null}});}}, '+ Nova conta')]),
+    div('card',[div('table-wrap',[el('table',{},[el('thead',{},[el('tr',{},[el('th',{},'Descrição'),el('th',{},'Categoria'),el('th',{},'Valor'),el('th',{},'Vencimento'),el('th',{},'Status'),el('th',{},'Recorrente'),el('th',{},'')])])  ,el('tbody',{},rows)])])]),
+  ]);
+}
+
+// ── CONTAS A RECEBER ──────────────────────────────────────────────────────────
+function renderReceber(){
+  var items=state.contas.filter(function(c){return c.tipo==='receber'&&c.profile===state.profile;});
+  var busca=state.busca.receber||'';
+  var filtro=state.filtro.receber||'todos';
+  var filtrados=items.filter(function(c){
+    var mb=c.descricao.toLowerCase().includes(busca.toLowerCase())||c.categoria.toLowerCase().includes(busca.toLowerCase());
+    if(filtro==='previsto')return mb&&c.status==='previsto';
+    if(filtro==='recebido')return mb&&c.status==='recebido';
+    return mb;
+  }).sort(function(a,b){return new Date(a.vencimento)-new Date(b.vencimento);});
+
+  var sb=div('search-wrap',[el('span',{},'🔍'),el('input',{placeholder:'Buscar...',value:busca,oninput:function(e){var b=Object.assign({},state.busca);b.receber=e.target.value;setState({busca:b});}})]);
+  var chips=['todos','previsto','recebido'].map(function(f){return el('button',{class:'chip'+(filtro===f?' active':''),onclick:function(){var fi=Object.assign({},state.filtro);fi.receber=f;setState({filtro:fi});}},f.charAt(0).toUpperCase()+f.slice(1));});
+
+  var rows=filtrados.length===0
+    ?[el('tr',{},[el('td',{colspan:'6',style:{textAlign:'center',padding:'30px',color:'var(--text3)'}},'Nenhuma entrada encontrada')])]
+    :filtrados.map(function(c){
+      return el('tr',{},[
+        el('td',{class:'text-main'},c.descricao),el('td',{},c.categoria),el('td',{style:{fontWeight:'600',color:'var(--green)'}},fmtMoney(c.valor)),el('td',{},fmtDate(c.vencimento)),el('td',{},[el('span',{class:'badge '+c.status},c.status)]),
+        el('td',{},[c.status!=='recebido'?el('button',{class:'btn-icon edit',onclick:function(){updateConta(Object.assign({},c,{status:'recebido'}));}}, '✓'):null,el('button',{class:'btn-icon edit',onclick:function(){setState({modal:{tipo:'receber',editItem:c}});}}, '✏️'),el('button',{class:'btn-icon',onclick:function(){deleteConta(c.id);}}, '🗑️')].filter(Boolean)),
+      ]);
+    });
+
+  return div('',[
+    div('page-header',[el('h1',{},'Contas a receber'),el('p',{},'Entradas previstas e realizadas')]),
+    div('action-row',[el('div',{style:{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}},[sb,div('filter-row',chips)]),el('button',{class:'btn-primary',onclick:function(){setState({modal:{tipo:'receber',editItem:null}});}}, '+ Nova entrada')]),
+    div('card',[div('table-wrap',[el('table',{},[el('thead',{},[el('tr',{},[el('th',{},'Descrição'),el('th',{},'Categoria'),el('th',{},'Valor'),el('th',{},'Previsão'),el('th',{},'Status'),el('th',{},'')])])  ,el('tbody',{},rows)])])]),
+  ]);
+}
+
+// ── FLUXO DE CAIXA ────────────────────────────────────────────────────────────
+function renderFluxo(){
+  var pf=state.profile,mes=state.mesSel;
+  var items=state.contas.filter(function(c){return c.profile===pf;});
+  function getMes(d){return d?parseInt(d.slice(5,7))-1:-1;}
+  var recAll=state.receitas.filter(function(r){return r.profile===pf;});
+
+  var ent=items.filter(function(c){return c.tipo==='receber'&&new Date(c.vencimento).getMonth()===mes;});
+  var sai=items.filter(function(c){return c.tipo==='pagar'&&new Date(c.vencimento).getMonth()===mes;});
+  var recDoMes=recAll.filter(function(r){return getMes(r.data)===mes;});
+
+  var totalE=ent.reduce(function(a,b){return a+b.valor;},0)+recDoMes.reduce(function(a,r){return a+r.valor;},0);
+  var totalS=sai.reduce(function(a,b){return a+b.valor;},0);
+  var saldo=totalE-totalS;
+
+  var chips=MESES.map(function(m,i){return el('button',{class:'chip'+(mes===i?' active':''),onclick:function(){setState({mesSel:i});}},m);});
+
+  function kpi(cls,label,value,valueCls,sub){return el('div',{class:'kpi-card '+cls},[el('div',{class:'kpi-label'},label),el('div',{class:'kpi-value '+(valueCls||'')},value),el('div',{class:'kpi-sub'},sub)]);}
+
+  var projecao=MESES.map(function(m,i){
+    var e=items.filter(function(c){return c.tipo==='receber'&&new Date(c.vencimento).getMonth()===i;}).reduce(function(a,b){return a+b.valor;},0);
+    var rec=recAll.filter(function(r){return getMes(r.data)===i;}).reduce(function(a,r){return a+r.valor;},0);
+    var s=items.filter(function(c){return c.tipo==='pagar'&&new Date(c.vencimento).getMonth()===i;}).reduce(function(a,b){return a+b.valor;},0);
+    return{mes:m,ent:e+rec,sai:s,sal:e+rec-s};
+  });
+
+  var tabela=el('table',{style:{width:'100%',borderCollapse:'collapse'}},[
+    el('thead',{},[el('tr',{},[el('th',{style:{textAlign:'left',padding:'6px 8px',fontSize:'11px',color:'var(--text3)',borderBottom:'1px solid var(--border)'}},'Mês'),el('th',{style:{textAlign:'right',padding:'6px 8px',fontSize:'11px',color:'var(--text3)',borderBottom:'1px solid var(--border)'}},'Entradas'),el('th',{style:{textAlign:'right',padding:'6px 8px',fontSize:'11px',color:'var(--text3)',borderBottom:'1px solid var(--border)'}},'Saídas'),el('th',{style:{textAlign:'right',padding:'6px 8px',fontSize:'11px',color:'var(--text3)',borderBottom:'1px solid var(--border)'}},'Saldo')])]),
+    el('tbody',{},projecao.map(function(p){
+      return el('tr',{style:{borderBottom:'1px solid var(--border)',background:p.mes===MESES[mes]?'var(--bg3)':'transparent'}},[
+        el('td',{style:{padding:'7px 8px',fontSize:'12px',fontWeight:p.mes===MESES[mes]?'700':'400',color:'var(--text)'}},p.mes),
+        el('td',{style:{padding:'7px 8px',fontSize:'12px',textAlign:'right',color:'var(--green)'}},p.ent>0?fmtMoney(p.ent):'—'),
+        el('td',{style:{padding:'7px 8px',fontSize:'12px',textAlign:'right',color:'var(--red)'}},p.sai>0?fmtMoney(p.sai):'—'),
+        el('td',{style:{padding:'7px 8px',fontSize:'12px',textAlign:'right',fontWeight:'600',color:p.sal>=0?'var(--green)':'var(--red)'}},p.sal!==0?fmtMoney(p.sal):'—'),
+      ]);
+    })),
+  ]);
+
+  function listaItem(descricao,valor,cor,sub){
+    return el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}},[
+      el('div',{},[el('span',{style:{fontSize:'13px',color:'var(--text2)'}},descricao),sub?el('span',{style:{fontSize:'11px',color:'var(--text3)',display:'block'}},sub):null].filter(Boolean)),
+      el('span',{style:{fontSize:'13px',fontWeight:'600',color:cor}},fmtMoney(valor)),
+    ]);
+  }
+
+  var entItems=ent.map(function(c){return listaItem(c.descricao,c.valor,'var(--green)','Contas a receber');});
+  var recItems=recDoMes.map(function(r){return listaItem(r.descricao,r.valor,'var(--green)','Receita · '+r.categoria);});
+  var allEnt=entItems.concat(recItems);
+  var entCard=div('card',[
+    div('card-title','Entradas — '+MESES[mes]),
+    allEnt.length>0?el('div',{},allEnt):el('p',{style:{fontSize:'12px',color:'var(--text3)',padding:'10px 0'}},'Sem entradas neste mês'),
+  ]);
+
+  var saiItems=sai.map(function(c){return listaItem(c.descricao,c.valor,'var(--red)',c.categoria);});
+  var saiCard=div('card',[
+    div('card-title','Saídas — '+MESES[mes]),
+    saiItems.length>0?el('div',{},saiItems):el('p',{style:{fontSize:'12px',color:'var(--text3)',padding:'10px 0'}},'Sem saídas neste mês'),
+  ]);
+
+  return div('',[
+    div('page-header',[el('h1',{},'Fluxo de caixa'),el('p',{},'Entradas e saídas por período')]),
+    el('div',{style:{display:'flex',gap:'6px',marginBottom:'16px',flexWrap:'wrap'}},chips),
+    el('div',{class:'kpi-grid',style:{gridTemplateColumns:'repeat(3,1fr)'}},[
+      kpi('green','Entradas — '+MESES[mes],fmtMoney(totalE),'green',(ent.length+recDoMes.length)+' lançamentos'),
+      kpi('red','Saídas — '+MESES[mes],fmtMoney(totalS),'red',sai.length+' lançamentos'),
+      kpi('gold','Saldo — '+MESES[mes],fmtMoney(saldo),saldo>=0?'green':'red',saldo>=0?'Positivo':'Negativo'),
+    ]),
+    div('grid-2',[entCard,saiCard]),
+    div('card',[div('card-title','Projeção anual'),tabela]),
+  ]);
+}
+
+// ── PLANEJAMENTO ──────────────────────────────────────────────────────────────
+function renderPlanejamento(){
+  var pfM=state.metas.filter(function(m){return m.profile===state.profile;});
+  return div('',[
+    div('page-header',[el('h1',{},'Planejamento e metas'),el('p',{},'Defina objetivos e acompanhe o progresso')]),
+    div('action-row',[el('div',{}),el('button',{class:'btn-primary',onclick:function(){setState({metaModal:{editItem:null}});}}, '+ Nova meta')]),
+    pfM.length===0?div('card',[div('empty',[div('empty-icon','🎯'),div('empty-title','Sem metas'),el('p',{style:{fontSize:'12px',color:'var(--text3)'}},'Clique em "Nova meta" para começar')])]):
+    el('div',{class:'grid-2'},pfM.map(function(m){
+      var pct=Math.min(100,Math.round((m.atual/m.meta)*100));
+      var cor=pct>=100?'var(--green)':pct>=60?'var(--gold)':'var(--blue)';
+      return div('card',[
+        el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'10px'}},[
+          el('div',{},[el('div',{style:{fontSize:'14px',fontWeight:'600',color:'var(--text)',marginBottom:'4px'}},m.descricao),el('span',{class:'badge previsto'},m.categoria)]),
+          el('div',{style:{display:'flex',gap:'4px'}},[el('button',{class:'btn-icon edit',onclick:function(){setState({metaModal:{editItem:m}});}}, '✏️'),el('button',{class:'btn-icon',onclick:function(){deleteMeta(m.id);}}, '🗑️')]),
+        ]),
+        el('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'6px'}},[el('div',{},[el('div',{style:{fontSize:'11px',color:'var(--text3)'}},'Atual'),el('div',{style:{fontSize:'16px',fontWeight:'700',color:cor}},fmtMoney(m.atual))]),el('div',{style:{textAlign:'right'}},[el('div',{style:{fontSize:'11px',color:'var(--text3)'}},'Meta'),el('div',{style:{fontSize:'16px',fontWeight:'700',color:'var(--text)'}},fmtMoney(m.meta))])]),
+        div('progress-bar',[el('div',{class:'progress-fill',style:{width:pct+'%',background:cor,height:'8px'}})]),
+        el('div',{style:{display:'flex',justifyContent:'space-between',marginTop:'6px'}},[el('span',{style:{fontSize:'12px',color:'var(--text3)'}},pct+'% concluído'),m.prazo?el('span',{style:{fontSize:'12px',color:'var(--text3)'}},'Prazo: '+fmtDate(m.prazo)):null].filter(Boolean)),
+        pct>=100?el('div',{style:{marginTop:'8px',fontSize:'12px',color:'var(--green)',fontWeight:'600'}},'✓ Meta atingida!'):el('div',{style:{marginTop:'6px',fontSize:'12px',color:'var(--text3)'}},'Falta: '+fmtMoney(m.meta-m.atual)),
+      ]);
+    })),
+  ]);
+}
+
+// ── ALERTAS ───────────────────────────────────────────────────────────────────
+function renderAlertas(){
+  var items=state.contas.filter(function(c){return c.profile===state.profile&&c.tipo==='pagar';});
+  function grupo(fn){return items.filter(fn);}
+  var vencidos=grupo(function(c){var d=diasRestantes(c.vencimento);return c.status!=='pago'&&d!==null&&d<0;});
+  var hoje=grupo(function(c){var d=diasRestantes(c.vencimento);return c.status!=='pago'&&d===0;});
+  var semana=grupo(function(c){var d=diasRestantes(c.vencimento);return c.status!=='pago'&&d!==null&&d>0&&d<=7;});
+  var mes=grupo(function(c){var d=diasRestantes(c.vencimento);return c.status!=='pago'&&d!==null&&d>7&&d<=30;});
+
+  function block(titulo,cor,arr,emptyMsg){
+    var card=div('card',[
+      el('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'12px'}},[el('div',{style:{width:'8px',height:'8px',borderRadius:'50%',background:cor}}),el('span',{style:{fontSize:'13px',fontWeight:'600',color:'var(--text)'}},titulo),arr.length>0?el('span',{class:'badge',style:{background:cor+'22',color:cor}},String(arr.length)):null].filter(Boolean)),
+      arr.length===0?el('p',{style:{fontSize:'12px',color:'var(--text3)',padding:'4px 0'}},emptyMsg):
+      div('',arr.map(function(c){
+        var d=diasRestantes(c.vencimento);
+        return el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}},[
+          el('div',{},[el('div',{style:{fontSize:'13px',color:'var(--text)',fontWeight:'500'}},c.descricao),el('div',{style:{fontSize:'11px',color:'var(--text3)'}},c.categoria+' · '+fmtDate(c.vencimento))]),
+          el('div',{style:{textAlign:'right'}},[el('div',{style:{fontSize:'13px',fontWeight:'700',color:cor}},fmtMoney(c.valor)),el('div',{style:{fontSize:'11px',color:'var(--text3)'}},d<0?Math.abs(d)+'d atraso':d===0?'Hoje':d+'d')]),
+        ]);
+      })),
+    ]);
+    card.style.borderLeft='3px solid '+cor;
+    return card;
+  }
+
+  return div('',[
+    div('page-header',[el('h1',{},'Alertas e vencimentos'),el('p',{},'Fique em dia com seus compromissos')]),
+    block('Vencidos','var(--red)',vencidos,'Nenhuma conta vencida 🎉'),
+    block('Vencem hoje','#e8a84c',hoje,'Nenhuma conta vence hoje'),
+    block('Próximos 7 dias','var(--gold)',semana,'Nenhuma conta nos próximos 7 dias'),
+    block('Próximos 30 dias','var(--blue)',mes,'Nenhuma conta nos próximos 30 dias'),
+  ]);
+}
+
+// ── RELATÓRIOS E EXPORTAÇÃO ────────────────────────────────────────────────────
+function renderExportar(){
+  var pf=state.profile;
+  var contas=state.contas.filter(function(c){return c.profile===pf;});
+  var receitas=state.receitas.filter(function(r){return r.profile===pf;});
+  var urgentes=contas.filter(function(c){var d=diasRestantes(c.vencimento);return c.tipo==='pagar'&&c.status!=='pago'&&d!==null&&d<=7;});
+
+  function btnCSV(label,fn){
+    return el('button',{class:'btn-ghost',style:{display:'flex',alignItems:'center',gap:'8px',padding:'10px 16px',width:'100%',justifyContent:'flex-start',marginBottom:'8px',fontSize:'13px'},onclick:fn},label);
+  }
+
+  function exportContas(){
+    var csv=toCSV(['ID','Descrição','Tipo','Valor','Vencimento','Status','Categoria','Recorrente','Notas'],
+      contas.map(function(c){return[c.id,c.descricao,c.tipo,c.valor,c.vencimento,c.status,c.categoria,c.recorrente?'Sim':'Não',c.notas||''];}));
+    downloadCSV(csv,'contas_'+pf+'_'+today()+'.csv');
+    showToast('CSV baixado!');
+  }
+  function exportReceitas(){
+    var csv=toCSV(['ID','Descrição','Valor','Data','Categoria','Banco','Notas'],
+      receitas.map(function(r){return[r.id,r.descricao,r.valor,r.data,r.categoria,r.banco||'',r.notas||''];}));
+    downloadCSV(csv,'receitas_'+pf+'_'+today()+'.csv');
+    showToast('CSV baixado!');
+  }
+  function exportTodos(){
+    var todas=contas.concat(receitas.map(function(r){return Object.assign({tipo:'receita'},r);}));
+    var csv=toCSV(['ID','Tipo','Descrição','Valor','Data/Vencimento','Status/Categoria'],
+      todas.map(function(x){return[x.id,x.tipo,x.descricao,x.valor,x.vencimento||x.data,x.status||x.categoria];}));
+    downloadCSV(csv,'financeiro_completo_'+pf+'_'+today()+'.csv');
+    showToast('CSV completo baixado!');
+  }
+  function exportJSON(){
+    var data={exportado_em:new Date().toISOString(),perfil:pf,contas:contas,receitas:receitas,bancos:state.bancos.filter(function(b){return b.profile===pf;}),metas:state.metas.filter(function(m){return m.profile===pf;})};
+    var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download='djfinance_backup_'+pf+'_'+today()+'.json';a.click();
+    setTimeout(function(){URL.revokeObjectURL(url);},1000);
+    showToast('JSON exportado!');
+  }
+
+  var jsonUrgentes=JSON.stringify({exportado_em:new Date().toISOString(),perfil:pf,lembretes:urgentes.map(function(c){return{titulo:'💰 '+c.descricao,valor:fmtMoney(c.valor),vencimento:c.vencimento,dias_restantes:diasRestantes(c.vencimento),categoria:c.categoria};})},null,2);
+  var copiarBtn=btn('btn-primary','📋 Copiar JSON iPhone',function(){navigator.clipboard.writeText(jsonUrgentes).then(function(){copiarBtn.textContent='✓ Copiado!';setTimeout(function(){copiarBtn.textContent='📋 Copiar JSON iPhone';},2000);});});
+
+  // Stats
+  var totalContas=contas.length;
+  var totalRec=receitas.length;
+  var totalMetas=state.metas.filter(function(m){return m.profile===pf;}).length;
+
+  return div('',[
+    div('page-header',[el('h1',{},'Relatórios e Exportação'),el('p',{},'Exporte seus dados em CSV, JSON ou integre com iPhone')]),
+
+    el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px',marginBottom:'14px'}},[
+      div('card',[
+        div('card-title','📥 Exportar dados (CSV / JSON)'),
+        el('p',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'12px'}},'Abra no Excel, Google Sheets ou qualquer ferramenta.'),
+        btnCSV('📊 Despesas e contas a receber (CSV)',exportContas),
+        btnCSV('💵 Receitas (CSV)',exportReceitas),
+        btnCSV('📦 Tudo em um arquivo (CSV)',exportTodos),
+        btnCSV('💾 Backup completo (JSON)',exportJSON),
+        el('div',{style:{marginTop:'10px',padding:'10px',background:'var(--bg3)',borderRadius:'var(--radius-sm)',fontSize:'12px',color:'var(--text3)'}},[
+          el('div',{},totalContas+' contas · '+totalRec+' receitas · '+totalMetas+' metas'),
+        ]),
+      ]),
+
+      div('card',[
+        div('card-title','📱 Integração iPhone'),
+        el('p',{style:{fontSize:'12px',color:'var(--text2)',marginBottom:'12px',lineHeight:'1.7'}},'1. Copie o JSON abaixo'+String.fromCharCode(13,10)+'2. No iPhone → Atalhos → Novo atalho'+String.fromCharCode(13,10)+'3. Ação: "Obter URL" com o JSON'+String.fromCharCode(13,10)+'4. Crie lembretes automáticos'),
+        copiarBtn,
+        el('div',{style:{marginTop:'10px'}},urgentes.length===0
+          ?el('p',{style:{fontSize:'12px',color:'var(--green)',marginTop:'8px'}},'✓ Nenhum vencimento urgente — você está em dia!')
+          :div('',urgentes.map(function(c){var d=diasRestantes(c.vencimento);return el('div',{class:'alert '+(d<=0?'danger':'warning'),style:{marginTop:'6px'}},[el('span',{},d<=0?'🔴':'🟡'),el('div',{},[el('div',{class:'alert-title'},c.descricao),el('div',{class:'alert-sub'},fmtMoney(c.valor)+' · '+(d===0?'Hoje':d<0?'Atrasado '+Math.abs(d)+'d':d+'d'))])]);}))),
+      ]),
+    ]),
+
+    div('card',[div('card-title','Prévia — JSON iPhone'),el('pre',{},jsonUrgentes)]),
+  ]);
+}
+
+// ── BANCOS ────────────────────────────────────────────────────────────────────
+function renderBancos(){
+  var bs=state.bancos.filter(function(b){return b.profile===state.profile;});
+  var total=bs.reduce(function(a,b){return a+b.saldo;},0);
+  var hist=(state.transferencias||[]).filter(function(t){return t.profile===state.profile;})
+    .slice().reverse().slice(0,20);
+
+  function nomebanco(id){var b=state.bancos.find(function(x){return x.id===id;});return b?b.nome:id;}
+  function corBanco(id){var b=state.bancos.find(function(x){return x.id===id;});return b?b.cor:'var(--text3)';}
+
+  var totalCard=el('div',{class:'kpi-card gold'},[
+    el('div',{class:'kpi-label'},'Saldo total consolidado'),
+    el('div',{class:'kpi-value '+(total>=0?'gold':'red')},fmtMoney(total)),
+    el('div',{class:'kpi-sub'},bs.length+' conta(s)'),
+  ]);
+
+  var cards=bs.map(function(b){
+    var card=el('div',{class:'kpi-card'},[
+      el('div',{style:{position:'absolute',top:'0',left:'0',right:'0',height:'3px',background:b.cor}}),
+      el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'8px'}},[
+        el('span',{style:{fontSize:'13px',fontWeight:'700',color:'var(--text)'}},b.nome),
+        el('div',{style:{display:'flex',gap:'4px'}},[
+          el('button',{class:'btn-icon edit',onclick:function(){setState({bancoModal:{editItem:b}});}}, '✏️'),
+          el('button',{class:'btn-icon',onclick:function(){if(confirm('Remover '+b.nome+'?'))deleteBanco(b.id);}}, '🗑️'),
+        ]),
+      ]),
+      el('div',{style:{fontSize:'22px',fontWeight:'800',color:b.cor,marginBottom:'4px'}},fmtMoney(b.saldo)),
+      el('div',{style:{fontSize:'11px',color:'var(--text3)'}},'Saldo atual'),
+    ]);
+    card.style.position='relative';
+    card.style.overflow='hidden';
+    return card;
+  });
+
+  var grid=el('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(190px,1fr))',gap:'14px',marginBottom:'14px'}});
+  cards.forEach(function(c){grid.appendChild(c);});
+
+  function nomebank(id){var b=bs.find(function(x){return x.id===id;});return b?b.nome:id;}
+
+  var histCard=div('card',[
+    div('card-title','Histórico de transferências'),
+    hist.length===0
+      ?el('p',{style:{fontSize:'12px',color:'var(--text3)',padding:'8px 0'}},'Nenhuma transferência realizada ainda')
+      :el('div',{},hist.map(function(t){
+          var deNome=nomebank(t.de);
+          var paraNome=nomebank(t.para);
+          var deCor=corBanco(t.de);
+          var paraCor=corBanco(t.para);
+          return el('div',{style:{display:'flex',alignItems:'center',gap:'10px',padding:'10px 0',borderBottom:'1px solid var(--border)'}},[
+            el('div',{style:{flex:'1'}},[
+              el('div',{style:{fontSize:'13px',color:'var(--text)',fontWeight:'500',marginBottom:'2px'}},t.desc||'Transferência'),
+              el('div',{style:{display:'flex',alignItems:'center',gap:'6px',fontSize:'12px'}},[
+                el('span',{style:{color:deCor,fontWeight:'600'}},deNome),
+                el('span',{style:{color:'var(--text3)'}},'→'),
+                el('span',{style:{color:paraCor,fontWeight:'600'}},paraNome),
+                el('span',{style:{color:'var(--text3)'}},'· '+fmtDate(t.data)),
+              ]),
+            ]),
+            el('div',{style:{textAlign:'right'}},[
+              el('div',{style:{fontSize:'14px',fontWeight:'700',color:'var(--blue)'}},fmtMoney(t.valor)),
+            ]),
+          ]);
+        })),
+  ]);
+
+  return div('',[
+    div('page-header',[el('h1',{},'Bancos e Contas'),el('p',{},state.profile==='artt'?'Artt Burger — saldos por instituição':'Saldos pessoais por instituição')]),
+    div('action-row',[
+      el('div',{style:{display:'flex',gap:'8px'}},[
+        bs.length>=2?el('button',{class:'btn-ghost',onclick:function(){setState({transfModal:{}});}}, '⇄ Transferir'):null,
+      ].filter(Boolean)),
+      el('button',{class:'btn-primary',onclick:function(){setState({bancoModal:{editItem:null}});}}, '+ Novo banco'),
+    ]),
+    bs.length===0
+      ?div('card',[div('empty',[div('empty-icon','🏦'),div('empty-title','Nenhum banco cadastrado')])])
+      :div('',[
+          el('div',{style:{marginBottom:'14px'}},[totalCard]),
+          grid,
+          histCard,
+        ]),
+  ]);
+}
+
+// ── RECEITAS ──────────────────────────────────────────────────────────────────
+function renderReceitas(){
+  var now=new Date();
+  var mesFiltro=state.receitasMes||(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0'));
+  var catFiltro=state.receitasCat||'';
+  var catKey=getCatKey(state.profile,'receitas');
+  var cats=getCats(catKey);
+
+  var todas=state.receitas.filter(function(r){return r.profile===state.profile;});
+  var doMes=todas.filter(function(r){return r.data&&r.data.startsWith(mesFiltro);});
+  var filtradas=catFiltro?doMes.filter(function(r){return r.categoria===catFiltro;}):doMes;
+  filtradas=filtradas.slice().sort(function(a,b){return b.data.localeCompare(a.data);});
+
+  // KPIs
+  var totalMes=doMes.reduce(function(a,r){return a+r.valor;},0);
+  var totalAno=todas.filter(function(r){return r.data&&r.data.startsWith(now.getFullYear()+'');}).reduce(function(a,r){return a+r.valor;},0);
+  var mesesComDados=[...new Set(todas.map(function(r){return r.data?r.data.slice(0,7):'';}))].filter(Boolean);
+  var mediaMensal=mesesComDados.length>0?totalAno/mesesComDados.length:0;
+
+  // por categoria no mês
+  var porCat={};
+  doMes.forEach(function(r){porCat[r.categoria]=(porCat[r.categoria]||0)+r.valor;});
+  var catArr=Object.keys(porCat).map(function(c){return{cat:c,val:porCat[c]};}).sort(function(a,b){return b.val-a.val;});
+
+  // selector de meses
+  var todosOsMeses=[...new Set(todas.map(function(r){return r.data?r.data.slice(0,7):'';}))].filter(Boolean).sort().reverse();
+  if(todosOsMeses.indexOf(mesFiltro)<0)todosOsMeses.unshift(mesFiltro);
+
+  function fmtMes(m){var p=m.split('-');return MESES[parseInt(p[1])-1]+' '+p[0];}
+
+  var selMes=el('select',{class:'form-input',style:{fontSize:'13px',padding:'6px 10px',minWidth:'130px'},onchange:function(e){setState({receitasMes:e.target.value,receitasCat:''});}});
+  todosOsMeses.forEach(function(m){var op=el('option',{value:m},fmtMes(m));if(m===mesFiltro)op.selected=true;selMes.appendChild(op);});
+
+  var selCat=el('select',{class:'form-input',style:{fontSize:'13px',padding:'6px 10px',minWidth:'140px'},onchange:function(e){setState({receitasCat:e.target.value});}});
+  [el('option',{value:''},'Todas categorias')].concat(cats.map(function(c){var op=el('option',{value:c},c);if(c===catFiltro)op.selected=true;return op;})).forEach(function(o){selCat.appendChild(o);});
+
+  var kpis=el('div',{class:'kpi-grid',style:{marginBottom:'14px'}},[
+    el('div',{class:'kpi-card green'},[el('div',{class:'kpi-label'},'Receitas do mês'),el('div',{class:'kpi-value green'},fmtMoney(totalMes)),el('div',{class:'kpi-sub'},doMes.length+' lançamento(s)')]),
+    el('div',{class:'kpi-card'},[el('div',{class:'kpi-label'},'Total no ano'),el('div',{class:'kpi-value'},fmtMoney(totalAno)),el('div',{class:'kpi-sub'},'Ano '+now.getFullYear())]),
+    el('div',{class:'kpi-card'},[el('div',{class:'kpi-label'},'Média mensal'),el('div',{class:'kpi-value'},fmtMoney(mediaMensal)),el('div',{class:'kpi-sub'},'('+mesesComDados.length+' mes(es))')]),
+  ]);
+
+  var barMax=catArr.length>0?catArr[0].val:1;
+  var catBars=catArr.map(function(c){
+    var pct=Math.round((c.val/barMax)*100);
+    var barItem=div('',[
+      el('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'4px'}},[
+        el('span',{style:{fontSize:'12px',color:'var(--text2)'}},c.cat),
+        el('span',{style:{fontSize:'12px',fontWeight:'700',color:'var(--green)'}},fmtMoney(c.val)),
+      ]),
+      el('div',{style:{height:'6px',borderRadius:'3px',background:'var(--bg3)',overflow:'hidden'}},[
+        el('div',{style:{width:pct+'%',height:'100%',background:'var(--green)',borderRadius:'3px',transition:'width .4s'}}),
+      ]),
+    ]);
+    barItem.style.marginBottom='10px';
+    return barItem;
+  });
+
+  var catCard=div('card',[
+    div('card-title','Por categoria — '+fmtMes(mesFiltro)),
+    catArr.length===0
+      ?el('p',{style:{fontSize:'12px',color:'var(--text3)',padding:'8px 0'}},'Sem receitas neste mês')
+      :el('div',{},catBars),
+  ]);
+
+  // tabela de lançamentos
+  var rows=filtradas.map(function(r){
+    var row=el('tr',{},[
+      el('td',{style:{fontSize:'13px',fontWeight:'500'}},r.descricao||'—'),
+      el('td',{},[el('span',{class:'badge badge-cat'},r.categoria||'—')]),
+      el('td',{style:{color:'var(--text3)',fontSize:'12px'}},fmtDate(r.data)),
+      el('td',{style:{textAlign:'right',fontWeight:'700',color:'var(--green)',fontSize:'14px'}},fmtMoney(r.valor)),
+      el('td',{style:{textAlign:'right'}},[
+        el('button',{class:'btn-icon edit',title:'Editar',onclick:function(){setState({receitaModal:{editItem:r}});}}, '✏️'),
+        el('button',{class:'btn-icon',title:'Excluir',onclick:function(){if(confirm('Remover receita?'))deleteReceita(r.id);}}, '🗑️'),
+      ]),
+    ]);
+    return row;
+  });
+
+  var tabela=div('card',[
+    el('table',{style:{width:'100%',borderCollapse:'collapse'}},[
+      el('thead',{},[el('tr',{},[
+        el('th',{style:{textAlign:'left',padding:'8px 6px',fontSize:'11px',color:'var(--text3)',fontWeight:'600',textTransform:'uppercase',borderBottom:'1px solid var(--border)'}},'Descrição'),
+        el('th',{style:{textAlign:'left',padding:'8px 6px',fontSize:'11px',color:'var(--text3)',fontWeight:'600',textTransform:'uppercase',borderBottom:'1px solid var(--border)'}},'Categoria'),
+        el('th',{style:{textAlign:'left',padding:'8px 6px',fontSize:'11px',color:'var(--text3)',fontWeight:'600',textTransform:'uppercase',borderBottom:'1px solid var(--border)'}},'Data'),
+        el('th',{style:{textAlign:'right',padding:'8px 6px',fontSize:'11px',color:'var(--text3)',fontWeight:'600',textTransform:'uppercase',borderBottom:'1px solid var(--border)'}},'Valor'),
+        el('th',{style:{borderBottom:'1px solid var(--border)'}}),
+      ])]),
+      el('tbody',{},rows.length>0?rows:[
+        el('tr',{},[el('td',{colspan:'5',style:{textAlign:'center',padding:'24px',color:'var(--text3)',fontSize:'13px'}},'Nenhuma receita neste mês')])
+      ]),
+    ]),
+  ]);
+
+  return div('',[
+    div('page-header',[
+      el('h1',{},'Receitas'),
+      el('p',{},state.profile==='artt'?'Artt Burger — entradas por categoria':'Receitas pessoais por categoria'),
+    ]),
+    div('action-row',[
+      el('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},[selMes,selCat]),
+      el('div',{style:{display:'flex',gap:'8px'}},[
+        el('button',{class:'btn-ghost',style:{fontSize:'12px'},onclick:function(){setState({catManager:{key:catKey,tipo:'receitas'}});}}, '✏️ Categorias'),
+        el('button',{class:'btn-primary',onclick:function(){setState({receitaModal:{editItem:null}});}}, '+ Nova receita'),
+      ]),
+    ]),
+    kpis,
+    el('div',{style:{display:'grid',gridTemplateColumns:'1fr 320px',gap:'14px',alignItems:'start'}},[tabela,catCard]),
+  ]);
+}
+
+// ── RENDER PRINCIPAL ──────────────────────────────────────────────────────────
+function render(){
+  var root=document.getElementById('app');
+  root.innerHTML='';
+
+  var pages={dashboard:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,pagar:renderPagar,receber:renderReceber,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar};
+  var pageContent=(pages[state.page]||renderDashboard)();
+  var content=div('content',[pageContent]);
+  var main=div('main',[renderTopbar(),content]);
+  var app=div('app',[renderSidebar(),main]);
+
+  var modal=renderModal();
+  var metaModal=renderMetaModal();
+  var catModal=renderCatManager();
+  var bancoModal=renderBancoModal();
+  var transfModal=renderTransfModal();
+  var receitaModal=renderReceitaModal();
+  var orcamentoModal=renderOrcamentoModal();
+  var buscaModal=renderBuscaModal();
+  var perfilModal=renderPerfilModal();
+  if(modal)app.appendChild(modal);
+  if(metaModal)app.appendChild(metaModal);
+  if(catModal)app.appendChild(catModal);
+  if(bancoModal)app.appendChild(bancoModal);
+  if(transfModal)app.appendChild(transfModal);
+  if(receitaModal)app.appendChild(receitaModal);
+  if(orcamentoModal)app.appendChild(orcamentoModal);
+  if(buscaModal)app.appendChild(buscaModal);
+  if(perfilModal)app.appendChild(perfilModal);
+  if(state.toast){
+    var t=el('div',{class:'toast '+state.toast.type},[el('span',{},state.toast.type==='success'?'✓':state.toast.type==='error'?'✕':'ℹ'),el('span',{},state.toast.msg)]);
+    app.appendChild(t);
+  }
+  root.appendChild(app);
+}
+
+</script>
+<script src="js/charts.js"></script>
+<script src="js/modal-lancamento.js"></script>
+<script src="js/modal-categorias.js"></script>
+<script src="js/modal-meta.js"></script>
+<script src="js/modal-banco.js"></script>
+<script src="js/modal-transferencia.js"></script>
+<script src="js/modal-receita.js"></script>
+<script src="js/modal-orcamento.js"></script>
+<script src="js/modal-busca.js"></script>
+<script src="js/modal-perfil.js"></script>
+<script src="js/page-dre.js"></script>
+<script src="js/page-orcamento.js"></script>
+<script>
+// ── TEMA ──────────────────────────────────────────────────────────────────────
+(function(){if(lsGet('theme','dark')==='light')document.body.classList.add('theme-light');})();
+
+// ── PIN ───────────────────────────────────────────────────────────────────────
+var PIN_KEY='djf_pin';
+
+function getPin(){return localStorage.getItem(PIN_KEY);}
+function savePin(p){localStorage.setItem(PIN_KEY,p);}
+
+function initApp(){
+  document.getElementById('app').style.display='';
+  document.getElementById('pin-overlay').style.display='none';
+  render();
+  loadFromFirebase().then(function(){runRecorrencia();}).catch(function(){runRecorrencia();});
+}
+
+function lockApp(){
+  document.getElementById('app').style.display='none';
+  var ov=document.getElementById('pin-overlay');
+  ov.style.display='flex';
+  buildPinScreen('enter');
+}
+
+function buildPinScreen(mode){
+  // mode: 'setup' | 'confirm' | 'enter'
+  var ov=document.getElementById('pin-overlay');
+  var digits=[];
+  var confirmDigits=null; // armazena primeiro PIN no fluxo de setup
+
+  function render(){
+    ov.innerHTML='';
+    var box=document.createElement('div');box.className='pin-box';
+
+    var logo=document.createElement('div');logo.className='pin-logo';logo.textContent='Financial Routine';
+    var dev=document.createElement('div');dev.className='pin-dev';dev.textContent='DJ DEVELOPMENT';
+
+    var titleText='';
+    var subText='';
+    if(mode==='setup'){titleText='Crie seu PIN';subText='Escolha 8 dígitos para proteger o sistema';}
+    else if(mode==='confirm'){titleText='Confirme seu PIN';subText='Digite novamente os 8 dígitos escolhidos';}
+    else{titleText='Bem-vindo de volta';subText='Digite seu PIN de 8 dígitos';}
+
+    var title=document.createElement('div');title.className='pin-title';title.textContent=titleText;
+    var sub=document.createElement('div');sub.className='pin-subtitle';sub.textContent=subText;
+
+    // Dots
+    var dotsEl=document.createElement('div');dotsEl.className='pin-dots';
+    var dots=[];
+    for(var i=0;i<8;i++){
+      var d=document.createElement('div');d.className='pin-dot';
+      dots.push(d);dotsEl.appendChild(d);
+    }
+
+    function updateDots(err){
+      dots.forEach(function(d,i){
+        d.className='pin-dot'+(i<digits.length?' filled':'')+(err?' error':'');
+      });
+    }
+
+    var msg=document.createElement('div');msg.className='pin-msg';
+
+    // Keypad
+    var pad=document.createElement('div');pad.className='pin-keypad';
+    var keys=['1','2','3','4','5','6','7','8','9','⌫','0','✓'];
+
+    function pressKey(k){
+      if(k==='⌫'){
+        if(digits.length>0)digits.pop();
+        updateDots(false);msg.textContent='';
+        // Se estava com erro, limpa
+        dots.forEach(function(d){d.classList.remove('error');});
+      } else if(k==='✓'){
+        if(digits.length<8){msg.className='pin-msg error';msg.textContent='Digite todos os 8 dígitos';return;}
+        var pin=digits.join('');
+        if(mode==='setup'){
+          // Guarda e vai para confirm
+          confirmDigits=pin;
+          digits=[];
+          mode='confirm';
+          buildPinScreen_confirm(confirmDigits);
+        } else if(mode==='confirm'){
+          if(pin===confirmDigits){
+            savePin(pin);
+            msg.className='pin-msg success';msg.textContent='PIN criado com sucesso!';
+            setTimeout(initApp,600);
+          } else {
+            digits=[];
+            updateDots(true);
+            msg.className='pin-msg error';msg.textContent='PINs não coincidem. Tente novamente.';
+            setTimeout(function(){mode='setup';confirmDigits=null;buildPinScreen('setup');},1200);
+          }
+        } else {
+          var saved=getPin();
+          if(pin===saved){
+            msg.className='pin-msg success';msg.textContent='✓ Acesso liberado';
+            setTimeout(initApp,400);
+          } else {
+            digits=[];
+            updateDots(true);
+            msg.className='pin-msg error';msg.textContent='PIN incorreto. Tente novamente.';
+            setTimeout(function(){updateDots(false);msg.textContent='';},1000);
+          }
+        }
+      } else {
+        if(digits.length>=8)return;
+        digits.push(k);
+        updateDots(false);
+        if(digits.length===8&&k!=='✓'){
+          // Auto-submit
+          setTimeout(function(){pressKey('✓');},120);
+        }
+      }
+    }
+
+    keys.forEach(function(k){
+      var b=document.createElement('button');
+      b.className='pin-key'+(k==='⌫'?' del':k==='✓'?' confirm':'');
+      b.textContent=k;
+      b.onclick=function(){pressKey(k);};
+      pad.appendChild(b);
+    });
+
+    // Teclado físico
+    function onKey(e){
+      if(e.key>='0'&&e.key<='9'){pressKey(e.key);}
+      else if(e.key==='Backspace'){pressKey('⌫');}
+      else if(e.key==='Enter'){pressKey('✓');}
+    }
+    document.removeEventListener('keydown',ov._keyHandler);
+    ov._keyHandler=onKey;
+    document.addEventListener('keydown',onKey);
+
+    box.appendChild(logo);box.appendChild(dev);box.appendChild(title);box.appendChild(sub);
+    box.appendChild(dotsEl);box.appendChild(pad);box.appendChild(msg);
+    ov.appendChild(box);
+  }
+
+  // Wrapper para confirm reusar confirmDigits
+  function buildPinScreen_confirm(firstPin){
+    var digits2=[];
+    ov.innerHTML='';
+    var box=document.createElement('div');box.className='pin-box';
+    var logo=document.createElement('div');logo.className='pin-logo';logo.textContent='Financial Routine';
+    var dev=document.createElement('div');dev.className='pin-dev';dev.textContent='DJ DEVELOPMENT';
+    var title=document.createElement('div');title.className='pin-title';title.textContent='Confirme seu PIN';
+    var sub=document.createElement('div');sub.className='pin-subtitle';sub.textContent='Digite novamente os 8 dígitos';
+    var dotsEl=document.createElement('div');dotsEl.className='pin-dots';
+    var dots2=[];
+    for(var i=0;i<8;i++){var d=document.createElement('div');d.className='pin-dot';dots2.push(d);dotsEl.appendChild(d);}
+    function upd2(err){dots2.forEach(function(d,i){d.className='pin-dot'+(i<digits2.length?' filled':'')+(err?' error':'');});}
+    var msg2=document.createElement('div');msg2.className='pin-msg';
+    var pad2=document.createElement('div');pad2.className='pin-keypad';
+    ['1','2','3','4','5','6','7','8','9','⌫','0','✓'].forEach(function(k){
+      var b=document.createElement('button');
+      b.className='pin-key'+(k==='⌫'?' del':k==='✓'?' confirm':'');
+      b.textContent=k;
+      b.onclick=function(){
+        if(k==='⌫'){if(digits2.length>0)digits2.pop();upd2(false);msg2.textContent='';}
+        else if(k==='✓'){
+          if(digits2.length<8){msg2.className='pin-msg error';msg2.textContent='Digite todos os 8 dígitos';return;}
+          if(digits2.join('')===firstPin){savePin(firstPin);msg2.className='pin-msg success';msg2.textContent='PIN criado!';setTimeout(initApp,500);}
+          else{digits2=[];upd2(true);msg2.className='pin-msg error';msg2.textContent='PINs diferentes. Recomeçando...';setTimeout(function(){buildPinScreen('setup');},1200);}
+        } else {
+          if(digits2.length>=8)return;
+          digits2.push(k);upd2(false);
+          if(digits2.length===8)setTimeout(function(){
+            if(digits2.join('')===firstPin){savePin(firstPin);msg2.className='pin-msg success';msg2.textContent='PIN criado!';setTimeout(initApp,500);}
+            else{digits2=[];upd2(true);msg2.className='pin-msg error';msg2.textContent='PINs diferentes. Recomeçando...';setTimeout(function(){buildPinScreen('setup');},1200);}
+          },120);
+        }
+      };
+      pad2.appendChild(b);
+    });
+    function onKey2(e){
+      if(e.key>='0'&&e.key<='9'){var b2=Array.from(pad2.children).find(function(x){return x.textContent===e.key;});if(b2)b2.click();}
+      else if(e.key==='Backspace'){Array.from(pad2.children).find(function(x){return x.textContent==='⌫';}).click();}
+      else if(e.key==='Enter'){Array.from(pad2.children).find(function(x){return x.textContent==='✓';}).click();}
+    }
+    document.removeEventListener('keydown',ov._keyHandler);
+    ov._keyHandler=onKey2;
+    document.addEventListener('keydown',onKey2);
+    box.appendChild(logo);box.appendChild(dev);box.appendChild(title);box.appendChild(sub);
+    box.appendChild(dotsEl);box.appendChild(pad2);box.appendChild(msg2);
+    ov.appendChild(box);
+  }
+
+  render();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+(function(){
+  var saved=getPin();
+  buildPinScreen(saved?'enter':'setup');
+})();
+</script>
+</body>
+</html>

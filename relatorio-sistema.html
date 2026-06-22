@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Relatório do Sistema — djfinance</title>
+<style>
+  :root{
+    --gold:#c9a84c;--green:#2d7a52;--red:#b94040;--blue:#3a6fa8;
+    --text:#1a1a1a;--text2:#444;--text3:#777;--border:#ddd;--bg:#f7f6f3;
+    --bg2:#fff;--radius:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;line-height:1.6;color:var(--text);background:var(--bg);}
+  .print-btn{position:fixed;top:20px;right:20px;background:var(--gold);color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:999;display:flex;align-items:center;gap:8px;}
+  .print-btn:hover{background:#b8932a;}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 24px 80px;}
+
+  /* CAPA */
+  .cover{background:linear-gradient(135deg,#1a1a1a 0%,#2e2e2e 100%);color:#fff;border-radius:var(--radius);padding:48px 40px;margin-bottom:32px;position:relative;overflow:hidden;}
+  .cover::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(201,168,76,.15);}
+  .cover::after{content:'';position:absolute;bottom:-60px;left:-20px;width:160px;height:160px;border-radius:50%;background:rgba(201,168,76,.08);}
+  .cover-logo{font-size:32px;font-weight:900;color:var(--gold);letter-spacing:-1px;margin-bottom:6px;}
+  .cover-sub{font-size:13px;color:#aaa;margin-bottom:32px;}
+  .cover-title{font-size:22px;font-weight:700;color:#fff;margin-bottom:8px;}
+  .cover-desc{font-size:13px;color:#bbb;max-width:480px;}
+  .cover-meta{display:flex;gap:24px;margin-top:28px;flex-wrap:wrap;}
+  .cover-meta-item{font-size:12px;color:#999;border-top:2px solid rgba(201,168,76,.4);padding-top:8px;min-width:120px;}
+  .cover-meta-item strong{display:block;font-size:14px;color:var(--gold);font-weight:700;}
+
+  /* SEÇÕES */
+  .section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;margin-bottom:20px;page-break-inside:avoid;}
+  .section-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid var(--gold);display:flex;align-items:center;gap:8px;}
+  .section-title .num{background:var(--gold);color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;}
+
+  /* SUBSECTIONS */
+  .subsection{margin-bottom:18px;}
+  .subsection-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;padding:6px 0;border-bottom:1px solid #eee;}
+
+  /* FEATURE GRID */
+  .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .feat-card{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px 14px;}
+  .feat-card-icon{font-size:18px;margin-bottom:6px;}
+  .feat-card-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;}
+  .feat-card-desc{font-size:11px;color:var(--text3);line-height:1.5;}
+
+  /* TABELA */
+  table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;}
+  th{background:#f0ede8;text-align:left;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);border-bottom:2px solid var(--border);}
+  td{padding:8px 12px;border-bottom:1px solid #f0f0f0;color:var(--text2);}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#fafaf8;}
+  td strong{color:var(--text);font-weight:600;}
+
+  /* TAGS */
+  .tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.3px;}
+  .tag.green{background:#e6f4ec;color:var(--green);}
+  .tag.red{background:#fde8e8;color:var(--red);}
+  .tag.gold{background:#fdf4e0;color:#8a6a20;}
+  .tag.blue{background:#e8f0fa;color:var(--blue);}
+  .tag.gray{background:#f0f0f0;color:#666;}
+
+  /* PROS/CONS */
+  .pros-cons{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .pros-list,.cons-list{list-style:none;padding:0;}
+  .pros-list li,.cons-list li{padding:7px 0 7px 22px;border-bottom:1px solid #f0f0f0;font-size:12px;color:var(--text2);position:relative;line-height:1.5;}
+  .pros-list li::before{content:'✓';position:absolute;left:0;color:var(--green);font-weight:700;}
+  .cons-list li::before{content:'✕';position:absolute;left:0;color:var(--red);font-weight:700;}
+  .pros-list li:last-child,.cons-list li:last-child{border-bottom:none;}
+  .pros-header{font-size:12px;font-weight:700;color:var(--green);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;}
+  .cons-header{font-size:12px;font-weight:700;color:var(--red);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;}
+
+  /* RISK TABLE */
+  .risk-alto{color:var(--red);font-weight:700;}
+  .risk-medio{color:#b07a00;font-weight:700;}
+  .risk-baixo{color:var(--green);font-weight:700;}
+
+  /* ROADMAP */
+  .roadmap-item{display:flex;gap:14px;padding:10px 0;border-bottom:1px solid #f0f0f0;}
+  .roadmap-item:last-child{border-bottom:none;}
+  .roadmap-prio{width:70px;flex-shrink:0;display:flex;align-items:flex-start;padding-top:2px;}
+  .roadmap-content strong{font-size:13px;color:var(--text);display:block;margin-bottom:3px;}
+  .roadmap-content p{font-size:11px;color:var(--text3);line-height:1.5;}
+
+  /* ARCH */
+  .arch-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .arch-row{display:flex;gap:8px;padding:7px 10px;background:var(--bg);border-radius:5px;border:1px solid var(--border);}
+  .arch-key{font-size:11px;font-weight:700;color:var(--text3);width:130px;flex-shrink:0;}
+  .arch-val{font-size:11px;color:var(--text2);}
+
+  /* SUMMARY BOX */
+  .summary-box{background:linear-gradient(135deg,#1a1a1a,#2e2e2e);color:#fff;border-radius:var(--radius);padding:24px 28px;margin-top:20px;}
+  .summary-box h3{font-size:15px;font-weight:700;color:var(--gold);margin-bottom:12px;}
+  .summary-box p{font-size:12px;color:#ccc;line-height:1.8;}
+  .summary-box strong{color:#fff;}
+
+  /* FOOTER */
+  .footer{text-align:center;padding:24px 0;color:var(--text3);font-size:11px;border-top:1px solid var(--border);margin-top:12px;}
+
+  /* PRINT */
+  @media print{
+    body{background:#fff;font-size:11px;}
+    .print-btn{display:none!important;}
+    .wrap{padding:0;max-width:100%;}
+    .cover{border-radius:0;margin-bottom:20px;padding:32px 28px;}
+    .section{border-radius:4px;padding:18px 20px;margin-bottom:12px;break-inside:avoid;}
+    .feat-grid{grid-template-columns:repeat(3,1fr);}
+    .pros-cons{grid-template-columns:1fr 1fr;}
+    .arch-grid{grid-template-columns:1fr 1fr;}
+    a{color:inherit;text-decoration:none;}
+    @page{margin:1.5cm 1.8cm;size:A4;}
+  }
+</style>
+</head>
+<body>
+
+<button class="print-btn" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+
+<div class="wrap">
+
+  <!-- CAPA -->
+  <div class="cover">
+    <div class="cover-logo">djfinance</div>
+    <div class="cover-sub">Sistema de Gestão Financeira</div>
+    <div class="cover-title">Relatório Técnico e Funcional do Sistema</div>
+    <div class="cover-desc">Documento de referência com mapeamento completo de funcionalidades, arquitetura, pontos fortes, vulnerabilidades e roadmap de melhorias.</div>
+    <div class="cover-meta">
+      <div class="cover-meta-item"><strong>22/06/2026</strong>Data de emissão</div>
+      <div class="cover-meta-item"><strong>v2.0</strong>Versão atual</div>
+      <div class="cover-meta-item"><strong>2 perfis</strong>Pessoal + Artt Burger</div>
+      <div class="cover-meta-item"><strong>13 módulos</strong>Funcionalidades ativas</div>
+    </div>
+  </div>
+
+  <!-- 1. VISÃO GERAL -->
+  <div class="section">
+    <div class="section-title"><span class="num">1</span> Visão Geral</div>
+    <p style="font-size:13px;color:#444;line-height:1.8;margin-bottom:16px;">
+      O <strong>djfinance</strong> é um sistema de gestão financeira pessoal e empresarial desenvolvido em HTML, CSS e JavaScript puro, sem frameworks ou dependências externas. Roda diretamente no navegador e sincroniza dados com o <strong>Firebase Realtime Database</strong>, com fallback automático para <code style="background:#f0ede8;padding:1px 5px;border-radius:3px;font-size:11px;">localStorage</code>.
+    </p>
+    <p style="font-size:13px;color:#444;line-height:1.8;">
+      O sistema é <strong>multi-perfil</strong>: gerencia simultaneamente as finanças do perfil <strong>Pessoal</strong> e da <strong>Artt Burger</strong> dentro da mesma interface, com dados completamente isolados por perfil. A alternância entre perfis é feita via sidebar sem necessidade de login separado.
+    </p>
+  </div>
+
+  <!-- 2. FUNCIONALIDADES -->
+  <div class="section">
+    <div class="section-title"><span class="num">2</span> Funcionalidades</div>
+
+    <div class="feat-grid">
+      <div class="feat-card">
+        <div class="feat-card-icon">📊</div>
+        <div class="feat-card-title">Dashboard</div>
+        <div class="feat-card-desc">KPIs em tempo real, alertas de vencimento, gastos por categoria, progresso de metas e receitas do mês.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-card-icon">🏦</div>
+        <div class="feat-card-title">Bancos e Contas</div>
+        <div class="feat-card-desc">5 bancos (Stone, MP, Cofre, Caixa, Sicredi), saldo consolidado, transferências com histórico.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-card-icon">💵</div>
+        <div class="feat-card-title">Receitas</div>
+        <div class="feat-card-desc">Registro por categoria, crédito automático no banco, filtros por mês, gráfico por categoria.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-card-icon">📋</div>
+        <div class="feat-card-title">DRE</div>
+        <div class="feat-card-desc">Demonstração de resultado com CMV, lucro bruto, despesas operacionais, margem % e gráficos anuais.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-card-icon">💸</div>
+        <div class="feat-card-title">Contas a Pagar</div>
+        <div class="feat-card-desc">Lançamentos com recorrência automática, prioridade, busca, filtros e marcação de pago.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-card-icon">💰</div>
+        <div class="feat-card-title">Contas a Receber</div>
+        <div class="feat-card-desc">Entradas previstas, marcação de recebido, filtros e histórico por categoria.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-card-icon">📈</div>
+        <div class="feat-card-title">Fluxo de Caixa</div>
+        <div class="feat-card-desc">Entradas e saídas por mês (inclui receitas + contas), projeção anual com tabela comparativa.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-card-icon">💰</div>
+        <div class="feat-card-title">Orçamento</div>
+        <div class="feat-card-desc">Metas de receita e limites por categoria de despesa, com barras de progresso e alertas de estouro.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-card-icon">🎯</div>
+        <div class="feat-card-title">Metas</div>
+        <div class="feat-card-desc">Objetivos financeiros com valor atual, valor alvo, prazo e barra de progresso colorida.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-card-icon">🔔</div>
+        <div class="feat-card-title">Alertas</div>
+        <div class="feat-card-desc">Painel de vencimentos agrupados: vencidos, hoje, 7 dias e 30 dias. Contador na sidebar.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-card-icon">🔍</div>
+        <div class="feat-card-title">Busca Global</div>
+        <div class="feat-card-desc">Pesquisa em tempo real em todos os módulos e perfis. Clique navega direto para o item.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-card-icon">📊</div>
+        <div class="feat-card-title">Relatórios</div>
+        <div class="feat-card-desc">Export CSV (contas, receitas, completo), backup JSON e integração com iPhone via Atalhos.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-card-icon">🔁</div>
+        <div class="feat-card-title">Recorrência</div>
+        <div class="feat-card-desc">Motor automático que gera lançamentos recorrentes ao abrir o sistema (até 2 meses à frente).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. ARQUITETURA -->
+  <div class="section">
+    <div class="section-title"><span class="num">3</span> Arquitetura Técnica</div>
+    <div class="arch-grid">
+      <div class="arch-row"><span class="arch-key">Linguagem</span><span class="arch-val">JavaScript vanilla ES6</span></div>
+      <div class="arch-row"><span class="arch-key">Interface</span><span class="arch-val">HTML/CSS puro, sem framework</span></div>
+      <div class="arch-row"><span class="arch-key">Banco de dados</span><span class="arch-val">Firebase Realtime Database (REST)</span></div>
+      <div class="arch-row"><span class="arch-key">Fallback offline</span><span class="arch-val">localStorage (prefixo djf_)</span></div>
+      <div class="arch-row"><span class="arch-key">Renderização</span><span class="arch-val">Re-render DOM a cada setState()</span></div>
+      <div class="arch-row"><span class="arch-key">Gráficos</span><span class="arch-val">SVG nativo (sem biblioteca)</span></div>
+      <div class="arch-row"><span class="arch-key">Modularização</span><span class="arch-val">Arquivos js/*.js por módulo</span></div>
+      <div class="arch-row"><span class="arch-key">Build system</span><span class="arch-val">Nenhum — abre direto no browser</span></div>
+      <div class="arch-row"><span class="arch-key">Autenticação</span><span class="arch-val">Nenhuma (ponto crítico)</span></div>
+      <div class="arch-row"><span class="arch-key">Deploy</span><span class="arch-val">Servidor local / arquivo direto</span></div>
+    </div>
+
+    <div style="margin-top:18px;">
+      <div class="subsection-title">Dados sincronizados com Firebase</div>
+      <p style="font-size:12px;color:#555;margin-top:8px;">Contas a pagar/receber · Metas · Receitas · Bancos e saldos · Histórico de transferências</p>
+    </div>
+
+    <div style="margin-top:14px;">
+      <div class="subsection-title">Arquivos do sistema</div>
+      <table>
+        <thead><tr><th>Arquivo</th><th>Responsabilidade</th></tr></thead>
+        <tbody>
+          <tr><td><code>index.html</code></td><td>App principal — estado, CRUD, renderização, Firebase, CSS</td></tr>
+          <tr><td><code>js/modal-lancamento.js</code></td><td>Modal de lançamento (pagar/receber)</td></tr>
+          <tr><td><code>js/modal-categorias.js</code></td><td>Gerenciador de categorias</td></tr>
+          <tr><td><code>js/modal-meta.js</code></td><td>Modal de metas</td></tr>
+          <tr><td><code>js/modal-banco.js</code></td><td>Modal de banco (criar/editar)</td></tr>
+          <tr><td><code>js/modal-transferencia.js</code></td><td>Modal de transferência entre bancos</td></tr>
+          <tr><td><code>js/modal-receita.js</code></td><td>Modal de receita com crédito em banco</td></tr>
+          <tr><td><code>js/modal-orcamento.js</code></td><td>Modal de orçamento por categoria</td></tr>
+          <tr><td><code>js/modal-busca.js</code></td><td>Modal de busca global</td></tr>
+          <tr><td><code>js/page-dre.js</code></td><td>Página DRE com gráficos</td></tr>
+          <tr><td><code>js/page-orcamento.js</code></td><td>Página Orçamento vs Realizado</td></tr>
+          <tr><td><code>js/charts.js</code></td><td>Funções de gráficos SVG</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 4. PONTOS FORTES E FRACOS -->
+  <div class="section">
+    <div class="section-title"><span class="num">4</span> Pontos Fortes e Fracos</div>
+    <div class="pros-cons">
+      <div>
+        <div class="pros-header">✓ Pontos Fortes</div>
+        <ul class="pros-list">
+          <li>Zero dependências externas — deploy imediato sem configuração</li>
+          <li>Firebase garante dados em qualquer dispositivo com internet</li>
+          <li>localStorage mantém funcionamento 100% offline</li>
+          <li>Multi-perfil (Pessoal + Artt Burger) em uma única interface</li>
+          <li>DRE funcional com CMV para gestão do restaurante</li>
+          <li>Banco conectado a receitas — saldos sempre consistentes</li>
+          <li>Motor de recorrência — lançamentos gerados automaticamente</li>
+          <li>Busca global em todos os módulos e perfis</li>
+          <li>Export CSV e backup JSON completo</li>
+          <li>Sem custo de infraestrutura (plano gratuito Firebase)</li>
+          <li>Gráficos SVG nativos sem biblioteca adicional</li>
+          <li>Código legível e sem abstração excessiva</li>
+        </ul>
+      </div>
+      <div>
+        <div class="cons-header">✕ Pontos Fracos</div>
+        <ul class="cons-list">
+          <li>Sem autenticação — dados acessíveis via URL do Firebase</li>
+          <li>Re-render total do DOM a cada interação (sem diff virtual)</li>
+          <li>Ocorrência deletada é regenerada pelo motor de recorrência</li>
+          <li>CMV por % fixo, não calculado a partir de insumos reais</li>
+          <li>Fluxo de caixa não filtra por ano — mistura períodos</li>
+          <li>Sem importação de extrato bancário (OFX/CSV do banco)</li>
+          <li>Sem multi-usuário — sem controle de quem alterou o quê</li>
+          <li>Sem relatório de inadimplência por cliente</li>
+          <li>Sem notificações push ou e-mail de vencimento</li>
+          <li>Interface não responsiva para celular</li>
+          <li>Sem backup automático agendado</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. ANÁLISE DE RISCOS -->
+  <div class="section">
+    <div class="section-title"><span class="num">5</span> Análise de Riscos</div>
+    <table>
+      <thead>
+        <tr><th>Risco</th><th>Probabilidade</th><th>Impacto</th><th>Status</th><th>Mitigação</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Acesso não autorizado ao Firebase</strong></td>
+          <td class="risk-alto">Alta</td>
+          <td class="risk-alto">Alto</td>
+          <td><span class="tag red">Sem controle</span></td>
+          <td>Implementar Firebase Auth (Google Sign-In)</td>
+        </tr>
+        <tr>
+          <td><strong>Perda de dados — limpeza do browser</strong></td>
+          <td class="risk-medio">Média</td>
+          <td class="risk-alto">Alto</td>
+          <td><span class="tag green">Mitigado</span></td>
+          <td>Firebase sincroniza todos os dados</td>
+        </tr>
+        <tr>
+          <td><strong>Lentidão com volume alto de lançamentos</strong></td>
+          <td class="risk-baixo">Baixa</td>
+          <td class="risk-medio">Médio</td>
+          <td><span class="tag gold">Monitorar</span></td>
+          <td>Re-render parcial quando necessário</td>
+        </tr>
+        <tr>
+          <td><strong>Inconsistência offline/online</strong></td>
+          <td class="risk-baixo">Baixa</td>
+          <td class="risk-medio">Médio</td>
+          <td><span class="tag green">Mitigado</span></td>
+          <td>localStorage como fallback automático</td>
+        </tr>
+        <tr>
+          <td><strong>Duplicação de recorrências</strong></td>
+          <td class="risk-medio">Média</td>
+          <td class="risk-baixo">Baixo</td>
+          <td><span class="tag gold">Parcial</span></td>
+          <td>ID determinístico previne duplicatas na abertura</td>
+        </tr>
+        <tr>
+          <td><strong>Sobrescrita de dados em uso simultâneo</strong></td>
+          <td class="risk-baixo">Baixa</td>
+          <td class="risk-medio">Médio</td>
+          <td><span class="tag red">Sem controle</span></td>
+          <td>Multi-usuário com Firebase listeners em tempo real</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 6. ROADMAP -->
+  <div class="section">
+    <div class="section-title"><span class="num">6</span> Roadmap — Próximos Passos</div>
+
+    <div class="subsection">
+      <div class="subsection-title">🔴 Prioridade Alta — Segurança e Correções</div>
+      <div class="roadmap-item">
+        <div class="roadmap-prio"><span class="tag red">Urgente</span></div>
+        <div class="roadmap-content">
+          <strong>Autenticação Firebase (Google Sign-In)</strong>
+          <p>Protege todos os dados contra acesso externo. Implementação estimada em 1 dia. Sem isso, qualquer pessoa com a URL do Firebase pode ler e escrever dados da Artt Burger.</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-prio"><span class="tag red">Urgente</span></div>
+        <div class="roadmap-content">
+          <strong>Filtro de ano no Fluxo de Caixa</strong>
+          <p>Atualmente o fluxo de caixa mistura lançamentos de anos diferentes no mesmo mês. Correção simples com alto impacto na precisão dos dados.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">🟡 Prioridade Média — Novas Funcionalidades</div>
+      <div class="roadmap-item">
+        <div class="roadmap-prio"><span class="tag gold">Médio</span></div>
+        <div class="roadmap-content">
+          <strong>Gestão de recorrência — opção "pular este mês"</strong>
+          <p>Permitir que o usuário exclua uma ocorrência gerada sem que ela reapareça na próxima abertura do sistema.</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-prio"><span class="tag gold">Médio</span></div>
+        <div class="roadmap-content">
+          <strong>CMV por entrada real de insumos</strong>
+          <p>Calcular o CMV automaticamente a partir de entradas na categoria "Fornecedor" / "Insumos", eliminando a necessidade de estimar um % fixo.</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-prio"><span class="tag gold">Médio</span></div>
+        <div class="roadmap-content">
+          <strong>Relatório de inadimplência</strong>
+          <p>Contas a receber em aberto agrupadas por cliente/origem, com total em atraso e dias vencidos.</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-prio"><span class="tag gold">Médio</span></div>
+        <div class="roadmap-content">
+          <strong>Importação de extrato bancário (CSV)</strong>
+          <p>Upload de extrato do banco em formato CSV para auto-preenchimento de lançamentos, eliminando entrada manual.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">🟢 Prioridade Baixa — Melhorias de Experiência</div>
+      <div class="roadmap-item">
+        <div class="roadmap-prio"><span class="tag green">Baixo</span></div>
+        <div class="roadmap-content">
+          <strong>Interface responsiva para celular</strong>
+          <p>Adaptar o layout para uso em dispositivos móveis com sidebar recolhível e tabelas adaptativas.</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-prio"><span class="tag green">Baixo</span></div>
+        <div class="roadmap-content">
+          <strong>Histórico de auditoria</strong>
+          <p>Log de todas as alterações realizadas: quem criou, editou ou excluiu cada lançamento e quando.</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-prio"><span class="tag green">Baixo</span></div>
+        <div class="roadmap-content">
+          <strong>Comparativo entre perfis no Dashboard</strong>
+          <p>Visão consolidada mostrando o saldo líquido de Pessoal + Artt Burger juntos.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. RESUMO EXECUTIVO -->
+  <div class="section">
+    <div class="section-title"><span class="num">7</span> Resumo Executivo</div>
+    <p style="font-size:13px;color:#444;line-height:1.8;margin-bottom:16px;">
+      O djfinance é um sistema maduro e funcional para o seu porte e propósito. Em sua versão atual (2.0) cobre o ciclo financeiro completo — receitas, despesas, bancos, transferências, DRE, fluxo de caixa, orçamento e metas — sem depender de nenhum serviço pago ou ferramenta externa.
+    </p>
+    <p style="font-size:13px;color:#444;line-height:1.8;margin-bottom:20px;">
+      A decisão de manter tudo em HTML puro com Firebase como backend mostrou-se acertada: o sistema funciona offline, não tem custo de infraestrutura e pode ser aberto em qualquer computador sem instalação.
+    </p>
+
+    <div class="summary-box">
+      <h3>⚠️ Ação imediata recomendada</h3>
+      <p>O principal gap crítico é <strong>segurança</strong>: a URL do Firebase está exposta no código sem nenhuma camada de autenticação. Qualquer pessoa que tiver acesso ao arquivo HTML pode ler e modificar todos os dados financeiros da <strong>Artt Burger</strong> e do perfil Pessoal. A implementação do Firebase Authentication (login com Google) resolve esse problema em aproximadamente 1 dia de trabalho e deve ser a <strong>próxima prioridade absoluta</strong> antes de qualquer nova funcionalidade.</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    Relatório gerado em 22 de junho de 2026 &nbsp;·&nbsp; djfinance v2.0 &nbsp;·&nbsp; Documento confidencial
+  </div>
+
+</div>
+
+</body>
+</html>

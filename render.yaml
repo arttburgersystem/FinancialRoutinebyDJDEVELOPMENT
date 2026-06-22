@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: financial-routine-dj
+    env: static
+    buildCommand: ""
+    staticPublishPath: .
+    branch: main

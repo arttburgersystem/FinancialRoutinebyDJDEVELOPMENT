@@ -351,12 +351,16 @@ function saveVenda(v){
   var existe=vendas.find(function(x){return x.id===v.id;});
   var novasVendas=existe?vendas.map(function(x){return x.id===v.id?v:x;}):vendas.concat([v]);
   var PDV_LABEL={dinheiro:'Dinheiro',pix:'Pix',credito:'Cartão Crédito',debito:'Cartão Débito',notinha:'Notinha Funcionários',ifood_online:'iFood Online',yooga:'Yooga Online'};
+  // Crédito e débito sempre caem no banco Stone (máquina Stone)
+  var stoneBanco=(state.bancos||[]).find(function(b){return b.nome&&b.nome.toLowerCase().indexOf('stone')!==-1;});
+  var stoneId=stoneBanco?stoneBanco.id:'';
   var recGeradas=[];
   Object.keys(v.pdv||{}).forEach(function(k){
     var bruto=v.pdv[k]||0;if(!bruto)return;
     var taxa=(taxas[k]||0)/100;
     var liquido=Math.round(bruto*(1-taxa)*100)/100;
-    recGeradas.push({id:'rec_vnd_'+v.data+'_'+k,descricao:(PDV_LABEL[k]||k)+' — '+fmtDate(v.data),valor:liquido,data:v.data,categoria:'Vendas PDV',profile:'artt',banco:'',notas:'Bruto '+fmtMoney(bruto)+' | Taxa '+(taxas[k]||0)+'%',venda_id:v.id});
+    var bancoDest=(k==='credito'||k==='debito')?stoneId:'';
+    recGeradas.push({id:'rec_vnd_'+v.data+'_'+k,descricao:(PDV_LABEL[k]||k)+' — '+fmtDate(v.data),valor:liquido,data:v.data,categoria:'Vendas PDV',profile:'artt',banco:bancoDest,notas:'Bruto '+fmtMoney(bruto)+' | Taxa '+(taxas[k]||0)+'%',venda_id:v.id});
   });
   var receitas=(state.receitas||[]).filter(function(r){return r.venda_id!==v.id;}).concat(recGeradas);
   lsSet('vendas',novasVendas);lsSet('receitas',receitas);

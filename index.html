@@ -2,8 +2,14 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <title>Financial Routine — DJ DEVELOPMENT</title>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#c9a84c"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="DJ Finance"/>
+<link rel="apple-touch-icon" href="icons/icon.svg"/>
 <style>
 :root{--bg:#0d0d0d;--bg2:#161616;--bg3:#1e1e1e;--bg4:#252525;--border:#2e2e2e;--border2:#3a3a3a;--text:#f0ede8;--text2:#a09d98;--text3:#6b6866;--gold:#c9a84c;--gold2:#e8c96a;--gold-dim:rgba(201,168,76,0.12);--red:#e05252;--red-dim:rgba(224,82,82,0.12);--green:#4caf82;--green-dim:rgba(76,175,130,0.12);--blue:#5b9bd5;--blue-dim:rgba(91,155,213,0.12);--purple:#9b7fe8;--radius:10px;--radius-sm:6px}
 body.theme-light{--bg:#f5f4f1;--bg2:#ffffff;--bg3:#eeecea;--bg4:#e5e3df;--border:#dddbd7;--border2:#ccc9c4;--text:#1a1916;--text2:#5a5754;--text3:#9a9794;--gold:#a07830;--gold2:#c9a84c;--gold-dim:rgba(160,120,48,0.10);--red:#c0392b;--red-dim:rgba(192,57,43,0.10);--green:#27805a;--green-dim:rgba(39,128,90,0.10);--blue:#2860a8;--blue-dim:rgba(40,96,168,0.10);--purple:#6c4ec2}
@@ -155,6 +161,71 @@ pre{font-size:11px;color:var(--text2);background:var(--bg3);padding:12px;border-
 .pin-msg{font-size:12px;font-weight:600;min-height:18px;text-align:center}
 .pin-msg.error{color:var(--red)}
 .pin-msg.success{color:var(--green)}
+
+/* ── SIDEBAR COLLAPSE (desktop) ─────────────────────────────────────────────── */
+.sidebar-collapse-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:7px 10px;border-radius:var(--radius-sm);background:transparent;border:1px solid var(--border);color:var(--text3);font-size:12px;cursor:pointer;transition:all .15s;font-family:inherit}
+.sidebar-collapse-btn:hover{color:var(--text);border-color:var(--border2)}
+.sidebar.collapsed{width:60px;min-width:60px}
+.sidebar.collapsed .logo-sub,.sidebar.collapsed .profile-switcher,.sidebar.collapsed .nav-section,.sidebar.collapsed .nav-label,.sidebar.collapsed .btn-ghost,.sidebar.collapsed .sync-badge{display:none!important}
+.sidebar.collapsed .sidebar-logo{padding:16px 8px;text-align:center}
+.sidebar.collapsed .logo-name{font-size:11px;letter-spacing:0}
+.sidebar.collapsed .nav-item{padding:11px;justify-content:center;gap:0;border-left-color:transparent}
+.sidebar.collapsed .nav-item.active{border-left-color:transparent;background:var(--gold-dim)}
+.sidebar.collapsed .nav-item .nav-icon{font-size:19px}
+.sidebar.collapsed .sidebar-collapse-btn span{display:none}
+.sidebar.collapsed .sidebar-footer{padding:10px 8px;gap:6px}
+.main.sb-collapsed{margin-left:60px}
+
+/* ── OVERLAY & MOBILE DRAWER ─────────────────────────────────────────────────── */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);transition:opacity .25s}
+.sidebar-overlay.visible{display:block}
+.mobile-topbar-btn{display:none;background:none;border:none;color:var(--text);font-size:22px;padding:4px 8px;cursor:pointer;border-radius:6px;line-height:1;flex-shrink:0}
+.mobile-topbar-btn:hover{background:var(--bg3)}
+
+/* ── MOBILE BOTTOM NAV ───────────────────────────────────────────────────────── */
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:100}
+.mobile-nav-inner{display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}
+.mobile-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:7px 2px;background:none;border:none;color:var(--text3);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;cursor:pointer;transition:color .15s;font-family:inherit;-webkit-tap-highlight-color:transparent}
+.mobile-nav-btn.active{color:var(--gold)}
+.mobile-nav-btn .mn-icon{font-size:21px;line-height:1.1}
+.mobile-nav-btn:active{background:var(--bg3)}
+
+/* ── MEDIA: MOBILE ───────────────────────────────────────────────────────────── */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);z-index:100;position:fixed;height:100vh}
+  .sidebar.mobile-open{transform:translateX(0);box-shadow:4px 0 24px rgba(0,0,0,.5)}
+  .main{margin-left:0!important}
+  .topbar{padding:0 10px;height:52px;gap:8px}
+  .topbar-title{font-size:14px;font-weight:600}
+  .topbar-date{display:none}
+  #djf-clock{display:none}
+  .content{padding:12px 12px 72px}
+  .mobile-topbar-btn{display:flex}
+  .mobile-nav{display:block}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
+  .grid-2{grid-template-columns:1fr!important}
+  .form-row{grid-template-columns:1fr!important}
+  .action-row{flex-direction:column;align-items:stretch;gap:8px}
+  .action-row .search-wrap{width:100%}
+  .action-row .btn-primary,.action-row .btn-ghost{width:100%;justify-content:center}
+  .modal-overlay{padding:0!important;align-items:flex-end!important}
+  .modal{border-radius:20px 20px 0 0!important;max-height:93vh!important;max-width:100%!important;width:100%!important;padding:20px 16px 24px}
+  .modal-title{font-size:15px}
+  .page-header{margin-bottom:14px}
+  .page-header h1{font-size:17px}
+  .page-header p{font-size:12px}
+  .card{padding:14px}
+  .kpi-card{padding:13px}
+  .kpi-value{font-size:17px}
+  .sidebar-collapse-btn{display:none}
+  table{font-size:12px}
+  td,th{padding:7px 8px!important}
+}
+@media(min-width:769px){
+  .mobile-nav{display:none!important}
+  .mobile-topbar-btn{display:none!important}
+  .sidebar-overlay{display:none!important}
+}
 </style>
 </head>
 <body>
@@ -244,6 +315,8 @@ var state={
   cartaoMesFiltro: null,
   cartoes: lsGet('cartoes',[]),
   transacoesCartao: lsGet('transacoesCartao',[]),
+  sidebarOpen: false,
+  sidebarCollapsed: lsGet('sidebarCollapsed', false),
   buscaModal: false,
   buscaBusca: '',
   receitasMes: null,
@@ -267,6 +340,7 @@ function showToast(msg,type,dur){
 }
 
 // ── UTILS ────────────────────────────────────────────────────────────────────
+function isMobile(){return window.innerWidth<=768;}
 function nowBR(){return new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));}
 function today(){return new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});}
 function fmtDate(d){if(!d)return'—';var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
@@ -596,8 +670,8 @@ function renderSidebar(){
     return div('',[
       div('nav-section',sec),
       ...items.map(function(n){
-        var ni=el('div',{class:'nav-item'+(state.page===n.id?' active':''),onclick:function(){setState({page:n.id});}},
-          [el('span',{},n.icon+' '),el('span',{style:{flex:'1'}},n.label)]
+        var ni=el('div',{class:'nav-item'+(state.page===n.id?' active':''),title:state.sidebarCollapsed?n.label:'',onclick:function(){setState({page:n.id,sidebarOpen:false});}},
+          [el('span',{class:'nav-icon'},n.icon+' '),el('span',{class:'nav-label',style:{flex:'1'}},n.label)]
         );
         if(n.id==='alertas'&&alertCount>0)ni.appendChild(el('span',{style:{background:'var(--red)',color:'#fff',fontSize:'10px',fontWeight:'700',padding:'1px 5px',borderRadius:'8px'}},String(alertCount)));
         return ni;
@@ -616,8 +690,12 @@ function renderSidebar(){
   var lockBtn=el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',color:'var(--text3)'},
     onclick:function(){lockApp();}
   },'🔒 Bloquear sistema');
-  var footer=div('sidebar-footer',[themeBtn,lockBtn,renderSyncBadge()]);
-  return div('sidebar',[logo,div('profile-switcher',[profBtn,dropdown].filter(Boolean)),navEl,footer]);
+  var collapseBtn=el('button',{class:'sidebar-collapse-btn',onclick:function(){
+    var c=!state.sidebarCollapsed;lsSet('sidebarCollapsed',c);setState({sidebarCollapsed:c});
+  }},[el('span',{},state.sidebarCollapsed?'→':'← Recolher')]);
+  var footer=div('sidebar-footer',[collapseBtn,themeBtn,lockBtn,renderSyncBadge()]);
+  var sbCls='sidebar'+(state.sidebarCollapsed?' collapsed':'')+(state.sidebarOpen?' mobile-open':'');
+  return div(sbCls,[logo,div('profile-switcher',[profBtn,dropdown].filter(Boolean)),navEl,footer]);
 }
 
 // ── TOPBAR ────────────────────────────────────────────────────────────────────
@@ -629,7 +707,9 @@ function renderTopbar(){
   var tag=el('span',{class:'tag',style:{background:pf.color+'22',color:pf.color}},pf.label);
   var searchBtn=el('button',{class:'btn-ghost',style:{padding:'6px 12px',fontSize:'13px'},onclick:function(){setState({buscaModal:true,buscaBusca:''});}}, '🔍 Buscar');
   var clockEl=el('span',{id:'djf-clock',style:{fontVariantNumeric:'tabular-nums',fontSize:'13px',color:'var(--text3)',letterSpacing:'.5px',fontWeight:'600'}},horaAtual);
+  var hamburger=el('button',{class:'mobile-topbar-btn',onclick:function(){setState({sidebarOpen:!state.sidebarOpen});}},state.sidebarOpen?'✕':'☰');
   return div('topbar',[
+    hamburger,
     el('div',{class:'topbar-title'},titles[state.page]||''),
     div('topbar-right',[
       el('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'1px'}},[
@@ -1306,6 +1386,35 @@ function renderReceitas(){
   ]);
 }
 
+// ── MOBILE BOTTOM NAV ─────────────────────────────────────────────────────────
+function renderMobileNav(){
+  var pf=state.profile;
+  var tabs=[
+    {id:'dashboard',icon:'📊',label:'Início'},
+    pf==='artt'
+      ?{id:'vendas',icon:'🛒',label:'Vendas'}
+      :{id:'receitas',icon:'💵',label:'Receitas'},
+    {id:'pagar',icon:'💸',label:'Despesas'},
+    {id:'bancos',icon:'🏦',label:'Bancos'},
+    {id:'_menu',icon:'☰',label:'Menu'},
+  ];
+  return div('mobile-nav',[
+    div('mobile-nav-inner',tabs.map(function(t){
+      var isActive=t.id===state.page;
+      return el('button',{
+        class:'mobile-nav-btn'+(isActive?' active':''),
+        onclick:function(){
+          if(t.id==='_menu'){setState({sidebarOpen:!state.sidebarOpen});}
+          else{setState({page:t.id,sidebarOpen:false});}
+        },
+      },[
+        el('span',{class:'mn-icon'},t.icon),
+        el('span',{},t.label),
+      ]);
+    })),
+  ]);
+}
+
 // ── RENDER PRINCIPAL ──────────────────────────────────────────────────────────
 function render(){
   var root=document.getElementById('app');
@@ -1314,8 +1423,12 @@ function render(){
   var pages={dashboard:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas};
   var pageContent=(pages[state.page]||renderDashboard)();
   var content=div('content',[pageContent]);
-  var main=div('main',[renderTopbar(),content]);
+  var mainCls='main'+(state.sidebarCollapsed?' sb-collapsed':'');
+  var main=div(mainCls,[renderTopbar(),content]);
   var app=div('app',[renderSidebar(),main]);
+  var overlay=el('div',{class:'sidebar-overlay'+(state.sidebarOpen?' visible':''),onclick:function(){setState({sidebarOpen:false});}});
+  app.appendChild(overlay);
+  app.appendChild(renderMobileNav());
 
   var modal=renderModal();
   var metaModal=renderMetaModal();
@@ -1409,6 +1522,12 @@ function initApp(){
   document.getElementById('app').style.display='';
   document.getElementById('pin-overlay').style.display='none';
   render();
+  // Fecha drawer ao rotacionar / redimensionar para desktop
+  window.removeEventListener('resize',window._djfResizeHandler);
+  window._djfResizeHandler=function(){
+    if(window.innerWidth>768&&state.sidebarOpen){Object.assign(state,{sidebarOpen:false});render();}
+  };
+  window.addEventListener('resize',window._djfResizeHandler);
   loadFromFirebase()
     .then(function(){runRecorrencia();migrarVendasStone();if(typeof setupTarefasNotificacoes==='function')setupTarefasNotificacoes();})
     .catch(function(){runRecorrencia();migrarVendasStone();if(typeof setupTarefasNotificacoes==='function')setupTarefasNotificacoes();});

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0d0d0d"/>
+  <rect x="0" y="0" width="512" height="6" rx="3" fill="#c9a84c"/>
+  <rect x="0" y="506" width="512" height="6" rx="3" fill="#c9a84c"/>
+  <text x="256" y="290" font-family="Arial Black, Arial, sans-serif" font-size="200" font-weight="900" fill="#c9a84c" text-anchor="middle" dominant-baseline="middle">FR</text>
+  <text x="256" y="390" font-family="Arial, sans-serif" font-size="52" font-weight="400" fill="#6b6866" text-anchor="middle">FINANCE</text>
+</svg>

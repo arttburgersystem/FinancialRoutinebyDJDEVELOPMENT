@@ -218,6 +218,7 @@ var state={
   vendasData: today(),
   taxas: lsGet('taxas',TAXAS_DEFAULT),
   emprestimos: lsGet('emprestimos',[]),
+  fornecedores: lsGet('fornecedores',[]),
   orcamentos: lsGet('orcamentos',[]),
   cmv: lsGet('cmv',{artt:30,pessoal:0}),
   catManager: null,
@@ -231,6 +232,7 @@ var state={
   perfilModal: null,
   emprestimoModal: null,
   abaterModal: null,
+  fornecedorModal: null,
   buscaModal: false,
   buscaBusca: '',
   receitasMes: null,
@@ -283,7 +285,7 @@ function fbPut(path,data){
 
 function loadFromFirebase(){
   setState({syncStatus:'syncing'});
-  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias'),fbGet('/vendas'),fbGet('/emprestimos')])
+  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias'),fbGet('/vendas'),fbGet('/emprestimos'),fbGet('/fornecedores')])
     .then(function(results){
       var contas=objToArr(results[0]);
       var metas=objToArr(results[1]);
@@ -293,14 +295,15 @@ function loadFromFirebase(){
       var transferencias=objToArr(results[4]);
       var vendas=objToArr(results[5]);
       var emprestimos=objToArr(results[6]);
-      lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);lsSet('vendas',vendas);lsSet('emprestimos',emprestimos);
-      setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,vendas:vendas,emprestimos:emprestimos,syncStatus:'ok'});
+      var fornecedores=objToArr(results[7]);
+      lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);lsSet('vendas',vendas);lsSet('emprestimos',emprestimos);lsSet('fornecedores',fornecedores);
+      setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,vendas:vendas,emprestimos:emprestimos,fornecedores:fornecedores,syncStatus:'ok'});
     })
     .catch(function(e){
       console.error(e);
       setState({syncStatus:'error'});
       showToast('Erro ao conectar ao Firebase. Usando dados locais.','error');
-      setState({contas:lsGet('contas',[]),metas:lsGet('metas',[]),receitas:lsGet('receitas',[]),vendas:lsGet('vendas',[]),emprestimos:lsGet('emprestimos',[])});
+      setState({contas:lsGet('contas',[]),metas:lsGet('metas',[]),receitas:lsGet('receitas',[]),vendas:lsGet('vendas',[]),emprestimos:lsGet('emprestimos',[]),fornecedores:lsGet('fornecedores',[])});
     });
 }
 
@@ -309,7 +312,7 @@ function scheduleSave(){
   clearTimeout(syncTimer);
   syncTimer=setTimeout(function(){
     setState({syncStatus:'syncing'});
-    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);
+    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);
     Promise.all([
       fbPut('/contas',arrToObj(state.contas)),
       fbPut('/metas',arrToObj(state.metas)),
@@ -318,6 +321,7 @@ function scheduleSave(){
       fbPut('/transferencias',arrToObj(state.transferencias)),
       fbPut('/vendas',arrToObj(state.vendas||[])),
       fbPut('/emprestimos',arrToObj(state.emprestimos||[])),
+      fbPut('/fornecedores',arrToObj(state.fornecedores||[])),
     ]).then(function(){setState({syncStatus:'ok'});})
       .catch(function(e){console.error(e);setState({syncStatus:'error'});showToast('Erro ao salvar no Firebase','error');});
   },1500);
@@ -521,6 +525,7 @@ function renderSidebar(){
     {id:'pagar',label:'Despesas',icon:'💸',section:'financeiro'},
     {id:'receber',label:'Contas a receber',icon:'💰',section:'financeiro'},
     {id:'emprestimos',label:'Empréstimos',icon:'💳',section:'financeiro'},
+    {id:'fornecedores',label:'Fornecedores',icon:'🏪',section:'financeiro'},
     {id:'fluxo',label:'Fluxo de caixa',icon:'📈',section:'financeiro'},
     {id:'orcamento',label:'Orçamento',icon:'💰',section:'planejamento'},
     {id:'planejamento',label:'Metas',icon:'🎯',section:'planejamento'},
@@ -1167,7 +1172,7 @@ function render(){
   var root=document.getElementById('app');
   root.innerHTML='';
 
-  var pages={dashboard:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar};
+  var pages={dashboard:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,fornecedores:renderFornecedores,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar};
   var pageContent=(pages[state.page]||renderDashboard)();
   var content=div('content',[pageContent]);
   var main=div('main',[renderTopbar(),content]);
@@ -1213,6 +1218,7 @@ function render(){
 <script src="js/page-orcamento.js"></script>
 <script src="js/page-vendas.js"></script>
 <script src="js/page-emprestimos.js"></script>
+<script src="js/page-fornecedores.js"></script>
 <script>
 // ── TEMA ──────────────────────────────────────────────────────────────────────
 (function(){if(lsGet('theme','dark')==='light')document.body.classList.add('theme-light');})();

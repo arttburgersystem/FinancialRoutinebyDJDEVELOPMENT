@@ -13,6 +13,8 @@ function renderModal(){
     lembrete_antecipado:edit.lembrete_antecipado||0,notas:edit.notas||'',
     formaPgto:edit.formaPgto||'',
     banco:edit.banco||'',
+    fornecedor:edit.fornecedor||'',
+    fornecedorId:edit.fornecedorId||'',
   };
 
   function g(id){return document.getElementById('mf-'+id)?document.getElementById('mf-'+id).value:vals[id];}
@@ -36,6 +38,10 @@ function renderModal(){
     d.lembrete_antecipado=r.lembrete;
     d.lembrete_custom=document.getElementById('mf-lembrete-custom')?document.getElementById('mf-lembrete-custom').value:'';
     d.prioridade=document.getElementById('mf-prior-val')?document.getElementById('mf-prior-val').value:'normal';
+    var fornecedorInp=document.getElementById('mf-fornecedor-input');
+    var fornecedorIdInp=document.getElementById('mf-fornecedor-id');
+    d.fornecedor=fornecedorInp?fornecedorInp.value.trim():'';
+    d.fornecedorId=fornecedorIdInp?fornecedorIdInp.value:'';
     if(!d.descricao||!d.valor){showToast('Preencha descrição e valor','error');return;}
 
     var novasContas;
@@ -173,6 +179,11 @@ function renderModal(){
       el('button',{class:'modal-close',onclick:function(){setState({modal:null});}},'×'),
     ]),
     div('form-group',[el('label',{class:'form-label',for:'mf-descricao'},'Descrição'),inp('descricao','text','Ex: Fornecedor de carnes',vals.descricao)]),
+    div('form-group',[
+      el('label',{class:'form-label'},tipo==='pagar'?'Fornecedor / Destinatário':'Cliente / Pagador'),
+      buildFornecedorInput(vals.fornecedor,vals.fornecedorId),
+      el('p',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'4px'}},'Use ↑ ↓ para navegar · Tab para selecionar · Enter para criar novo'),
+    ]),
     div('form-row',[
       div('form-group',[el('label',{class:'form-label',for:'mf-valor'},'Valor (R$)'),valorInp]),
       div('form-group',[el('label',{class:'form-label',for:'mf-vencimento'},tipo==='pagar'?'Vencimento':'Previsão'),inp('vencimento','date','',vals.vencimento)]),

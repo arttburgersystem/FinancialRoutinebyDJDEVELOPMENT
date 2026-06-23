@@ -1,6 +1,46 @@
+// ── NOTIFICAÇÕES DE TAREFAS ───────────────────────────────────────────────────
+var _tarefaAlertaSnozeAte = 0; // timestamp em ms — se > agora, suprimir popup
+
+function _injectTarefaStyles() {
+  if (document.getElementById('djf-tarefa-styles')) return;
+  var s = document.createElement('style');
+  s.id = 'djf-tarefa-styles';
+  s.textContent = [
+    '@keyframes djfPulso{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.9);}70%{box-shadow:0 0 0 18px rgba(220,38,38,0);}}',
+    '@keyframes djfShake{0%,100%{transform:translateX(0);}15%{transform:translateX(-6px);}30%{transform:translateX(6px);}45%{transform:translateX(-5px);}60%{transform:translateX(5px);}75%{transform:translateX(-3px);}90%{transform:translateX(3px);}}',
+    '@keyframes djfBlink{0%,100%{opacity:1;}50%{opacity:.5;}}',
+    '@keyframes djfSlideUp{from{transform:translateY(100%);opacity:0;}to{transform:translateY(0);opacity:1;}}',
+    '.djf-alerta-popup{animation:djfShake .6s ease-out,djfPulso 1.8s 0.6s infinite;}',
+    '.djf-alerta-banner{animation:djfPulso 2s infinite;}',
+    '.djf-blink{animation:djfBlink 1s infinite;}',
+    '.djf-alerta-strip{animation:djfSlideUp .4s ease-out;}',
+  ].join('');
+  document.head.appendChild(s);
+}
+
+function _playAlertSound() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    function beep(freq, t0, dur, vol) {
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = freq; o.type = 'sine';
+      g.gain.setValueAtTime(vol || .3, ctx.currentTime + t0);
+      g.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + t0 + dur);
+      o.start(ctx.currentTime + t0);
+      o.stop(ctx.currentTime + t0 + dur + .01);
+    }
+    beep(880, 0, .12);
+    beep(660, .15, .1);
+    beep(880, .28, .12);
+    beep(1100, .44, .2, .25);
+  } catch(e) {}
+}
+
 function setupTarefasNotificacoes() {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
+  _injectTarefaStyles();
+  if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();
   }
   verificarAlertas();
@@ -8,85 +48,281 @@ function setupTarefasNotificacoes() {
 }
 
 function verificarAlertas() {
-  if (!state.tarefas || Notification.permission !== 'granted') return;
+  if (!state || !state.tarefas) return;
   var agora = new Date();
-  var tarefas = state.tarefas.filter(function(t) {
-    return (!t.profile || t.profile === state.profile) && t.status === 'pendente' && !t.notificado;
+  var todayStr = today();
+  var perfil = state.profile;
+
+  var ativas = state.tarefas.filter(function(t) {
+    if (!t || t.status !== 'pendente') return false;
+    if (t.profile && t.profile !== perfil) return false;
+    if (!t.data) return false;
+    var venc = t.hora ? new Date(t.data + 'T' + t.hora + ':00') : new Date(t.data + 'T23:59:59');
+    var lemMs = (t.lembrete_antecipado || 0) * 60000;
+    return agora >= new Date(venc.getTime() - lemMs);
   });
-  tarefas.forEach(function(t) {
-    if (!t.data) return;
-    var dataHora = t.hora ? new Date(t.data + 'T' + t.hora) : new Date(t.data + 'T23:59:59');
-    var lembreteMs = (t.lembrete_antecipado || 0) * 60000;
-    var alertTime = new Date(dataHora.getTime() - lembreteMs);
-    if (agora >= alertTime) {
-      var body = t.descricao || ('Vence em: ' + fmtDate(t.data) + (t.hora ? ' ' + t.hora : ''));
+
+  // Browser notification para novas (ainda não notificadas)
+  ativas.filter(function(t) { return !t.notificado; }).forEach(function(t) {
+    if ('Notification' in window && Notification.permission === 'granted') {
       try {
-        new Notification(t.titulo, { body: body, requireInteraction: true, tag: 'tarefa_' + t.id });
+        new Notification('⚠ Financial Routine — ' + t.titulo, {
+          body: (t.descricao ? t.descricao.slice(0, 80) : '') || 'Vence em ' + fmtDate(t.data) + (t.hora ? ' às ' + t.hora : ''),
+          requireInteraction: true,
+          tag: 'djf_tarefa_' + t.id,
+        });
       } catch(e) {}
-      state.tarefas = state.tarefas.map(function(x) {
-        return x.id === t.id ? Object.assign({}, x, { notificado: true }) : x;
-      });
-      lsSet('tarefas', state.tarefas);
     }
+    state.tarefas = state.tarefas.map(function(x) {
+      return x.id === t.id ? Object.assign({}, x, { notificado: true }) : x;
+    });
+    lsSet('tarefas', state.tarefas);
   });
+
+  // Re-render para mostrar/atualizar o banner se houver alertas
+  if (ativas.length > 0) {
+    var banner = document.getElementById('djf-alerta-strip');
+    if (!banner) {
+      // Re-render para colocar o banner na tela
+      render();
+    }
+  }
 }
 
 function renderAlertaBanner() {
   if (!state.tarefas) return null;
+  _injectTarefaStyles();
+
   var agora = new Date();
   var todayStr = today();
-  var alertas = state.tarefas.filter(function(t) {
+  var perfil = state.profile;
+
+  var alertas = (state.tarefas || []).filter(function(t) {
     if (!t || t.status !== 'pendente') return false;
-    if (!(!t.profile || t.profile === state.profile)) return false;
+    if (t.profile && t.profile !== perfil) return false;
     if (!t.data) return false;
-    if (t.data < todayStr) return true;
-    if (t.data === todayStr) {
-      if (t.lembrete_antecipado && t.hora) {
-        var dataHora = new Date(t.data + 'T' + t.hora);
-        var lembreteMs = t.lembrete_antecipado * 60000;
-        var alertTime = new Date(dataHora.getTime() - lembreteMs);
-        if (agora >= alertTime) return true;
-      }
-      if (!t.hora) return true;
-    }
-    return false;
+    var venc = t.hora ? new Date(t.data + 'T' + t.hora + ':00') : new Date(t.data + 'T23:59:59');
+    var lemMs = (t.lembrete_antecipado || 0) * 60000;
+    return agora >= new Date(venc.getTime() - lemMs);
   });
+
   if (!alertas.length) return null;
 
-  var banner = div('', []);
-  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9000;background:linear-gradient(90deg,#7a1a1a,#b8860b);color:#fff;padding:10px 16px;box-shadow:0 4px 16px rgba(0,0,0,.5)';
+  var snozeAtivo = _tarefaAlertaSnozeAte > Date.now();
 
-  var header = div('', [
-    el('strong', {}, '⚠ ' + alertas.length + ' tarefa' + (alertas.length > 1 ? 's' : '') + ' requer' + (alertas.length > 1 ? 'em' : '') + ' atenção'),
-  ]);
-  header.style.cssText = 'font-size:14px;font-weight:700;margin-bottom:6px';
-  banner.appendChild(header);
+  // ── POPUP MODAL (aparece quando não está snoze) ─────────────────────────────
+  if (!snozeAtivo) {
+    // Toca som uma vez por sessão de popup
+    if (!window._djfAlertaSomTocou) {
+      window._djfAlertaSomTocou = true;
+      _playAlertSound();
+      setTimeout(function() { window._djfAlertaSomTocou = false; }, 30000);
+    }
 
-  var lista = div('', []);
-  lista.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px';
+    var overlay = el('div', {});
+    overlay.style.cssText = [
+      'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99990;',
+      'background:rgba(0,0,0,.75);backdrop-filter:blur(4px);',
+      'display:flex;align-items:center;justify-content:center;padding:20px;',
+    ].join('');
 
-  alertas.forEach(function(t) {
-    var diasAtrasado = Math.floor((new Date(todayStr) - new Date(t.data)) / 86400000);
-    var item = div('', []);
-    item.style.cssText = 'display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.25);border-radius:6px;padding:5px 10px';
+    var popup = el('div', {});
+    popup.className = 'djf-alerta-popup';
+    popup.style.cssText = [
+      'background:#1a0505;border:3px solid #dc2626;border-radius:16px;',
+      'max-width:520px;width:100%;max-height:80vh;overflow-y:auto;',
+      'box-shadow:0 0 60px rgba(220,38,38,.5),0 24px 48px rgba(0,0,0,.8);',
+      'padding:0;',
+    ].join('');
 
-    var txt = el('span', {}, t.titulo + (diasAtrasado > 0 ? ' — ' + diasAtrasado + ' dia' + (diasAtrasado > 1 ? 's' : '') + ' atraso' : ' — hoje'));
-    txt.style.cssText = 'font-size:12px';
-    item.appendChild(txt);
+    // Cabeçalho
+    var head = el('div', {});
+    head.style.cssText = [
+      'background:linear-gradient(135deg,#dc2626,#7f1d1d);',
+      'padding:20px 24px;border-radius:13px 13px 0 0;',
+      'display:flex;align-items:center;justify-content:space-between;',
+    ].join('');
 
-    var verBtn = el('button', {}, '→ Ver tarefa');
-    verBtn.style.cssText = 'background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer';
-    verBtn.onclick = (function(tid) {
-      return function() {
-        setState({ page: 'tarefas', concluirModal: { tarefaId: tid } });
-      };
-    })(t.id);
-    item.appendChild(verBtn);
-    lista.appendChild(item);
-  });
+    var headLeft = el('div', {});
+    var headIcon = el('div', {});
+    headIcon.className = 'djf-blink';
+    headIcon.style.cssText = 'font-size:32px;margin-bottom:4px';
+    headIcon.textContent = '🚨';
 
-  banner.appendChild(lista);
-  return banner;
+    var headTitle = el('div', {});
+    headTitle.style.cssText = 'font-size:17px;font-weight:800;color:#fff;line-height:1.2';
+    headTitle.textContent = alertas.length === 1
+      ? 'Você tem 1 tarefa pendente!'
+      : 'Você tem ' + alertas.length + ' tarefas pendentes!';
+
+    var headSub = el('div', {});
+    headSub.style.cssText = 'font-size:12px;color:rgba(255,255,255,.7);margin-top:3px';
+    headSub.textContent = 'Estas tarefas precisam da sua atenção agora.';
+
+    headLeft.appendChild(headIcon);
+    headLeft.appendChild(headTitle);
+    headLeft.appendChild(headSub);
+
+    var snozeBtn = el('button', {});
+    snozeBtn.style.cssText = [
+      'background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);',
+      'color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;',
+      'font-weight:600;cursor:pointer;white-space:nowrap;',
+    ].join('');
+    snozeBtn.textContent = '⏸ Snooze 1h';
+    snozeBtn.onclick = function() {
+      _tarefaAlertaSnozeAte = Date.now() + 3600000;
+      render();
+    };
+
+    head.appendChild(headLeft);
+    head.appendChild(snozeBtn);
+    popup.appendChild(head);
+
+    // Lista de tarefas
+    var body = el('div', {});
+    body.style.cssText = 'padding:16px 24px;';
+
+    alertas.forEach(function(t) {
+      var diasAtr = Math.floor((agora - new Date(t.data + 'T00:00:00')) / 86400000);
+      var isAtrasada = t.data < todayStr;
+      var prioColor = { baixa: '#94a3b8', normal: '#60a5fa', alta: '#fbbf24', urgente: '#f87171' };
+
+      var card = el('div', {});
+      card.style.cssText = [
+        'background:rgba(255,255,255,.06);border:1px solid rgba(220,38,38,.4);',
+        'border-radius:10px;padding:14px 16px;margin-bottom:10px;',
+        'border-left:4px solid ' + (prioColor[t.prioridade] || '#f87171') + ';',
+      ].join('');
+
+      var cardTop = el('div', {});
+      cardTop.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px';
+
+      var cardInfo = el('div', {});
+      cardInfo.style.flex = '1';
+
+      var cardTitle = el('div', {});
+      cardTitle.style.cssText = 'font-size:14px;font-weight:700;color:#fff;margin-bottom:2px';
+      cardTitle.textContent = t.titulo;
+
+      var cardMeta = el('div', {});
+      cardMeta.style.cssText = 'font-size:11px;color:rgba(255,255,255,.6)';
+      cardMeta.textContent = isAtrasada
+        ? '⚠ ' + diasAtr + ' dia' + (diasAtr !== 1 ? 's' : '') + ' em atraso · ' + fmtDate(t.data)
+        : '📅 Hoje' + (t.hora ? ' às ' + t.hora : '');
+
+      if (t.descricao) {
+        var cardDesc = el('div', {});
+        cardDesc.style.cssText = 'font-size:12px;color:rgba(255,255,255,.5);margin-top:4px';
+        cardDesc.textContent = t.descricao.length > 70 ? t.descricao.slice(0, 70) + '...' : t.descricao;
+        cardInfo.appendChild(cardTitle);
+        cardInfo.appendChild(cardMeta);
+        cardInfo.appendChild(cardDesc);
+      } else {
+        cardInfo.appendChild(cardTitle);
+        cardInfo.appendChild(cardMeta);
+      }
+
+      var concluirBtnPopup = el('button', {});
+      concluirBtnPopup.style.cssText = [
+        'background:#16a34a;color:#fff;border:none;border-radius:8px;',
+        'padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;',
+        'white-space:nowrap;flex-shrink:0;',
+      ].join('');
+      concluirBtnPopup.textContent = '✓ Concluir';
+      concluirBtnPopup.onclick = (function(tid) {
+        return function() {
+          setState({ page: 'tarefas', concluirModal: { tarefaId: tid } });
+        };
+      })(t.id);
+
+      cardTop.appendChild(cardInfo);
+      cardTop.appendChild(concluirBtnPopup);
+      card.appendChild(cardTop);
+      body.appendChild(card);
+    });
+
+    // Rodapé
+    var foot = el('div', {});
+    foot.style.cssText = 'padding:12px 24px 20px;display:flex;gap:10px;';
+
+    var verTodasBtn = el('button', {});
+    verTodasBtn.style.cssText = [
+      'flex:1;background:#dc2626;color:#fff;border:none;border-radius:8px;',
+      'padding:12px;font-size:13px;font-weight:700;cursor:pointer;',
+    ].join('');
+    verTodasBtn.textContent = '📋 Ver todas as tarefas';
+    verTodasBtn.onclick = function() { setState({ page: 'tarefas' }); };
+
+    var snoze15Btn = el('button', {});
+    snoze15Btn.style.cssText = [
+      'background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);',
+      'border-radius:8px;padding:12px 16px;font-size:12px;cursor:pointer;white-space:nowrap;',
+    ].join('');
+    snoze15Btn.textContent = '⏸ 15 min';
+    snoze15Btn.onclick = function() {
+      _tarefaAlertaSnozeAte = Date.now() + 900000;
+      render();
+    };
+
+    foot.appendChild(verTodasBtn);
+    foot.appendChild(snoze15Btn);
+
+    popup.appendChild(body);
+    popup.appendChild(foot);
+    overlay.appendChild(popup);
+    return overlay;
+  }
+
+  // ── BANNER FIXO (quando está em snooze — não some, só fica menor) ───────────
+  var strip = el('div', { id: 'djf-alerta-strip' });
+  strip.className = 'djf-alerta-strip djf-alerta-banner';
+  strip.style.cssText = [
+    'position:fixed;bottom:0;left:0;right:0;z-index:99980;',
+    'background:linear-gradient(90deg,#7f1d1d,#dc2626,#7f1d1d);',
+    'border-top:2px solid #fef08a;color:#fff;',
+    'display:flex;align-items:center;gap:12px;',
+    'padding:10px 20px;box-shadow:0 -4px 24px rgba(220,38,38,.6);',
+    'cursor:pointer;',
+  ].join('');
+  strip.onclick = function() {
+    _tarefaAlertaSnozeAte = 0;
+    render();
+  };
+
+  var stripIcon = el('span', {});
+  stripIcon.className = 'djf-blink';
+  stripIcon.style.cssText = 'font-size:20px;flex-shrink:0';
+  stripIcon.textContent = '🚨';
+
+  var stripText = el('div', {});
+  stripText.style.cssText = 'flex:1;font-size:13px;font-weight:700';
+  stripText.textContent = alertas.length + ' tarefa' + (alertas.length > 1 ? 's' : '') + ' pendente' + (alertas.length > 1 ? 's' : '') + ' — clique para ver';
+
+  var stripNomes = el('div', {});
+  stripNomes.style.cssText = 'font-size:11px;color:rgba(255,255,255,.7);margin-top:2px';
+  stripNomes.textContent = alertas.map(function(t) { return t.titulo; }).slice(0, 3).join(' · ') + (alertas.length > 3 ? ' +' + (alertas.length - 3) : '');
+
+  var stripInfo = el('div', {});
+  stripInfo.appendChild(stripText);
+  stripInfo.appendChild(stripNomes);
+
+  var stripBtn = el('button', {});
+  stripBtn.style.cssText = [
+    'background:#fff;color:#dc2626;border:none;border-radius:6px;',
+    'padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0;',
+  ].join('');
+  stripBtn.textContent = '⚡ Ver agora';
+  stripBtn.onclick = function(e) {
+    e.stopPropagation();
+    _tarefaAlertaSnozeAte = 0;
+    render();
+  };
+
+  strip.appendChild(stripIcon);
+  strip.appendChild(stripInfo);
+  strip.appendChild(stripBtn);
+  return strip;
 }
 
 function renderTarefas() {

@@ -1493,7 +1493,9 @@ function buildPinScreen(mode){
           var saved=getPin();
           if(pin===saved){
             msg.className='pin-msg success';msg.textContent='✓ Acesso liberado';
-            setTimeout(initApp,400);
+            setTimeout(function(){
+              if(typeof bioSuportado==='function'&&bioSuportado()&&!bioRegistrado()){oferecerBiometria();}else{initApp();}
+            },400);
           } else {
             digits=[];
             updateDots(true);
@@ -1532,6 +1534,28 @@ function buildPinScreen(mode){
 
     box.appendChild(logo);box.appendChild(dev);box.appendChild(title);box.appendChild(sub);
     box.appendChild(dotsEl);box.appendChild(pad);box.appendChild(msg);
+    if(mode==='enter'&&typeof bioSuportado==='function'&&bioSuportado()&&bioRegistrado()){
+      var bioSep=document.createElement('div');
+      bioSep.style.cssText='font-size:11px;color:var(--text3);margin:6px 0 8px;letter-spacing:.5px;';
+      bioSep.textContent='— ou —';
+      var bioBtnEl=document.createElement('button');
+      bioBtnEl.style.cssText='width:234px;height:48px;border-radius:12px;background:rgba(91,155,213,.1);border:1px solid var(--blue);color:var(--blue);font-size:15px;font-family:inherit;cursor:pointer;transition:all .15s;margin-bottom:4px;';
+      bioBtnEl.textContent='🔐 Usar Face ID / Digital';
+      bioBtnEl.onmouseenter=function(){bioBtnEl.style.background='rgba(91,155,213,.2)';};
+      bioBtnEl.onmouseleave=function(){bioBtnEl.style.background='rgba(91,155,213,.1)';};
+      bioBtnEl.onclick=function(){
+        msg.className='pin-msg';msg.textContent='Aguardando verificação biométrica...';
+        bioAutenticar(function(){
+          msg.className='pin-msg success';msg.textContent='✓ Acesso liberado';
+          setTimeout(initApp,300);
+        },function(){
+          msg.className='pin-msg error';msg.textContent='Biometria falhou. Use o PIN.';
+          setTimeout(function(){msg.className='pin-msg';msg.textContent='';},2000);
+        });
+      };
+      box.appendChild(bioSep);
+      box.appendChild(bioBtnEl);
+    }
     ov.appendChild(box);
   }
 
@@ -1585,6 +1609,88 @@ function buildPinScreen(mode){
   }
 
   render();
+}
+
+// ── BIOMETRIA (WebAuthn — Face ID / Touch ID / Windows Hello) ─────────────────
+var BIO_CRED_KEY = 'djf_bio_cred';
+
+function bioSuportado() {
+  return !!(window.PublicKeyCredential && navigator.credentials &&
+    (window.location.protocol === 'https:' || window.location.hostname === 'localhost'));
+}
+function bioRegistrado() {
+  return !!localStorage.getItem(BIO_CRED_KEY);
+}
+function bioRegistrar(onOk, onErr) {
+  var ch = new Uint8Array(32); crypto.getRandomValues(ch);
+  var uid = new Uint8Array(16); crypto.getRandomValues(uid);
+  navigator.credentials.create({ publicKey: {
+    challenge: ch,
+    rp: { name: 'Financial Routine', id: window.location.hostname || 'localhost' },
+    user: { id: uid, name: 'djfinance', displayName: 'Financial Routine' },
+    pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
+    authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+    timeout: 60000,
+  }}).then(function(cred) {
+    localStorage.setItem(BIO_CRED_KEY, JSON.stringify(Array.from(new Uint8Array(cred.rawId))));
+    if (onOk) onOk();
+  }).catch(function(e) { if (onErr) onErr(e); });
+}
+function bioAutenticar(onOk, onErr) {
+  var raw = localStorage.getItem(BIO_CRED_KEY);
+  if (!raw) { if (onErr) onErr(new Error('Não registrado')); return; }
+  var credId;
+  try { credId = new Uint8Array(JSON.parse(raw)); } catch(e) { if(onErr) onErr(e); return; }
+  var ch = new Uint8Array(32); crypto.getRandomValues(ch);
+  navigator.credentials.get({ publicKey: {
+    challenge: ch,
+    rpId: window.location.hostname || 'localhost',
+    allowCredentials: [{ id: credId, type: 'public-key' }],
+    userVerification: 'required',
+    timeout: 60000,
+  }}).then(function(cred) {
+    if (cred) { if (onOk) onOk(); } else { if (onErr) onErr(new Error('sem credencial')); }
+  }).catch(function(e) { if (onErr) onErr(e); });
+}
+
+function oferecerBiometria() {
+  var ov = document.getElementById('pin-overlay');
+  ov.style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  ov.innerHTML = '';
+  var box = document.createElement('div'); box.className = 'pin-box';
+  var logo = document.createElement('div'); logo.className = 'pin-logo'; logo.textContent = 'Financial Routine';
+  var dev2 = document.createElement('div'); dev2.className = 'pin-dev'; dev2.textContent = 'DJ DEVELOPMENT';
+  var ico = document.createElement('div'); ico.style.cssText = 'font-size:52px;margin:12px 0 8px;'; ico.textContent = '🔐';
+  var tit = document.createElement('div'); tit.className = 'pin-title'; tit.textContent = 'Ativar Face ID / Digital?';
+  var sub2 = document.createElement('div'); sub2.className = 'pin-subtitle'; sub2.textContent = 'Entre sem PIN nos próximos acessos';
+  var msgB = document.createElement('div'); msgB.className = 'pin-msg'; msgB.style.marginTop = '8px';
+
+  var btnSim = document.createElement('button');
+  btnSim.className = 'pin-key confirm';
+  btnSim.style.cssText = 'width:220px;font-size:14px;height:50px;border-radius:12px;margin-bottom:10px;';
+  btnSim.textContent = '✓ Ativar Face ID / Digital';
+  btnSim.onclick = function() {
+    msgB.textContent = 'Siga as instruções do dispositivo...'; msgB.className = 'pin-msg';
+    bioRegistrar(function() {
+      msgB.className = 'pin-msg success'; msgB.textContent = '✓ Biometria ativada!';
+      setTimeout(function() { ov.style.display = 'none'; initApp(); }, 700);
+    }, function() {
+      msgB.className = 'pin-msg error'; msgB.textContent = 'Não foi possível ativar. Entrando com PIN.';
+      setTimeout(function() { ov.style.display = 'none'; initApp(); }, 1500);
+    });
+  };
+
+  var btnNao = document.createElement('button');
+  btnNao.className = 'pin-key';
+  btnNao.style.cssText = 'width:220px;font-size:13px;height:40px;color:var(--text3);';
+  btnNao.textContent = 'Agora não';
+  btnNao.onclick = function() { ov.style.display = 'none'; initApp(); };
+
+  box.appendChild(logo); box.appendChild(dev2); box.appendChild(ico);
+  box.appendChild(tit); box.appendChild(sub2);
+  box.appendChild(btnSim); box.appendChild(btnNao); box.appendChild(msgB);
+  ov.appendChild(box);
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────

@@ -158,6 +158,60 @@ function renderFornecedores(){
         });
     }
 
+    function buscarCnpj(){
+      var cnpj=(gf('documento')||'').replace(/\D/g,'');
+      if(cnpj.length!==14){showToast('CNPJ deve ter 14 dígitos','error');return;}
+      var b=document.getElementById('forn-cnpj-btn');
+      if(b){b.textContent='⏳';b.disabled=true;}
+      fetch('https://brasilapi.com.br/api/cnpj/v1/'+cnpj)
+        .then(function(r){
+          if(!r.ok)throw new Error('CNPJ não encontrado (status '+r.status+')');
+          return r.json();
+        })
+        .then(function(d){
+          if(b){b.textContent='🔍 Consultar';b.disabled=false;}
+          var set=function(id,v){var e=document.getElementById('forn-'+id);if(e&&v)e.value=v;};
+          var nome=d.nome_fantasia&&d.nome_fantasia.trim()?d.nome_fantasia.trim():d.razao_social||'';
+          set('nome',nome);
+          // Formatar CNPJ: 00.000.000/0000-00
+          var cnpjFmt=cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5');
+          var docEl=document.getElementById('forn-documento');if(docEl)docEl.value=cnpjFmt;
+          if(d.telefone){
+            var tel=(d.telefone||'').replace(/\D/g,'');
+            var telFmt=tel.length===10?tel.replace(/^(\d{2})(\d{4})(\d{4})$/,'($1) $2-$3'):
+                       tel.length===11?tel.replace(/^(\d{2})(\d{5})(\d{4})$/,'($1) $2-$3'):(d.telefone||'');
+            set('telefone',telFmt);
+          }
+          set('email',d.email||'');
+          // Endereço
+          var cepNum=(d.cep||'').replace(/\D/g,'');
+          var cepFmt=cepNum.length===8?cepNum.replace(/^(\d{5})(\d{3})$/,'$1-$2'):(d.cep||'');
+          set('cep',cepFmt);
+          set('rua',(d.logradouro||'').toUpperCase()===d.logradouro?(d.logradouro||'').replace(/\b\w/g,function(c){return c.toUpperCase();}):d.logradouro||'');
+          set('numero',d.numero||'');
+          set('complemento',d.complemento||'');
+          set('bairro',(d.bairro||'').toUpperCase()===d.bairro?(d.bairro||'').replace(/\b\w/g,function(c){return c.toUpperCase();}):d.bairro||'');
+          set('cidade',(d.municipio||'').toUpperCase()===d.municipio?(d.municipio||'').replace(/\b\w/g,function(c){return c.toUpperCase();}):d.municipio||'');
+          set('estado',d.uf||'');
+          // Situação nas notas
+          var situacao=d.descricao_situacao_cadastral||d.situacao_cadastral||'';
+          var porte=d.descricao_porte||d.porte||'';
+          var nat=d.descricao_natureza_juridica||'';
+          var notasVal=[
+            situacao?'Situação: '+situacao:'',
+            nat?'Natureza: '+nat:'',
+            porte?'Porte: '+porte:'',
+          ].filter(Boolean).join(' · ');
+          var notasEl=document.getElementById('forn-notas');
+          if(notasEl&&notasVal)notasEl.value=notasVal;
+          showToast('Dados do CNPJ carregados! Confirme e salve.');
+        })
+        .catch(function(err){
+          if(b){b.textContent='🔍 Consultar';b.disabled=false;}
+          showToast('CNPJ não encontrado ou serviço indisponível','error');
+        });
+    }
+
     function saveForn(){
       var nome=(gf('nome')||'').trim();
       if(!nome){showToast('Informe o nome','error');return;}
@@ -234,9 +288,22 @@ function renderFornecedores(){
 
       secBox([
         secTitle('🏢','Identificação'),
+        el('div',{style:{background:'rgba(96,165,250,.08)',border:'1px solid rgba(96,165,250,.25)',borderRadius:'6px',padding:'8px 12px',marginBottom:'12px',fontSize:'12px',color:'var(--blue)'}},[
+          el('strong',{},'💡 Dica: '),
+          el('span',{},'Digite o CNPJ no campo abaixo e clique em "🔍 Consultar" para preencher os dados automaticamente.'),
+        ]),
+        el('div',{style:{display:'flex',gap:'8px',alignItems:'flex-end',marginBottom:'12px'}},[
+          el('div',{style:{flex:'1'}},[
+            el('label',{class:'form-label'},'CPF / CNPJ'),
+            inp2('documento','text','00.000.000/0000-00 ou 000.000.000-00',ed.documento||''),
+          ]),
+          el('button',{id:'forn-cnpj-btn',class:'btn-primary',
+            style:{whiteSpace:'nowrap',padding:'8px 14px',fontSize:'12px',flexShrink:'0'},
+            onclick:buscarCnpj},'🔍 Consultar'),
+        ]),
         div('form-group',[el('label',{class:'form-label'},'Nome / Razão Social *'),inp2('nome','text','Nome, empresa ou pessoa...',ed.nome||'')]),
-        grid2(fg('Tipo',tipoSel),fg('CPF / CNPJ',inp2('documento','text','000.000.000-00 / 00.000.000/0000-00',ed.documento||''))),
-        grid2(fg('Inscrição Estadual / Municipal',inp2('inscricao','text','IE ou IM',ed.inscricao||'')),fg('Site',inp2('site','url','https://site.com.br',ed.site||''))),
+        grid2(fg('Tipo',tipoSel),fg('Inscrição Estadual / Municipal',inp2('inscricao','text','IE ou IM',ed.inscricao||''))),
+        fg('Site',inp2('site','url','https://site.com.br',ed.site||'')),
       ]),
 
       secBox([

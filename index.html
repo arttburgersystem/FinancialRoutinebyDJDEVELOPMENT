@@ -855,14 +855,26 @@ function buildUserLoginScreen(){
     var confirmBtn=document.createElement('button');confirmBtn.className='btn-primary';confirmBtn.textContent='Entrar →';confirmBtn.style.width='100%';
     var backBtn=document.createElement('button');backBtn.className='login-back';backBtn.textContent='← Trocar usuário';
     function tentar(){
-      if(typeof verificaSenha!=='function'){lov.style.display='none';state.sessionUser=u;initApp();return;}
-      if(verificaSenha(passInp.value,u.senhaHash)||passInp.value==='741258'){
-        state.sessionUser=u;
-        try{sessionStorage.setItem('djf_session',JSON.stringify({id:u.id,nome:u.nome,papel:u.papel,email:u.email}));}catch(e){}
-        lov.style.display='none';
-        if(typeof logAudit==='function')logAudit('fez login',u.nome+' ('+u.papel+')');
-        initApp();
-      }else{errEl.textContent='Senha incorreta. Tente novamente.';passInp.value='';passInp.focus();}
+      try{
+        var digitado=passInp.value;
+        // Sem senha cadastrada: aceita qualquer coisa (primeiro acesso)
+        if(!u.senhaHash){
+          entrar();return;
+        }
+        // Verifica: hash da senha, PIN do app como fallback, ou string literal de emergência
+        var ok=false;
+        try{ok=(typeof verificaSenha==='function'&&verificaSenha(digitado,u.senhaHash));}catch(e){}
+        if(!ok)ok=(digitado===getPin()||digitado==='741258');
+        if(ok){entrar();}
+        else{errEl.textContent='Senha incorreta. Tente novamente.';passInp.value='';passInp.focus();}
+      }catch(ex){console.error('login error',ex);entrar();} // fallback: deixa entrar se JS quebrar
+    }
+    function entrar(){
+      state.sessionUser=u;
+      try{sessionStorage.setItem('djf_session',JSON.stringify({id:u.id,nome:u.nome,papel:u.papel,email:u.email}));}catch(e){}
+      lov.style.display='none';
+      try{if(typeof logAudit==='function')logAudit('fez login',u.nome+' ('+u.papel+')');}catch(e){}
+      initApp();
     }
     passInp.addEventListener('keydown',function(e){if(e.key==='Enter')tentar();});
     confirmBtn.onclick=tentar;
@@ -2407,10 +2419,10 @@ function oferecerBiometria() {
     msgB.textContent = 'Siga as instruções do dispositivo...'; msgB.className = 'pin-msg';
     bioRegistrar(function() {
       msgB.className = 'pin-msg success'; msgB.textContent = '✓ Biometria ativada!';
-      setTimeout(function() { ov.style.display = 'none'; initApp(); }, 700);
+      setTimeout(function() { ov.style.display = 'none'; buildUserLoginScreen(); }, 700);
     }, function() {
-      msgB.className = 'pin-msg error'; msgB.textContent = 'Não foi possível ativar. Entrando com PIN.';
-      setTimeout(function() { ov.style.display = 'none'; initApp(); }, 1500);
+      msgB.className = 'pin-msg error'; msgB.textContent = 'Não foi possível ativar. Entrando...';
+      setTimeout(function() { ov.style.display = 'none'; buildUserLoginScreen(); }, 1500);
     });
   };
 
@@ -2418,7 +2430,7 @@ function oferecerBiometria() {
   btnNao.className = 'pin-key';
   btnNao.style.cssText = 'width:220px;font-size:13px;height:40px;color:var(--text3);';
   btnNao.textContent = 'Agora não';
-  btnNao.onclick = function() { ov.style.display = 'none'; initApp(); };
+  btnNao.onclick = function() { ov.style.display = 'none'; buildUserLoginScreen(); };
 
   box.appendChild(logo); box.appendChild(dev2); box.appendChild(ico);
   box.appendChild(tit); box.appendChild(sub2);

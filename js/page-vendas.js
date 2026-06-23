@@ -1,6 +1,6 @@
 // ── VENDAS DO DIA — exclusivo Artt Burger ────────────────────────────────────
-var _vcalYear=new Date().getFullYear();
-var _vcalMonth=new Date().getMonth();
+var _vcalYear=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'})).getFullYear();
+var _vcalMonth=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'})).getMonth();
 
 function renderVendas(){
   if(state.profile!=='artt'){
@@ -13,8 +13,9 @@ function renderVendas(){
   var vendaId='venda_'+dataSel;
   var atual=(state.vendas||[]).find(function(v){return v.id===vendaId;})||null;
 
-  var ontem=new Date();ontem.setDate(ontem.getDate()-1);
-  var ontemStr=ontem.toISOString().split('T')[0];
+  var ontem=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));
+  ontem.setDate(ontem.getDate()-1);
+  var ontemStr=ontem.toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
   var dObj=new Date(dataSel+'T12:00:00');
   var DIAS=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
   var MESES_FULL=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -29,7 +30,7 @@ function renderVendas(){
   function navDate(delta){
     var d=new Date(dataSel+'T12:00:00');
     d.setDate(d.getDate()+delta);
-    setState({vendasData:d.toISOString().split('T')[0]});
+    setState({vendasData:d.toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'})});
   }
 
   function irParaData(dateStr){
@@ -488,7 +489,7 @@ function renderVendas(){
         _vcalMonth++;if(_vcalMonth>11){_vcalMonth=0;_vcalYear++;}renderBottomCal();
       }},'→'),
       el('button',{class:'btn-ghost',style:{fontSize:'11px',padding:'4px 10px',marginLeft:'8px'},onclick:function(){
-        _vcalYear=new Date().getFullYear();_vcalMonth=new Date().getMonth();renderBottomCal();
+        var _hj=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));_vcalYear=_hj.getFullYear();_vcalMonth=_hj.getMonth();renderBottomCal();
       }},'Hoje'),
     ]);
     wrap.appendChild(header);

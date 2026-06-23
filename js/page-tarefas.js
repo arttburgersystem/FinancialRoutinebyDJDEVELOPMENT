@@ -330,9 +330,9 @@ function renderTarefas() {
     return !t.profile || t.profile === state.profile;
   });
   var todayStr = today();
-  var now = new Date();
+  var now = typeof nowBR === 'function' ? nowBR() : new Date();
   var nowMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-  var in30 = new Date(now.getTime() + 30 * 86400000).toISOString().split('T')[0];
+  var in30 = new Date(now.getTime() + 30 * 86400000).toLocaleDateString('sv-SE', {timeZone:'America/Sao_Paulo'});
 
   var tipoIcon = { tarefa: '📋', lembrete: '🔔', reuniao: '🗓', prazo: '⏰' };
   var prioridadeColor = { baixa: 'var(--text3)', normal: 'var(--blue)', alta: 'var(--gold)', urgente: 'var(--red)' };
@@ -582,8 +582,8 @@ function renderTarefas() {
   var proximas = pendentes.filter(function(t) { return t.data > todayStr && t.data <= in30; }).sort(function(a, b) { return a.data < b.data ? -1 : 1; });
   var concluidas = tarefas.filter(function(t) { return t.status === 'concluido'; }).slice(-20).reverse();
 
-  var now2 = new Date();
-  var semFim = new Date(now2.getTime() + 7 * 86400000).toISOString().split('T')[0];
+  var now2 = typeof nowBR === 'function' ? nowBR() : new Date();
+  var semFim = new Date(now2.getTime() + 7 * 86400000).toLocaleDateString('sv-SE', {timeZone:'America/Sao_Paulo'});
   var estaSemana = pendentes.filter(function(t) { return t.data >= todayStr && t.data <= semFim; });
   var concluidosMes = tarefas.filter(function(t) { return t.status === 'concluido' && t.dataConclusao && t.dataConclusao.startsWith(nowMonth); });
 

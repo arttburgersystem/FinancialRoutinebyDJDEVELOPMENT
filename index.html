@@ -242,12 +242,12 @@ var state={
   buscaBusca: '',
   receitasMes: null,
   receitasCat: '',
-  dreFiltro: {mes:new Date().getMonth(),ano:new Date().getFullYear()},
+  dreFiltro: {mes:nowBR().getMonth(),ano:nowBR().getFullYear()},
   orcamentoMes: null,
   toast: null,
   filtro: {pagar:'todos',receber:'todos'},
   busca: {pagar:'',receber:''},
-  mesSel: new Date().getMonth(),
+  mesSel: nowBR().getMonth(),
 };
 
 function lsGet(k,d){try{var v=localStorage.getItem('djf_'+k);return v?JSON.parse(v):d;}catch(e){return d;}}
@@ -261,10 +261,11 @@ function showToast(msg,type,dur){
 }
 
 // ── UTILS ────────────────────────────────────────────────────────────────────
-function today(){return new Date().toISOString().split('T')[0];}
+function nowBR(){return new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));}
+function today(){return new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});}
 function fmtDate(d){if(!d)return'—';var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
 function fmtMoney(v){return'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function diasRestantes(venc){if(!venc)return null;return Math.ceil((new Date(venc)-new Date(today()))/86400000);}
+function diasRestantes(venc){if(!venc)return null;return Math.ceil((new Date(venc+' 12:00:00')-new Date(today()+' 12:00:00'))/86400000);}
 function statusBadge(item){
   var d=diasRestantes(item.vencimento);
   if(item.status==='pago'||item.status==='recebido')return item.status;
@@ -430,11 +431,11 @@ function addPeriodo(d,tipo,n){
   else if(tipo==='semanal')dt.setDate(dt.getDate()+7*n);
   else if(tipo==='anual')dt.setFullYear(dt.getFullYear()+n);
   else dt.setMonth(dt.getMonth()+n);
-  return dt.toISOString().split('T')[0];
+  return dt.toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
 }
 function runRecorrencia(){
-  var limite=new Date();limite.setMonth(limite.getMonth()+2);
-  var limitStr=limite.toISOString().split('T')[0];
+  var limite=nowBR();limite.setMonth(limite.getMonth()+2);
+  var limitStr=limite.toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
   var recorrentes=state.contas.filter(function(c){return c.recorrente&&!c.gerado_de;});
   var novas=[];
   recorrentes.forEach(function(r){
@@ -612,12 +613,20 @@ function renderSidebar(){
 function renderTopbar(){
   var pf=PROFILES.find(function(p){return p.id===state.profile;});
   var titles={dashboard:'Visão geral',bancos:'Bancos e Contas',receitas:'Receitas',dre:'DRE — Resultado',vendas:'Vendas do Dia',pagar:'Despesas',receber:'Contas a receber',fluxo:'Fluxo de caixa',orcamento:'Orçamento vs Realizado',planejamento:'Metas e Objetivos',alertas:'Alertas',exportar:'Relatórios e Exportação'};
-  var dataAtual=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+  var dataAtual=new Date().toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo',weekday:'long',day:'2-digit',month:'long'});
+  var horaAtual=new Date().toLocaleTimeString('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',second:'2-digit'});
   var tag=el('span',{class:'tag',style:{background:pf.color+'22',color:pf.color}},pf.label);
   var searchBtn=el('button',{class:'btn-ghost',style:{padding:'6px 12px',fontSize:'13px'},onclick:function(){setState({buscaModal:true,buscaBusca:''});}}, '🔍 Buscar');
+  var clockEl=el('span',{id:'djf-clock',style:{fontVariantNumeric:'tabular-nums',fontSize:'13px',color:'var(--text3)',letterSpacing:'.5px',fontWeight:'600'}},horaAtual);
   return div('topbar',[
     el('div',{class:'topbar-title'},titles[state.page]||''),
-    div('topbar-right',[el('span',{class:'topbar-date'},dataAtual),searchBtn,tag]),
+    div('topbar-right',[
+      el('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'1px'}},[
+        el('span',{class:'topbar-date'},dataAtual),
+        clockEl,
+      ]),
+      searchBtn,tag,
+    ]),
   ]);
 }
 
@@ -632,7 +641,7 @@ function renderDashboard(){
   var saldo=totalR-totalP;
   var vencendo=pagar.filter(function(c){var d=diasRestantes(c.vencimento);return d!==null&&d>=0&&d<=7&&c.status!=='pago';});
 
-  var now=new Date();
+  var now=nowBR();
   var mesMesStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   var recMes=state.receitas.filter(function(r){return r.profile===pf&&r.data&&r.data.startsWith(mesMesStr);});
   var totalRecMes=recMes.reduce(function(a,r){return a+r.valor;},0);
@@ -1045,7 +1054,7 @@ function renderExportar(){
     showToast('CSV completo baixado!');
   }
   function exportJSON(){
-    var data={exportado_em:new Date().toISOString(),perfil:pf,contas:contas,receitas:receitas,bancos:state.bancos.filter(function(b){return b.profile===pf;}),metas:state.metas.filter(function(m){return m.profile===pf;})};
+    var data={exportado_em:new Date().toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),perfil:pf,contas:contas,receitas:receitas,bancos:state.bancos.filter(function(b){return b.profile===pf;}),metas:state.metas.filter(function(m){return m.profile===pf;})};
     var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
     var url=URL.createObjectURL(blob);
     var a=document.createElement('a');a.href=url;a.download='djfinance_backup_'+pf+'_'+today()+'.json';a.click();
@@ -1053,7 +1062,7 @@ function renderExportar(){
     showToast('JSON exportado!');
   }
 
-  var jsonUrgentes=JSON.stringify({exportado_em:new Date().toISOString(),perfil:pf,lembretes:urgentes.map(function(c){return{titulo:'💰 '+c.descricao,valor:fmtMoney(c.valor),vencimento:c.vencimento,dias_restantes:diasRestantes(c.vencimento),categoria:c.categoria};})},null,2);
+  var jsonUrgentes=JSON.stringify({exportado_em:new Date().toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),perfil:pf,lembretes:urgentes.map(function(c){return{titulo:'💰 '+c.descricao,valor:fmtMoney(c.valor),vencimento:c.vencimento,dias_restantes:diasRestantes(c.vencimento),categoria:c.categoria};})},null,2);
   var copiarBtn=btn('btn-primary','📋 Copiar JSON iPhone',function(){navigator.clipboard.writeText(jsonUrgentes).then(function(){copiarBtn.textContent='✓ Copiado!';setTimeout(function(){copiarBtn.textContent='📋 Copiar JSON iPhone';},2000);});});
 
   // Stats
@@ -1176,7 +1185,7 @@ function renderBancos(){
 
 // ── RECEITAS ──────────────────────────────────────────────────────────────────
 function renderReceitas(){
-  var now=new Date();
+  var now=nowBR();
   var mesFiltro=state.receitasMes||(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0'));
   var catFiltro=state.receitasCat||'';
   var catKey=getCatKey(state.profile,'receitas');
@@ -1322,6 +1331,12 @@ function render(){
     app.appendChild(t);
   }
   root.appendChild(app);
+  if(window._djfClockTimer)clearInterval(window._djfClockTimer);
+  window._djfClockTimer=setInterval(function(){
+    var ck=document.getElementById('djf-clock');
+    if(!ck){clearInterval(window._djfClockTimer);return;}
+    ck.textContent=new Date().toLocaleTimeString('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  },1000);
 }
 
 </script>

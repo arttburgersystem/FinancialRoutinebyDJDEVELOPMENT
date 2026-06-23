@@ -398,6 +398,7 @@ var state={
   usuDevModal: false,
   _devCallback: null,
   sessionUser: null,
+  sessionPickerOpen: false,
   auditLog: lsGet('auditLog',[]),
   auditBusca: '',
   recorrModal: null,
@@ -1031,24 +1032,56 @@ function renderSidebar(){
   },'🔒 Bloquear sistema');
   // Usuário logado + logout
   var sessionEl=null;
-  if(state.sessionUser){
-    var PAPEIS_COR2={desenvolvedor:'#ff6b35',administrador:'#c9a84c',gerente:'#4caf7d',operador:'#4c7dc9',visualizador:'#9e9e9e'};
-    var uc=PAPEIS_COR2[state.sessionUser.papel]||'#c9a84c';
-    sessionEl=el('div',{style:{padding:'8px 10px',display:'flex',alignItems:'center',gap:'8px'}},[
+  var PAPEIS_COR2={desenvolvedor:'#ff6b35',administrador:'#c9a84c',gerente:'#4caf7d',operador:'#4c7dc9',visualizador:'#9e9e9e'};
+  var su=state.sessionUser;
+  var uc=su?(PAPEIS_COR2[su.papel]||'#c9a84c'):'#c9a84c';
+  sessionEl=el('div',{style:{padding:'6px 10px',cursor:'pointer',borderRadius:'8px',transition:'background .15s'},
+    onclick:function(){setState({sessionPickerOpen:!state.sessionPickerOpen});},
+    onmouseenter:function(){this.style.background='var(--bg3)';},
+    onmouseleave:function(){this.style.background='';},
+  },[
+    el('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},[
       el('div',{style:{width:'28px',height:'28px',borderRadius:'50%',background:uc+'22',border:'1.5px solid '+uc+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:'900',color:uc,flexShrink:'0'}},
-        state.sessionUser.avatar||state.sessionUser.nome.substring(0,2).toUpperCase()),
+        su?(su.avatar||su.nome.substring(0,2).toUpperCase()):'?'),
       el('div',{class:'nav-label',style:{flex:'1',minWidth:0}},[
-        el('div',{style:{fontSize:'12px',fontWeight:'700',color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},state.sessionUser.nome),
-        el('div',{style:{fontSize:'10px',color:'var(--text3)'}},state.sessionUser.papel),
+        el('div',{style:{fontSize:'12px',fontWeight:'700',color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},su?su.nome:'Selecionar usuário'),
+        el('div',{style:{fontSize:'10px',color:'var(--text3)'}},su?su.papel:'Clique para identificar'),
       ]),
-      el('button',{title:'Sair',style:{background:'none',border:'none',color:'var(--text3)',cursor:'pointer',fontSize:'16px',padding:'2px 4px'},onclick:function(){
-        if(typeof logAudit==='function')logAudit('fez logout',state.sessionUser.nome);
-        state.sessionUser=null;
-        try{sessionStorage.removeItem('djf_session');}catch(e){}
-        lockApp();
-      }},'⏏'),
-    ]);
-  }
+      el('span',{class:'nav-label',style:{color:'var(--text3)',fontSize:'12px'}},state.sessionPickerOpen?'▲':'▼'),
+    ]),
+    // Picker inline
+    state.sessionPickerOpen?el('div',{style:{marginTop:'8px',display:'flex',flexDirection:'column',gap:'4px'},
+      onclick:function(e){e.stopPropagation();}},[
+      ...(state.usuarios||[]).filter(function(u){return u.ativo!==false;}).map(function(u){
+        var uc2=PAPEIS_COR2[u.papel]||'#c9a84c';
+        var isSelected=su&&su.id===u.id;
+        return el('div',{
+          style:{display:'flex',alignItems:'center',gap:'8px',padding:'6px 8px',borderRadius:'6px',cursor:'pointer',background:isSelected?'var(--gold-dim)':'transparent',border:isSelected?'1px solid var(--gold)':'1px solid transparent'},
+          onclick:function(){
+            state.sessionUser=u;
+            try{sessionStorage.setItem('djf_session',JSON.stringify({id:u.id,nome:u.nome,papel:u.papel,email:u.email}));}catch(e){}
+            try{if(typeof logAudit==='function')logAudit('trocou usuário',u.nome);}catch(e){}
+            setState({sessionPickerOpen:false});
+          },
+        },[
+          el('div',{style:{width:'22px',height:'22px',borderRadius:'50%',background:uc2+'22',border:'1px solid '+uc2+'44',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',fontWeight:'900',color:uc2}},u.avatar||u.nome.substring(0,2).toUpperCase()),
+          el('div',{style:{flex:'1',fontSize:'12px',color:isSelected?'var(--gold)':'var(--text2)',fontWeight:isSelected?'700':'400'}},u.nome),
+          isSelected?el('span',{style:{color:'var(--gold)',fontSize:'12px'}},'✓'):null,
+        ].filter(Boolean));
+      }),
+      su?el('div',{
+        style:{display:'flex',alignItems:'center',gap:'6px',padding:'6px 8px',borderRadius:'6px',cursor:'pointer',color:'var(--danger)',fontSize:'12px',marginTop:'2px'},
+        onmouseenter:function(){this.style.background='var(--bg3)';},
+        onmouseleave:function(){this.style.background='';},
+        onclick:function(){
+          try{if(typeof logAudit==='function')logAudit('fez logout',su.nome);}catch(e){}
+          state.sessionUser=null;
+          try{sessionStorage.removeItem('djf_session');}catch(e){}
+          setState({sessionPickerOpen:false});
+        },
+      },'⏏ Sair da conta'):null,
+    ].filter(Boolean)):null,
+  ]);
   var collapseBtn=el('button',{class:'sidebar-collapse-btn',onclick:function(){
     var c=!state.sidebarCollapsed;lsSet('sidebarCollapsed',c);setState({sidebarCollapsed:c});
   }},[el('span',{},state.sidebarCollapsed?'→':'← Recolher')]);
@@ -2239,7 +2272,7 @@ function buildPinScreen(mode){
           if(pin===saved){
             msg.className='pin-msg success';msg.textContent='✓ Acesso liberado';
             setTimeout(function(){
-              if(typeof bioSuportado==='function'&&bioSuportado()&&!bioRegistrado()){oferecerBiometria();}else{buildUserLoginScreen();}
+              if(typeof bioSuportado==='function'&&bioSuportado()&&!bioRegistrado()){oferecerBiometria();}else{initApp();}
             },400);
           } else {
             digits=[];
@@ -2419,10 +2452,10 @@ function oferecerBiometria() {
     msgB.textContent = 'Siga as instruções do dispositivo...'; msgB.className = 'pin-msg';
     bioRegistrar(function() {
       msgB.className = 'pin-msg success'; msgB.textContent = '✓ Biometria ativada!';
-      setTimeout(function() { ov.style.display = 'none'; buildUserLoginScreen(); }, 700);
+      setTimeout(function() { ov.style.display = 'none'; initApp(); }, 700);
     }, function() {
       msgB.className = 'pin-msg error'; msgB.textContent = 'Não foi possível ativar. Entrando...';
-      setTimeout(function() { ov.style.display = 'none'; buildUserLoginScreen(); }, 1500);
+      setTimeout(function() { ov.style.display = 'none'; initApp(); }, 1500);
     });
   };
 
@@ -2430,7 +2463,7 @@ function oferecerBiometria() {
   btnNao.className = 'pin-key';
   btnNao.style.cssText = 'width:220px;font-size:13px;height:40px;color:var(--text3);';
   btnNao.textContent = 'Agora não';
-  btnNao.onclick = function() { ov.style.display = 'none'; buildUserLoginScreen(); };
+  btnNao.onclick = function() { ov.style.display = 'none'; initApp(); };
 
   box.appendChild(logo); box.appendChild(dev2); box.appendChild(ico);
   box.appendChild(tit); box.appendChild(sub2);

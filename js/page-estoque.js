@@ -1,8 +1,17 @@
 // ── ESTOQUE & CMV ─────────────────────────────────────────────────────────────
 // v1.1.1 — Controle de estoque com CMV, Curva ABC e integração financeira
 
-var EST_CATS  = ['Proteínas','Pães','Vegetais/Saladas','Laticínios','Bebidas','Embalagens','Temperos/Molhos','Outros'];
-var EST_UNIDS = ['kg','g','un','L','ml','cx','pct','sc'];
+var EST_CATS_DEFAULT  = ['Proteínas','Pães','Vegetais/Saladas','Laticínios','Bebidas','Embalagens','Temperos/Molhos','Outros'];
+var EST_UNIDS_DEFAULT = ['kg','g','un','L','ml','cx','pct','sc'];
+
+function estCats() {
+  var cats = state.estCategorias || [];
+  return cats.length ? cats.map(function(c){ return c.nome; }) : EST_CATS_DEFAULT;
+}
+function estUnids() {
+  var u = state.estUnidades || [];
+  return u.length ? u.map(function(u){ return u.nome; }) : EST_UNIDS_DEFAULT;
+}
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -187,70 +196,366 @@ function buildFornecedorCombo(fornecedores, currentId, onChange) {
 
 // ── MODAL PRODUTO ─────────────────────────────────────────────────────────────
 
+// ── GERENCIADOR DE CATEGORIAS ─────────────────────────────────────────────────
+
+function renderEstCatManager() {
+  if (!state.estCatManager) return null;
+  var cats = state.estCategorias || [];
+
+  var newInp = el('input',{class:'form-input',placeholder:'Nova categoria...',style:{flex:'1'}});
+  newInp.style.marginBottom='0';
+
+  function addCat() {
+    var nome = newInp.value.trim();
+    if (!nome) return;
+    if (cats.find(function(c){ return c.nome.toLowerCase()===nome.toLowerCase(); })) {
+      showToast('Categoria já existe','error'); return;
+    }
+    var nova = {id:'cat_'+Date.now(), nome:nome};
+    var novas = cats.concat([nova]);
+    lsSet('estCategorias', novas);
+    setState({estCategorias:novas, estCatManager:{open:true}});
+    scheduleSave();
+    showToast('Categoria adicionada!');
+  }
+  newInp.onkeydown = function(e){ if(e.key==='Enter'){e.preventDefault();addCat();} };
+
+  var rows = cats.map(function(c,i) {
+    var nameEl = el('span',{style:{flex:'1',fontSize:'13px'}},c.nome);
+    var inUseCount = (state.produtos||[]).filter(function(p){return p.categoria===c.nome&&p.profile===state.profile;}).length;
+    var badge = inUseCount>0 ? el('span',{style:{fontSize:'10px',color:'var(--text3)',background:'var(--bg3)',borderRadius:'8px',padding:'1px 6px'}},inUseCount+' prod.') : null;
+
+    var editBtn = el('button',{class:'btn-icon edit',title:'Editar'});
+    editBtn.textContent='✏️';
+    editBtn.onclick = function(){
+      var novo = window.prompt('Renomear "'+c.nome+'" para:', c.nome);
+      if (!novo || !novo.trim() || novo.trim()===c.nome) return;
+      var novoNome = novo.trim();
+      var novas = cats.map(function(x,j){ return j===i ? Object.assign({},x,{nome:novoNome}) : x; });
+      var novosProds = (state.produtos||[]).map(function(p){
+        return p.categoria===c.nome ? Object.assign({},p,{categoria:novoNome}) : p;
+      });
+      lsSet('estCategorias',novas); lsSet('produtos',novosProds);
+      setState({estCategorias:novas, produtos:novosProds, estCatManager:{open:true}});
+      scheduleSave();
+      showToast('Categoria renomeada!');
+    };
+
+    var delBtn = el('button',{class:'btn-icon',title:'Excluir',style:{color:'var(--danger)'}});
+    delBtn.textContent='🗑';
+    delBtn.onclick = function(){
+      if (inUseCount>0&&!window.confirm('A categoria "'+c.nome+'" está em uso por '+inUseCount+' produto(s). Excluir mesmo assim?')) return;
+      var novas = cats.filter(function(x,j){ return j!==i; });
+      lsSet('estCategorias',novas);
+      setState({estCategorias:novas, estCatManager:{open:true}});
+      scheduleSave();
+      showToast('Categoria removida','error');
+    };
+
+    var row = el('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 0',borderBottom:'1px solid var(--border)'}},
+      [nameEl,badge,editBtn,delBtn].filter(Boolean));
+    return row;
+  });
+
+  var addRow = el('div',{style:{display:'flex',gap:'8px',marginTop:'14px',alignItems:'center'}},[
+    newInp,
+    el('button',{class:'btn-primary',onclick:addCat,style:{flexShrink:'0'}},'＋ Adicionar'),
+  ]);
+
+  var modal = el('div',{class:'modal',style:{maxWidth:'420px',zIndex:'100000'}},[
+    el('div',{class:'modal-header'},[
+      el('h3',{class:'modal-title'},'⚙️ Gerenciar Categorias'),
+      el('button',{class:'modal-close',onclick:function(){setState({estCatManager:null});}},'✕'),
+    ]),
+    el('div',{class:'modal-body'},[
+      cats.length===0 ? el('p',{style:{color:'var(--text3)',fontSize:'13px',margin:'0 0 12px'}},'Nenhuma categoria cadastrada ainda.') : null,
+      el('div',{},rows),
+      addRow,
+    ].filter(Boolean)),
+    el('div',{class:'modal-footer'},[
+      el('button',{class:'btn-primary',onclick:function(){setState({estCatManager:null});}},'Fechar'),
+    ]),
+  ]);
+  var overlay = el('div',{class:'modal-overlay',style:{zIndex:'99999'}});
+  overlay.onclick = function(e){ if(e.target===overlay) setState({estCatManager:null}); };
+  overlay.appendChild(modal);
+  return overlay;
+}
+
+// ── GERENCIADOR DE UNIDADES ───────────────────────────────────────────────────
+
+function renderEstUnidManager() {
+  if (!state.estUnidManager) return null;
+  var unids = state.estUnidades || [];
+
+  var newInp = el('input',{class:'form-input',placeholder:'Nova unidade (ex: dz, L, m²)...',style:{flex:'1','margin-bottom':'0'}});
+
+  function addUnid() {
+    var nome = newInp.value.trim();
+    if (!nome) return;
+    if (unids.find(function(u){ return u.nome.toLowerCase()===nome.toLowerCase(); })) {
+      showToast('Unidade já existe','error'); return;
+    }
+    var nova = {id:'unid_'+Date.now(), nome:nome};
+    var novas = unids.concat([nova]);
+    lsSet('estUnidades',novas);
+    setState({estUnidades:novas, estUnidManager:{open:true}});
+    scheduleSave();
+    showToast('Unidade adicionada!');
+  }
+  newInp.onkeydown = function(e){ if(e.key==='Enter'){e.preventDefault();addUnid();} };
+
+  var rows = unids.map(function(u,i) {
+    var nameEl = el('span',{style:{flex:'1',fontSize:'13px',fontWeight:'600'}},u.nome);
+
+    var editBtn = el('button',{class:'btn-icon edit'});
+    editBtn.textContent='✏️';
+    editBtn.onclick = function(){
+      var novo = window.prompt('Renomear "'+u.nome+'" para:', u.nome);
+      if (!novo || !novo.trim() || novo.trim()===u.nome) return;
+      var novoNome = novo.trim();
+      var novas = unids.map(function(x,j){ return j===i ? Object.assign({},x,{nome:novoNome}) : x; });
+      var novosProds = (state.produtos||[]).map(function(p){
+        return p.unidade===u.nome ? Object.assign({},p,{unidade:novoNome}) : p;
+      });
+      lsSet('estUnidades',novas); lsSet('produtos',novosProds);
+      setState({estUnidades:novas,produtos:novosProds,estUnidManager:{open:true}});
+      scheduleSave();
+      showToast('Unidade renomeada!');
+    };
+
+    var delBtn = el('button',{class:'btn-icon',style:{color:'var(--danger)'}});
+    delBtn.textContent='🗑';
+    delBtn.onclick = function(){
+      if (!window.confirm('Excluir unidade "'+u.nome+'"?')) return;
+      var novas = unids.filter(function(x,j){ return j!==i; });
+      lsSet('estUnidades',novas);
+      setState({estUnidades:novas, estUnidManager:{open:true}});
+      scheduleSave();
+      showToast('Unidade removida','error');
+    };
+
+    return el('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 0',borderBottom:'1px solid var(--border)'}},[nameEl,editBtn,delBtn]);
+  });
+
+  var addRow = el('div',{style:{display:'flex',gap:'8px',marginTop:'14px'}},[
+    newInp,
+    el('button',{class:'btn-primary',onclick:addUnid,style:{flexShrink:'0'}},'＋ Adicionar'),
+  ]);
+
+  var modal = el('div',{class:'modal',style:{maxWidth:'380px',zIndex:'100000'}},[
+    el('div',{class:'modal-header'},[
+      el('h3',{class:'modal-title'},'⚙️ Gerenciar Unidades de Medida'),
+      el('button',{class:'modal-close',onclick:function(){setState({estUnidManager:null});}},'✕'),
+    ]),
+    el('div',{class:'modal-body'},[
+      unids.length===0 ? el('p',{style:{color:'var(--text3)',fontSize:'13px',margin:'0 0 12px'}},'Usando as unidades padrão do sistema. Adicione para personalizar.') : null,
+      el('div',{},rows),
+      addRow,
+    ].filter(Boolean)),
+    el('div',{class:'modal-footer'},[
+      el('button',{class:'btn-primary',onclick:function(){setState({estUnidManager:null});}},'Fechar'),
+    ]),
+  ]);
+  var overlay = el('div',{class:'modal-overlay',style:{zIndex:'99999'}});
+  overlay.onclick = function(e){ if(e.target===overlay) setState({estUnidManager:null}); };
+  overlay.appendChild(modal);
+  return overlay;
+}
+
 function renderProdutoModal() {
   var p = state.produtoModal || {};
   var isEdit = !!p.id;
   function fld(lbl, inp) { return el('div',{class:'form-group'},[el('label',{class:'form-label'},lbl),inp]); }
 
-  var nomeInp  = el('input',{class:'form-input',value:p.nome||'',placeholder:'Ex: Carne 150g, Pão brioche...',oninput:function(){p.nome=this.value;}});
-  var catSel   = el('select',{class:'form-input',onchange:function(){p.categoria=this.value;}},
-    EST_CATS.map(function(c){return el('option',{value:c,selected:p.categoria===c},c);}));
-  var unidSel  = el('select',{class:'form-input',onchange:function(){p.unidade=this.value;}},
-    EST_UNIDS.map(function(u){return el('option',{value:u,selected:p.unidade===u},u);}));
+  // ── TIPO (obrigatório) ────────────────────────────────────────────────────
+  function tipoBtn(id, icon, label, desc) {
+    var ativo = p.tipo === id;
+    var b = el('button',{});
+    b.style.cssText = 'flex:1;padding:14px 10px;border-radius:10px;border:2px solid '
+      +(ativo?'var(--gold)':'var(--border)')+';background:'
+      +(ativo?'var(--gold-dim)':'var(--bg3)')+';color:'
+      +(ativo?'var(--gold)':'var(--text3)')+';font-family:inherit;'
+      +'cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .15s;';
+    var iconEl = el('span',{style:{fontSize:'28px'}},icon);
+    var lblEl  = el('span',{style:{fontSize:'13px',fontWeight:'700'}},label);
+    var dscEl  = el('span',{style:{fontSize:'10px',opacity:'.8'}},desc);
+    b.appendChild(iconEl); b.appendChild(lblEl); b.appendChild(dscEl);
+    b.onclick = function(e){
+      e.preventDefault();
+      setState({produtoModal:Object.assign({},state.produtoModal,{tipo:id})});
+    };
+    return b;
+  }
+
+  // ── CATEGORIA + gerenciar ──────────────────────────────────────────────────
+  var cats = estCats();
+  var catSel = el('select',{class:'form-input',onchange:function(){p.categoria=this.value;}},
+    cats.map(function(c){return el('option',{value:c,selected:(p.categoria||cats[0])===c},c);}));
+  var catRow = el('div',{style:{display:'flex',gap:'8px',alignItems:'flex-end'}},[
+    el('div',{style:{flex:'1'}},[el('label',{class:'form-label'},'Categoria'),catSel]),
+    el('button',{class:'btn-ghost',style:{padding:'8px 10px',fontSize:'11px',flexShrink:'0',whiteSpace:'nowrap'},
+      onclick:function(e){e.preventDefault();setState({estCatManager:{open:true}});}}, '⚙️ Gerenciar'),
+  ]);
+
+  // ── UNIDADE + gerenciar ────────────────────────────────────────────────────
+  var unids = estUnids();
+  var unidSel = el('select',{class:'form-input',onchange:function(){p.unidade=this.value;}},
+    unids.map(function(u){return el('option',{value:u,selected:(p.unidade||'un')===u},u);}));
+  var unidRow = el('div',{style:{display:'flex',gap:'8px',alignItems:'flex-end'}},[
+    el('div',{style:{flex:'1'}},[el('label',{class:'form-label'},'Unidade de medida'),unidSel]),
+    el('button',{class:'btn-ghost',style:{padding:'8px 10px',fontSize:'11px',flexShrink:'0',whiteSpace:'nowrap'},
+      onclick:function(e){e.preventDefault();setState({estUnidManager:{open:true}});}}, '⚙️ Gerenciar'),
+  ]);
+
+  // ── CAMPOS BÁSICOS ─────────────────────────────────────────────────────────
+  var nomeInp  = el('input',{class:'form-input',value:p.nome||'',placeholder:'Ex: X-Burguer, Bacon, Pão brioche...',oninput:function(){p.nome=this.value;}});
   var custoInp = el('input',{class:'form-input',type:'number',min:'0',step:'0.01',value:p.custoMedio||'',placeholder:'0,00',oninput:function(){p.custoMedio=parseFloat(this.value)||0;}});
-  var vendaInp = el('input',{class:'form-input',type:'number',min:'0',step:'0.01',value:p.precoVenda||'',placeholder:'0,00 (opcional)',oninput:function(){p.precoVenda=parseFloat(this.value)||0;}});
+  var vendaInp = el('input',{class:'form-input',type:'number',min:'0',step:'0.01',value:p.precoVenda||'',placeholder:'0,00',oninput:function(){p.precoVenda=parseFloat(this.value)||0;}});
   var estAInp  = el('input',{class:'form-input',type:'number',min:'0',step:'0.001',value:p.estoqueAtual||'',placeholder:'0',oninput:function(){p.estoqueAtual=parseFloat(this.value)||0;}});
   var estMInp  = el('input',{class:'form-input',type:'number',min:'0',step:'0.001',value:p.estoqueMinimo||'',placeholder:'0',oninput:function(){p.estoqueMinimo=parseFloat(this.value)||0;}});
+  var fornCombo = buildFornecedorCombo(state.fornecedores||[], p.fornecedor_id||'', function(id){p.fornecedor_id=id;});
+  var obsInp    = el('input',{class:'form-input',value:p.obs||'',placeholder:'Observações...',oninput:function(){p.obs=this.value;}});
 
-  // Autocomplete de fornecedor
-  var fornCombo = buildFornecedorCombo(
-    state.fornecedores || [],
-    p.fornecedor_id || '',
-    function(id){ p.fornecedor_id = id; }
-  );
+  // ── SEÇÃO CARDÁPIO (só para produto) ──────────────────────────────────────
+  var setores = state.setoresImpressao || [];
+  var setorSel = el('select',{class:'form-input',onchange:function(){p.setorImpressao=this.value;}},
+    [el('option',{value:''},'— Nenhum —')].concat(
+      setores.map(function(s){return el('option',{value:s.id,selected:p.setorImpressao===s.id},s.nome);})));
+  var descCardInp = el('textarea',{class:'form-input',rows:'2',placeholder:'Descrição visível no cardápio...',style:{resize:'vertical'},oninput:function(){p.descricaoCard=this.value;}},p.descricaoCard||'');
+  var imgInp = el('input',{class:'form-input',type:'url',placeholder:'https://... URL da foto do item',value:p.imagemUrl||'',oninput:function(){p.imagemUrl=this.value;}});
 
-  var obsInp = el('input',{class:'form-input',value:p.obs||'',placeholder:'Observações...',oninput:function(){p.obs=this.value;}});
-  var errEl  = el('div',{style:{color:'var(--danger)',fontSize:'12px',minHeight:'16px'}});
+  // ── INFORMAÇÕES FISCAIS ────────────────────────────────────────────────────
+  var ORIGEM_OPTS=[
+    {v:'0',l:'0 – Nacional'},
+    {v:'1',l:'1 – Estrangeira (importação direta)'},
+    {v:'2',l:'2 – Estrangeira (mercado interno)'},
+    {v:'3',l:'3 – Nacional, conteúdo > 40% importado'},
+    {v:'4',l:'4 – Nacional (prod. básicos)'},
+    {v:'5',l:'5 – Nacional, conteúdo < 40% importado'},
+    {v:'6',l:'6 – Estrangeira (imp. direta), sem similar'},
+    {v:'7',l:'7 – Estrangeira (merc. interno), sem similar'},
+    {v:'8',l:'8 – Nacional, conteúdo > 70%'},
+  ];
+  var origemSel = el('select',{class:'form-input',onchange:function(){p.origemMerc=this.value;}},
+    ORIGEM_OPTS.map(function(o){return el('option',{value:o.v,selected:(p.origemMerc||'0')===o.v},o.l);}));
+
+  function ftxt(field,ph,val){
+    var i=el('input',{class:'form-input',type:'text',value:val||'',placeholder:ph||'',oninput:function(){p[field]=this.value;}});
+    return i;
+  }
+  function fnum(field,val){
+    var i=el('input',{class:'form-input',type:'number',min:'0',step:'0.01',value:val||'',placeholder:'0',oninput:function(){p[field]=parseFloat(this.value)||0;}});
+    return i;
+  }
+
+  // ── ERRO + SALVAR ──────────────────────────────────────────────────────────
+  var errEl = el('div',{style:{color:'var(--danger)',fontSize:'12px',minHeight:'18px',marginTop:'4px'}});
+
+  function secHead(icon,txt) {
+    var d=el('div',{});
+    d.style.cssText='font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);padding:14px 0 8px;border-top:1px solid var(--border);margin-top:4px;';
+    d.textContent=icon+' '+txt;
+    return d;
+  }
 
   function salvar() {
-    if (!(p.nome||'').trim()) { errEl.textContent='Informe o nome do produto.'; return; }
+    if (!p.tipo) { errEl.textContent='⚠️ Selecione o tipo: Produto ou Insumo.'; return; }
+    if (!(p.nome||'').trim()) { errEl.textContent='Informe o nome.'; return; }
+    var catVal  = catSel.value || cats[0] || '';
+    var unidVal = unidSel.value || 'un';
     var prod = {
-      id:p.id||uid(), profile:state.profile, nome:(p.nome||'').trim(),
-      categoria:p.categoria||EST_CATS[0], unidade:p.unidade||'un',
+      id:p.id||uid(), profile:state.profile,
+      tipo:p.tipo,
+      nome:(p.nome||'').trim(),
+      categoria:catVal, unidade:unidVal,
       custoMedio:p.custoMedio||0, precoVenda:p.precoVenda||0,
       estoqueAtual:p.estoqueAtual||0, estoqueMinimo:p.estoqueMinimo||0,
       fornecedor_id:p.fornecedor_id||'', obs:p.obs||'',
+      // Cardápio
+      setorImpressao:p.setorImpressao||'',
+      descricaoCard:p.descricaoCard||'',
+      imagemUrl:p.imagemUrl||'',
+      disponivel:p.disponivel!==false,
+      // Fiscal
+      ncm:p.ncm||'', cest:p.cest||'', cfop:p.cfop||'',
+      csosn:p.csosn||'', cst:p.cst||'', origemMerc:origemSel.value||'0',
+      aliqIcms:p.aliqIcms||0, aliqIpi:p.aliqIpi||0,
+      aliqPis:p.aliqPis||0, aliqCofins:p.aliqCofins||0,
+      unidTrib:p.unidTrib||'',
       ativo:true, criadoEm:p.criadoEm||today(),
     };
     var novos = isEdit
       ? state.produtos.map(function(x){return x.id===prod.id?prod:x;})
       : (state.produtos||[]).concat([prod]);
-    logAudit((isEdit?'editou':'cadastrou')+' produto', prod.nome);
+    logAudit((isEdit?'editou':'cadastrou')+' '+prod.tipo, prod.nome);
     setState({produtos:novos, produtoModal:null});
     scheduleSave();
     showToast(isEdit?'Produto atualizado!':'Produto cadastrado!','success');
   }
 
+  // ── LAYOUT ────────────────────────────────────────────────────────────────
   return el('div',{class:'modal-overlay',onclick:function(e){if(e.target===this)setState({produtoModal:null});}},
-    el('div',{class:'modal',style:{maxWidth:'520px'}},[
+    el('div',{class:'modal',style:{maxWidth:'600px',maxHeight:'90vh',overflowY:'auto'}},[
       el('div',{class:'modal-header'},[
         el('h3',{class:'modal-title'},(isEdit?'✏️ Editar':'➕ Novo')+' Produto / Insumo'),
         el('button',{class:'modal-close',onclick:function(){setState({produtoModal:null});}}, '✕'),
       ]),
       el('div',{class:'modal-body'},[
+
+        // TIPO — OBRIGATÓRIO
+        el('div',{style:{marginBottom:'18px'}},[
+          el('div',{style:{fontWeight:'700',fontSize:'12px',color:'var(--gold)',marginBottom:'10px',display:'flex',alignItems:'center',gap:'6px'}},[
+            el('span',{},'⭐ Tipo (obrigatório)'),
+            !p.tipo?el('span',{style:{fontSize:'11px',color:'var(--danger)',fontWeight:'400'}},'— selecione para continuar'):null,
+          ].filter(Boolean)),
+          el('div',{style:{display:'flex',gap:'10px'}},[
+            tipoBtn('produto','🍔','Produto','aparece no cardápio'),
+            tipoBtn('insumo','⚙️','Insumo','matéria-prima / estoque'),
+          ]),
+        ]),
+
+        // IDENTIFICAÇÃO
         el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}},[
-          el('div',{style:{gridColumn:'1/-1'}},fld('Nome do produto / insumo',nomeInp)),
-          fld('Categoria',catSel),
-          fld('Unidade de medida',unidSel),
+          el('div',{style:{gridColumn:'1/-1'}},fld('Nome *',nomeInp)),
+          el('div',{style:{gridColumn:'1/-1'}},catRow),
+          el('div',{style:{gridColumn:'1/-1'}},unidRow),
           fld('Custo médio (R$)',custoInp),
           fld('Preço de venda (R$)',vendaInp),
           fld('Estoque atual',estAInp),
           fld('Estoque mínimo (alerta)',estMInp),
           el('div',{style:{gridColumn:'1/-1'}},fld('Fornecedor principal',fornCombo)),
-          el('div',{style:{gridColumn:'1/-1'}},fld('Observações',obsInp)),
         ]),
+
+        // CARDÁPIO (só produto)
+        p.tipo==='produto' ? el('div',{},[
+          secHead('🍽️','Cardápio / Impressão'),
+          el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}},[
+            el('div',{style:{gridColumn:'1/-1'}},fld('Setor de impressão',setorSel)),
+            el('div',{style:{gridColumn:'1/-1'}},fld('Descrição no cardápio (opcional)',descCardInp)),
+            el('div',{style:{gridColumn:'1/-1'}},fld('URL da imagem (opcional)',imgInp)),
+          ]),
+        ]) : null,
+
+        // FISCAL
+        secHead('🧾','Informações Fiscais'),
+        el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}},[
+          fld('NCM (8 dígitos)',ftxt('ncm','0000.00.00',p.ncm||'')),
+          fld('CEST (7 dígitos, se aplicável)',ftxt('cest','0000000',p.cest||'')),
+          fld('CFOP',ftxt('cfop','0000',p.cfop||'')),
+          fld('CSOSN (Simples) ou CST',ftxt('csosn','000 / 00',p.csosn||p.cst||'')),
+          el('div',{style:{gridColumn:'1/-1'}},fld('Origem da mercadoria',origemSel)),
+          fld('Alíq. ICMS (%)',fnum('aliqIcms',p.aliqIcms||'')),
+          fld('Alíq. IPI (%)',fnum('aliqIpi',p.aliqIpi||'')),
+          fld('PIS (%)',fnum('aliqPis',p.aliqPis||'')),
+          fld('COFINS (%)',fnum('aliqCofins',p.aliqCofins||'')),
+          fld('Unidade tributável (se ≠ comercial)',ftxt('unidTrib','kg, L, un...',p.unidTrib||'')),
+        ]),
+
+        // OBS
+        el('div',{style:{marginTop:'12px'}},fld('Observações',obsInp)),
         errEl,
-      ]),
+      ].filter(Boolean)),
       el('div',{class:'modal-footer'},[
         btn('btn-secondary','Cancelar',function(){setState({produtoModal:null});}),
         btn('btn-primary',isEdit?'💾 Salvar':'✅ Criar',salvar),
@@ -870,5 +1175,7 @@ function renderEstoque() {
     content,
     state.produtoModal!==null ? renderProdutoModal() : null,
     state.movModal!==null     ? renderMovModal()     : null,
+    state.estCatManager  ? renderEstCatManager()  : null,
+    state.estUnidManager ? renderEstUnidManager() : null,
   ].filter(Boolean));
 }

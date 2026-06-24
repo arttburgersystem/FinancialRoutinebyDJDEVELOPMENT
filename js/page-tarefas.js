@@ -108,7 +108,7 @@ function renderAlertaBanner() {
 
   if (!alertas.length) return null;
 
-  var snozeAtivo = _tarefaAlertaSnozeAte > Date.now();
+  var snozeAtivo = (_tarefaAlertaSnozeAte > Date.now()) || !!state.concluirModal || !!state.tarefaModal;
 
   // ── POPUP MODAL (aparece quando não está snoze) ─────────────────────────────
   if (!snozeAtivo) {
@@ -232,6 +232,7 @@ function renderAlertaBanner() {
       concluirBtnPopup.textContent = '✓ Concluir';
       concluirBtnPopup.onclick = (function(tid) {
         return function() {
+          _tarefaAlertaSnozeAte = Date.now() + 300000;
           setState({ page: 'tarefas', concluirModal: { tarefaId: tid } });
         };
       })(t.id);

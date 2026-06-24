@@ -415,6 +415,12 @@ var state={
   complementoModal:null,
   crdDropOpen:     null,
   configImpressao: lsGet('configImpressao',{logoUrl:'',mostrarLogo:true,mostrarCnpj:true,mostrarEndereco:true,largura:'80mm',rodape:'Obrigado pela preferência!\nVolte sempre!'}),
+  kdsConfigs:   lsGet('kdsConfigs',[]),
+  pedidos:      lsGet('pedidos',[]),
+  kdsMode:      null,
+  kdsViewTab:   'pedidos',
+  kdsModal:     null,
+  pedidoModal:  null,
   empresaData: lsGet('empresaData',{}),
   estTab: 'produtos',
   produtoModal: null,
@@ -595,7 +601,7 @@ function fbPut(path,data){
 
 function loadFromFirebase(){
   setState({syncStatus:'syncing'});
-  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias'),fbGet('/vendas'),fbGet('/emprestimos'),fbGet('/fornecedores'),fbGet('/funcionarios'),fbGet('/tarefas'),fbGet('/cartoes'),fbGet('/transacoesCartao'),fbGet('/usuarios'),fbGet('/auditLog'),fbGet('/produtos'),fbGet('/movEstoque'),fbGet('/empresaData'),fbGet('/setoresImpressao'),fbGet('/complementos')])
+  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias'),fbGet('/vendas'),fbGet('/emprestimos'),fbGet('/fornecedores'),fbGet('/funcionarios'),fbGet('/tarefas'),fbGet('/cartoes'),fbGet('/transacoesCartao'),fbGet('/usuarios'),fbGet('/auditLog'),fbGet('/produtos'),fbGet('/movEstoque'),fbGet('/empresaData'),fbGet('/setoresImpressao'),fbGet('/complementos'),fbGet('/kdsConfigs'),fbGet('/pedidos')])
     .then(function(results){
       var contas=objToArr(results[0]);
       var metas=objToArr(results[1]);
@@ -617,8 +623,10 @@ function loadFromFirebase(){
       var empresaData=(results[16]&&typeof results[16]==='object'&&!Array.isArray(results[16]))?results[16]:lsGet('empresaData',{});
       var setoresImpressao=objToArr(results[17]||[]);
       var complementos=objToArr(results[18]||[]);
-      lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);lsSet('vendas',vendas);lsSet('emprestimos',emprestimos);lsSet('fornecedores',fornecedores);lsSet('funcionarios',funcionarios);lsSet('tarefas',tarefas);lsSet('cartoes',cartoes);lsSet('transacoesCartao',transacoesCartao);lsSet('usuarios',usuarios);lsSet('auditLog',auditLog);lsSet('produtos',produtos);lsSet('movEstoque',movEstoque);lsSet('empresaData',empresaData);lsSet('setoresImpressao',setoresImpressao);lsSet('complementos',complementos);
-      setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,vendas:vendas,emprestimos:emprestimos,fornecedores:fornecedores,funcionarios:funcionarios,tarefas:tarefas,cartoes:cartoes,transacoesCartao:transacoesCartao,usuarios:usuarios,auditLog:auditLog,produtos:produtos,movEstoque:movEstoque,empresaData:empresaData,setoresImpressao:setoresImpressao,complementos:complementos,syncStatus:'ok'});
+      var kdsConfigs=objToArr(results[19]||[]);
+      var pedidos=objToArr(results[20]||[]);
+      lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);lsSet('vendas',vendas);lsSet('emprestimos',emprestimos);lsSet('fornecedores',fornecedores);lsSet('funcionarios',funcionarios);lsSet('tarefas',tarefas);lsSet('cartoes',cartoes);lsSet('transacoesCartao',transacoesCartao);lsSet('usuarios',usuarios);lsSet('auditLog',auditLog);lsSet('produtos',produtos);lsSet('movEstoque',movEstoque);lsSet('empresaData',empresaData);lsSet('setoresImpressao',setoresImpressao);lsSet('complementos',complementos);lsSet('kdsConfigs',kdsConfigs);lsSet('pedidos',pedidos);
+      setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,vendas:vendas,emprestimos:emprestimos,fornecedores:fornecedores,funcionarios:funcionarios,tarefas:tarefas,cartoes:cartoes,transacoesCartao:transacoesCartao,usuarios:usuarios,auditLog:auditLog,produtos:produtos,movEstoque:movEstoque,empresaData:empresaData,setoresImpressao:setoresImpressao,complementos:complementos,kdsConfigs:kdsConfigs,pedidos:pedidos,syncStatus:'ok'});
     })
     .catch(function(e){
       console.error(e);
@@ -633,7 +641,7 @@ function scheduleSave(){
   clearTimeout(syncTimer);
   syncTimer=setTimeout(function(){
     setState({syncStatus:'syncing'});
-    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});
+    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);
     Promise.all([
       fbPut('/contas',arrToObj(state.contas)),
       fbPut('/metas',arrToObj(state.metas)),
@@ -652,6 +660,8 @@ function scheduleSave(){
       fbPut('/movEstoque',arrToObj(state.movEstoque||[])),
       fbPut('/setoresImpressao',arrToObj(state.setoresImpressao||[])),
       fbPut('/complementos',arrToObj(state.complementos||[])),
+      fbPut('/kdsConfigs',arrToObj(state.kdsConfigs||[])),
+      fbPut('/pedidos',arrToObj(state.pedidos||[])),
     ]).then(function(){setState({syncStatus:'ok'});})
       .catch(function(e){console.error(e);setState({syncStatus:'error'});showToast('Erro ao salvar no Firebase','error');});
   },1500);
@@ -1004,6 +1014,7 @@ function renderSidebar(){
     {id:'cardapio',label:'Cardápio',icon:'🍽️',section:'financeiro'},
     {id:'impressoes',label:'Setores de Impressão',icon:'🖨️',section:'financeiro'},
     {id:'exportar',label:'Relatórios',icon:'📊',section:'integração'},
+    {id:'kds',label:'KDS',icon:'📺',section:'sistema'},
     {id:'empresa',label:'Dados da Empresa',icon:'🏢',section:'sistema'},
     {id:'usuarios',label:'Usuários & Permissões',icon:'🔐',section:'sistema'},
     {id:'auditoria',label:'Auditoria',icon:'📋',section:'sistema'},
@@ -2130,7 +2141,17 @@ function render(){
   var root=document.getElementById('app');
   root.innerHTML='';
 
-  var pages={dashboard:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas,usuarios:renderUsuarios,recorrencias:renderRecorrencias,auditoria:renderAuditoria,ajuda:renderAjuda,estoque:renderEstoque,empresa:renderEmpresa,cardapio:renderCardapio,impressoes:renderImpressoes};
+  // KDS mode: tela cheia, sem sidebar
+  if (state.kdsMode && typeof renderKDSViewer === 'function') {
+    root.appendChild(renderKDSViewer(state.kdsMode));
+    if(state.toast){
+      var tKds=el('div',{class:'toast '+state.toast.type},[el('span',{},state.toast.type==='success'?'✓':state.toast.type==='error'?'✕':'ℹ'),el('span',{},state.toast.msg)]);
+      root.appendChild(tKds);
+    }
+    return;
+  }
+
+  var pages={dashboard:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas,usuarios:renderUsuarios,recorrencias:renderRecorrencias,auditoria:renderAuditoria,ajuda:renderAjuda,estoque:renderEstoque,empresa:renderEmpresa,cardapio:renderCardapio,impressoes:renderImpressoes,kds:renderKDS};
   var pageContent=(pages[state.page]||renderDashboard)();
   var content=div('content',[pageContent]);
   var mainCls='main'+(state.sidebarCollapsed?' sb-collapsed':'');
@@ -2209,6 +2230,7 @@ function render(){
 <script src="js/page-empresa.js"></script>
 <script src="js/page-impressoes.js"></script>
 <script src="js/page-cardapio.js"></script>
+<script src="js/page-kds.js"></script>
 <script src="js/background-sync.js"></script>
 <script>
 // ── TEMA ──────────────────────────────────────────────────────────────────────

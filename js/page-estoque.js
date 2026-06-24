@@ -397,7 +397,7 @@ function renderEstMovs() {
         el('th',{style:{padding:'8px 10px',textAlign:'right',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Custo Unit.'),
         el('th',{style:{padding:'8px 10px',textAlign:'right',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Total'),
         el('th',{style:{padding:'8px 10px',textAlign:'left',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Motivo'),
-      ]))),
+      ])),
       el('tbody',{},rows),
     ]));
 
@@ -531,7 +531,7 @@ function renderEstCMV() {
               el('th',{style:{padding:'8px 12px',textAlign:'right',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'CMV R$'),
               el('th',{style:{padding:'8px 12px',textAlign:'right',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'% do Total'),
               el('th',{style:{padding:'8px 12px',textAlign:'left',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Participação'),
-            ]))),
+            ])),
             el('tbody',{},rankCMV.map(function(p,i){
               var pct2 = cmvReal>0 ? (p.total/cmvReal)*100 : 0;
               return el('tr',{style:{borderBottom:'1px solid var(--border)',background:i%2===1?'var(--bg3)':'transparent'}},[
@@ -624,7 +624,7 @@ function renderEstABC() {
               el('th',{style:{padding:'8px 12px',textAlign:'right',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'% Individual'),
               el('th',{style:{padding:'8px 12px',textAlign:'right',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'% Acumulado'),
               el('th',{style:{padding:'8px 12px',textAlign:'center',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Classe'),
-            ]))),
+            ])),
             el('tbody',{},lista.map(function(p,i){
               var cor = classeCorABC(p.classe);
               return el('tr',{style:{borderBottom:'1px solid var(--border)',background:i%2===1?'var(--bg3)':'transparent'}},[

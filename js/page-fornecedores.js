@@ -5,19 +5,24 @@ function buildFornecedorInput(currentValue, currentId){
   var inputEl,dropEl,hiddenEl;
 
   function getFornecedores(){
-    return (state.fornecedores||[])
+    var forn=(state.fornecedores||[])
       .filter(function(f){return !f.profile||f.profile===state.profile;})
-      .sort(function(a,b){return a.nome.localeCompare(b.nome);});
+      .map(function(f){return Object.assign({},f,{_tipo:'fornecedor'});});
+    var adm=(state.administradores||[])
+      .filter(function(a){return a.profile===state.profile;})
+      .map(function(a){return Object.assign({},a,{_tipo:'admin',tipo:a.cargo||'Sócio',documento:a.cpf||''});});
+    return forn.concat(adm).sort(function(a,b){return a.nome.localeCompare(b.nome);});
   }
 
   function doFilter(query){
     var q=(query||'').toLowerCase().trim();
     var all=getFornecedores();
-    if(!q)return all.slice(0,10);
+    if(!q)return all.slice(0,12);
     return all.filter(function(f){
       return f.nome.toLowerCase().indexOf(q)!==-1||
-        (f.documento&&f.documento.indexOf(q)!==-1);
-    }).slice(0,10);
+        (f.documento&&f.documento.indexOf(q)!==-1)||
+        (f.tipo&&f.tipo.toLowerCase().indexOf(q)!==-1);
+    }).slice(0,12);
   }
 
   function closeDropdown(){if(dropEl)dropEl.style.display='none';selectedIndex=-1;}
@@ -56,7 +61,11 @@ function buildFornecedorInput(currentValue, currentId){
           onmousedown:function(e){e.preventDefault();selectItem(f);},
           onmouseenter:function(){selectedIndex=i;updateHighlight();},
         });
-        var nomeSpan=el('span',{style:{fontWeight:'500'}});
+        var nomeSpan=el('span',{style:{fontWeight:'500',display:'flex',alignItems:'center',gap:'6px'}});
+        if(f._tipo==='admin'){
+          var badge=el('span',{style:{fontSize:'9px',fontWeight:'700',background:'rgba(201,168,76,0.15)',color:'var(--gold)',border:'1px solid var(--gold)',borderRadius:'3px',padding:'0 4px',flexShrink:'0'}},'👤 Sócio');
+          nomeSpan.appendChild(badge);
+        }
         nomeSpan.appendChild(buildHighlight(f.nome,query));
         row.appendChild(nomeSpan);
         if(f.documento||f.tipo){

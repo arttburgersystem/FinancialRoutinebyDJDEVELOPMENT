@@ -55,6 +55,7 @@ function _bgFirebasePoll() {
     fbGet('/pedidos'),
     fbGet('/notas'),
     fbGet('/impressorasCadastradas'),
+    fbGet('/administradores'),
   ]).then(function(results) {
     var tarefas              = toArr(results[0]);
     var contas               = toArr(results[1]);
@@ -68,6 +69,7 @@ function _bgFirebasePoll() {
     var pedidos              = toArr(results[9]||[]);
     var notas                = toArr(results[10]||[]);
     var impressorasCadastradas = toArr(results[11]||[]);
+    var administradores = toArr(results[12]||[]);
 
     var patch = {};
     if (_dadosMudou(state.tarefas, tarefas))            { patch.tarefas    = tarefas;    if(typeof lsSet==='function') lsSet('tarefas',tarefas); }
@@ -82,6 +84,7 @@ function _bgFirebasePoll() {
     if (_dadosMudou(state.pedidos, pedidos))                       { patch.pedidos = pedidos; if(typeof lsSet==='function') lsSet('pedidos',pedidos); }
     if (_dadosMudou(state.notas, notas))                           { patch.notas = notas; if(typeof lsSet==='function') lsSet('notas',notas); }
     if (_dadosMudou(state.impressorasCadastradas, impressorasCadastradas)) { patch.impressorasCadastradas = impressorasCadastradas; if(typeof lsSet==='function') lsSet('impressorasCadastradas',impressorasCadastradas); }
+    if (_dadosMudou(state.administradores, administradores)) { patch.administradores = administradores; if(typeof lsSet==='function') lsSet('administradores',administradores); }
 
     if (Object.keys(patch).length > 0) {
       Object.assign(state, patch);
@@ -112,7 +115,7 @@ function _temModalAberto() {
     state.tarefaModal !== null || state.usuarioModal !== null || state.recorrModal !== null ||
     state.bancoModal || state.transfModal || state.receitaModal || state.cartaoModal ||
     state.perfilModal || state.metaModal || state.orcamentoModal || state.buscaModal ||
-    state.kdsModal || state.pedidoModal || state.impModal);
+    state.kdsModal || state.pedidoModal || state.impModal || state.adminModal);
 }
 
 // ── INDICADOR VISUAL DE SINCRONIZAÇÃO ─────────────────────────────────────────

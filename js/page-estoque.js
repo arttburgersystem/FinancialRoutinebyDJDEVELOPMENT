@@ -33,6 +33,158 @@ function classeCorABC(c) {
   return c === 'A' ? 'var(--danger)' : c === 'B' ? 'var(--gold)' : 'var(--green)';
 }
 
+// ── AUTOCOMPLETE DE FORNECEDOR ────────────────────────────────────────────────
+
+function buildFornecedorCombo(fornecedores, currentId, onChange) {
+  var _idx    = -1;
+  var _selId  = currentId || '';
+  var _aberto = false;
+
+  // Opções: "Nenhum" + fornecedores do perfil
+  var OPTS = [{id:'', nome:'— Nenhum —'}].concat(
+    fornecedores.filter(function(f){ return f.profile === state.profile; })
+  );
+
+  // Valor inicial visível
+  var selAtual = OPTS.find(function(o){ return o.id === _selId; });
+
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:relative;';
+
+  var inp = document.createElement('input');
+  inp.className = 'form-input';
+  inp.value     = selAtual && selAtual.id ? selAtual.nome : '';
+  inp.placeholder = '🔍 Pesquisar fornecedor...';
+  inp.autocomplete = 'off';
+  inp.spellcheck  = false;
+  inp.style.paddingRight = '28px';
+
+  // Ícone de seta
+  var arrow = document.createElement('span');
+  arrow.textContent = '▾';
+  arrow.style.cssText = 'position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none;font-size:13px;';
+
+  var drop = document.createElement('div');
+  drop.style.cssText = [
+    'position:absolute;top:calc(100% + 2px);left:0;right:0;',
+    'background:var(--bg2);border:1px solid var(--gold);border-radius:8px;',
+    'max-height:220px;overflow-y:auto;z-index:99999;display:none;',
+    'box-shadow:0 8px 24px rgba(0,0,0,.5);',
+  ].join('');
+
+  function filtradas() {
+    var q = inp.value.toLowerCase().trim();
+    if (!q || q === (selAtual && selAtual.nome || '').toLowerCase()) return OPTS;
+    return OPTS.filter(function(o){ return o.nome.toLowerCase().includes(q); });
+  }
+
+  function renderDrop() {
+    drop.innerHTML = '';
+    var lista = filtradas();
+    if (!lista.length) {
+      var vazio = document.createElement('div');
+      vazio.style.cssText = 'padding:10px 12px;font-size:12px;color:var(--text3);';
+      vazio.textContent = 'Nenhum fornecedor encontrado';
+      drop.appendChild(vazio);
+      return;
+    }
+    lista.forEach(function(o, i) {
+      var item = document.createElement('div');
+      var ativo = i === _idx;
+      item.style.cssText = [
+        'padding:9px 14px;font-size:13px;cursor:pointer;',
+        'color:' + (ativo ? 'var(--gold)' : 'var(--text)') + ';',
+        'background:' + (ativo ? 'var(--gold-dim)' : 'transparent') + ';',
+        'font-weight:' + (ativo ? '700' : '400') + ';',
+        'display:flex;align-items:center;gap:8px;',
+        i > 0 ? 'border-top:1px solid var(--border);' : '',
+      ].join('');
+      item.innerHTML = (o.id ? '🏭 ' : '✕ ') + o.nome;
+      item.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        selecionar(o);
+      });
+      item.addEventListener('mouseenter', function() {
+        _idx = i;
+        renderDrop();
+      });
+      drop.appendChild(item);
+      // Scroll automático no item ativo
+      if (ativo) { setTimeout(function(){ item.scrollIntoView({block:'nearest'}); }, 0); }
+    });
+    drop.style.display = 'block';
+  }
+
+  function selecionar(o) {
+    _selId    = o.id;
+    selAtual  = o;
+    inp.value = o.id ? o.nome : '';
+    _aberto   = false;
+    _idx      = -1;
+    drop.style.display = 'none';
+    onChange(o.id);
+    inp.blur();
+  }
+
+  function abrir() {
+    _aberto = true;
+    _idx    = -1;
+    renderDrop();
+    // Scroll até o item já selecionado
+    var sel = OPTS.findIndex(function(o){ return o.id === _selId; });
+    if (sel >= 0) { _idx = sel; renderDrop(); }
+  }
+
+  function fechar() {
+    _aberto = false;
+    drop.style.display = 'none';
+    _idx = -1;
+    // Restaura o nome se o campo ficou sujo sem selecionar
+    inp.value = selAtual && selAtual.id ? selAtual.nome : '';
+  }
+
+  inp.addEventListener('focus', function() { inp.select(); abrir(); });
+  inp.addEventListener('input', function() { _idx = -1; renderDrop(); });
+  inp.addEventListener('blur',  function() { setTimeout(fechar, 160); });
+
+  inp.addEventListener('keydown', function(e) {
+    var lista = filtradas();
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _idx = Math.min(_idx + 1, lista.length - 1);
+      renderDrop();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _idx = Math.max(_idx - 1, 0);
+      renderDrop();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (_idx >= 0 && lista[_idx]) { selecionar(lista[_idx]); }
+      else { fechar(); }
+    } else if (e.key === 'Tab') {
+      // Tab confirma o item em destaque (se houver) sem bloquear navegação
+      if (_idx >= 0 && lista[_idx]) {
+        selecionar(lista[_idx]);
+      } else {
+        fechar();
+      }
+    } else if (e.key === 'Escape') {
+      fechar();
+    }
+  });
+
+  // Clique na seta abre/fecha
+  arrow.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    if (_aberto) { fechar(); inp.blur(); } else { inp.focus(); }
+  });
+
+  wrap.appendChild(inp);
+  wrap.appendChild(arrow);
+  wrap.appendChild(drop);
+  return wrap;
+}
+
 // ── MODAL PRODUTO ─────────────────────────────────────────────────────────────
 
 function renderProdutoModal() {
@@ -49,10 +201,14 @@ function renderProdutoModal() {
   var vendaInp = el('input',{class:'form-input',type:'number',min:'0',step:'0.01',value:p.precoVenda||'',placeholder:'0,00 (opcional)',oninput:function(){p.precoVenda=parseFloat(this.value)||0;}});
   var estAInp  = el('input',{class:'form-input',type:'number',min:'0',step:'0.001',value:p.estoqueAtual||'',placeholder:'0',oninput:function(){p.estoqueAtual=parseFloat(this.value)||0;}});
   var estMInp  = el('input',{class:'form-input',type:'number',min:'0',step:'0.001',value:p.estoqueMinimo||'',placeholder:'0',oninput:function(){p.estoqueMinimo=parseFloat(this.value)||0;}});
-  var fornSel  = el('select',{class:'form-input',onchange:function(){p.fornecedor_id=this.value;}},
-    [el('option',{value:''},'— Nenhum —')].concat(
-      (state.fornecedores||[]).filter(function(f){return f.profile===state.profile;})
-        .map(function(f){return el('option',{value:f.id,selected:p.fornecedor_id===f.id},f.nome);})));
+
+  // Autocomplete de fornecedor
+  var fornCombo = buildFornecedorCombo(
+    state.fornecedores || [],
+    p.fornecedor_id || '',
+    function(id){ p.fornecedor_id = id; }
+  );
+
   var obsInp = el('input',{class:'form-input',value:p.obs||'',placeholder:'Observações...',oninput:function(){p.obs=this.value;}});
   var errEl  = el('div',{style:{color:'var(--danger)',fontSize:'12px',minHeight:'16px'}});
 
@@ -90,7 +246,7 @@ function renderProdutoModal() {
           fld('Preço de venda (R$)',vendaInp),
           fld('Estoque atual',estAInp),
           fld('Estoque mínimo (alerta)',estMInp),
-          fld('Fornecedor principal',fornSel),
+          el('div',{style:{gridColumn:'1/-1'}},fld('Fornecedor principal',fornCombo)),
           el('div',{style:{gridColumn:'1/-1'}},fld('Observações',obsInp)),
         ]),
         errEl,

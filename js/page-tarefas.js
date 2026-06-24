@@ -44,7 +44,7 @@ function setupTarefasNotificacoes() {
     Notification.requestPermission();
   }
   verificarAlertas();
-  setInterval(verificarAlertas, 60000);
+  setInterval(verificarAlertas, 30000);
 }
 
 function verificarAlertas() {

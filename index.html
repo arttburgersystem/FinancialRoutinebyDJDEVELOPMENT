@@ -2161,6 +2161,7 @@ function render(){
 <script src="js/page-auditoria.js"></script>
 <script src="js/page-ajuda.js"></script>
 <script src="js/page-estoque.js"></script>
+<script src="js/background-sync.js"></script>
 <script>
 // ── TEMA ──────────────────────────────────────────────────────────────────────
 (function(){if(lsGet('theme','dark')==='light')document.body.classList.add('theme-light');})();
@@ -2209,8 +2210,8 @@ function initApp(){
   window.addEventListener('resize',window._djfResizeHandler);
   initWeatherLocation();
   loadFromFirebase()
-    .then(function(){runRecorrencia();migrarVendasStone();if(typeof setupTarefasNotificacoes==='function')setupTarefasNotificacoes();})
-    .catch(function(){runRecorrencia();migrarVendasStone();if(typeof setupTarefasNotificacoes==='function')setupTarefasNotificacoes();});
+    .then(function(){runRecorrencia();migrarVendasStone();if(typeof setupTarefasNotificacoes==='function')setupTarefasNotificacoes();if(typeof iniciarBackgroundSync==='function')iniciarBackgroundSync();})
+    .catch(function(){runRecorrencia();migrarVendasStone();if(typeof setupTarefasNotificacoes==='function')setupTarefasNotificacoes();if(typeof iniciarBackgroundSync==='function')iniciarBackgroundSync();});
 }
 
 function lockApp(){

@@ -3,6 +3,7 @@
 var _kdsTab      = 'kds';      // 'kds' | 'pedidos'
 var _kdsInterval = null;       // auto-refresh interval no viewer
 var _kdsVisorCfg = null;       // settings panel aberto no viewer
+var KDS_COR_OPCOES = ['#c9a84c','#dc2626','#2563eb','#16a34a','#9333ea','#ea580c','#0891b2','#be185d'];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function _kdsTempoMin(isoStr) {
@@ -322,259 +323,265 @@ function renderKDSViewer(kdsId) {
 }
 
 // ── PÁGINA GERENCIAL DE KDS ───────────────────────────────────────────────────
+// ── MODAL KDS CONFIG (top-level — appendado direto ao #app pelo render()) ─────
+function renderKDSModal() {
+  if (state.kdsModal === null || state.kdsModal === undefined) return null;
+  var perfil = state.profile;
+  var km     = state.kdsModal;
+  var isEdK  = !!km.id;
+  var allSetores = (state.setoresImpressao||[]).filter(function(s){return s.profile===perfil;});
+
+  var nomeInp  = el('input',{class:'form-input',value:km.nome||'',placeholder:'Ex: KDS Cozinha, KDS Chapa, KDS Bar...',
+    oninput:function(){state.kdsModal.nome=this.value;}});
+  var identInp = el('input',{class:'form-input',value:km.identificador||'',placeholder:'Ex: CHAPA, COZINHA, BAR...',
+    style:{textTransform:'uppercase'},oninput:function(){state.kdsModal.identificador=this.value.toUpperCase();}});
+
+  var corSel=el('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'4px'}},
+    KDS_COR_OPCOES.map(function(cor){
+      var b=el('button',{});
+      b.style.cssText='width:28px;height:28px;border-radius:50%;background:'+cor+';border:3px solid '
+        +((state.kdsModal.cor||KDS_COR_OPCOES[0])===cor?'var(--text)':'transparent')+';cursor:pointer;';
+      b.onclick=function(e){
+        e.preventDefault();
+        state.kdsModal.cor=cor;
+        // Re-render somente a cor — atualiza bordas manualmente sem full render
+        corSel.querySelectorAll('button').forEach(function(btn2){
+          btn2.style.border='3px solid '+(btn2.style.background===cor||btn2.dataset.cor===cor?'var(--text)':'transparent');
+        });
+        b.style.border='3px solid var(--text)';
+      };
+      b.dataset.cor=cor;
+      return b;
+    }));
+
+  // Checkboxes de setores (referências salvas para leitura no salvar)
+  var _setChks=[];
+  var setoresCheck=el('div',{style:{display:'flex',flexDirection:'column',gap:'6px',marginTop:'6px'}},
+    allSetores.map(function(s){
+      var vis=km.setoresVisiveis||[];
+      var chk=el('input',{type:'checkbox',style:{accentColor:s.cor||'var(--gold)'}});
+      chk.checked=!vis.length||vis.indexOf(s.id)>=0;
+      _setChks.push({chk:chk,id:s.id});
+      var lbl=el('label',{style:{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'13px'}});
+      var dot=el('span',{style:{width:'10px',height:'10px',borderRadius:'50%',background:s.cor||'var(--gold)',flexShrink:'0'}});
+      lbl.appendChild(chk);lbl.appendChild(dot);lbl.appendChild(document.createTextNode(s.nome));
+      return lbl;
+    }));
+
+  // Checkboxes de categorias
+  var _catChks=[];
+  var catsCheck=el('div',{style:{display:'flex',flexDirection:'column',gap:'6px',marginTop:'6px'}},
+    (typeof estCats==='function'?estCats():[]).map(function(cat){
+      var vis=km.categoriasVisiveis||[];
+      var chkC=el('input',{type:'checkbox',style:{accentColor:'var(--gold)'}});
+      chkC.checked=!vis.length||vis.indexOf(cat)>=0;
+      _catChks.push({chk:chkC,cat:cat});
+      var lblC=el('label',{style:{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'13px'}});
+      lblC.appendChild(chkC);lblC.appendChild(document.createTextNode(cat));
+      return lblC;
+    }));
+
+  function salvarKDS(){
+    var nomeVal=(nomeInp.value||'').trim();
+    if(!nomeVal){showToast('Informe o nome do KDS','error');return;}
+    var setoresVis=_setChks.filter(function(x){return x.chk.checked;}).map(function(x){return x.id;});
+    var catsVis=_catChks.filter(function(x){return x.chk.checked;}).map(function(x){return x.cat;});
+    var item={
+      id:isEdK?km.id:uid(),profile:perfil,
+      nome:nomeVal,
+      identificador:(identInp.value||nomeVal).trim().toUpperCase(),
+      cor:state.kdsModal.cor||KDS_COR_OPCOES[0],
+      setoresVisiveis:setoresVis,
+      categoriasVisiveis:catsVis,
+      ativo:km.ativo!==false,
+      criadoEm:km.criadoEm||today(),
+    };
+    var arr=isEdK
+      ?(state.kdsConfigs||[]).map(function(x){return x.id===item.id?item:x;})
+      :(state.kdsConfigs||[]).concat([item]);
+    lsSet('kdsConfigs',arr);
+    logAudit((isEdK?'editou':'criou')+' KDS',item.nome);
+    setState({kdsConfigs:arr,kdsModal:null});
+    scheduleSave();
+    showToast(isEdK?'KDS atualizado!':'KDS cadastrado!','success');
+  }
+
+  function fg(lbl,inp,hint){
+    return div('form-group',[el('label',{class:'form-label'},lbl),inp,
+      hint?el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'4px'}},hint):null].filter(Boolean));
+  }
+
+  var mEl=el('div',{class:'modal',style:{maxWidth:'520px',maxHeight:'88vh',overflowY:'auto'}},[
+    el('div',{class:'modal-header'},[
+      el('h3',{class:'modal-title'},(isEdK?'✏️ Editar':'➕ Novo')+' KDS'),
+      el('button',{class:'modal-close',onclick:function(){setState({kdsModal:null});}},'✕'),
+    ]),
+    el('div',{class:'modal-body'},[
+      el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}},[
+        el('div',{style:{gridColumn:'1/-1'}},fg('Nome do KDS *',nomeInp,'Nome completo — Ex: KDS Cozinha Principal')),
+        el('div',{style:{gridColumn:'1/-1'}},fg('Identificador (curto)',identInp,'Aparece no header do KDS — Ex: CHAPA, BAR, COZINHA')),
+      ]),
+      fg('Cor identificadora',corSel),
+      el('div',{style:{marginTop:'14px',paddingTop:'14px',borderTop:'1px solid var(--border)'}},[
+        el('div',{style:{fontWeight:'700',fontSize:'11px',textTransform:'uppercase',letterSpacing:'.8px',color:'var(--text3)',marginBottom:'10px'}},'🖨️ Setores visíveis neste KDS'),
+        el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'8px'}},'Marque todos os setores cujos itens aparecerão nesta tela.'),
+        allSetores.length?setoresCheck:el('div',{style:{color:'var(--text3)',fontSize:'12px'}},'Nenhum setor cadastrado — crie em Setores de Impressão.'),
+      ]),
+      el('div',{style:{marginTop:'14px',paddingTop:'14px',borderTop:'1px solid var(--border)'}},[
+        el('div',{style:{fontWeight:'700',fontSize:'11px',textTransform:'uppercase',letterSpacing:'.8px',color:'var(--text3)',marginBottom:'10px'}},'📂 Categorias visíveis'),
+        el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'8px'}},'Deixe todos marcados para exibir todas as categorias.'),
+        catsCheck,
+      ]),
+    ]),
+    el('div',{class:'modal-footer'},[
+      btn('btn-secondary','Cancelar',function(){setState({kdsModal:null});}),
+      btn('btn-primary',isEdK?'💾 Salvar':'➕ Criar',salvarKDS),
+    ]),
+  ]);
+  var mOv=div('modal-overlay',[mEl]);
+  mOv.onclick=function(e){if(e.target===mOv)setState({kdsModal:null});};
+  return mOv;
+}
+
+// ── MODAL PEDIDO (top-level) ──────────────────────────────────────────────────
+function renderKDSPedidoModal() {
+  if (state.pedidoModal === null || state.pedidoModal === undefined) return null;
+  var perfil = state.profile;
+  var pm     = state.pedidoModal;
+  var isEdP  = !!pm.id;
+  var prodCatalogo = (state.produtos||[]).filter(function(p){return p.profile===perfil&&p.tipo==='produto';});
+  var compCatalogo = (state.complementos||[]).filter(function(c){return c.profile===perfil;});
+  var allSetores2  = (state.setoresImpressao||[]).filter(function(s){return s.profile===perfil;});
+
+  var cliInp  = el('input',{class:'form-input',value:pm.cliente||'',placeholder:'Nome do cliente...',oninput:function(){state.pedidoModal.cliente=this.value;}});
+  var mesaInp = el('input',{class:'form-input',value:pm.mesa||'',placeholder:'Nº mesa / comanda...',oninput:function(){state.pedidoModal.mesa=this.value;}});
+  var obsInp  = el('input',{class:'form-input',value:pm.obs||'',placeholder:'Observação geral do pedido...',oninput:function(){state.pedidoModal.obs=this.value;}});
+
+  pm.itens=pm.itens||[];
+
+  function reRenderModal(){setState({pedidoModal:Object.assign({},state.pedidoModal,{itens:state.pedidoModal.itens})});}
+
+  var itensEl=el('div',{style:{display:'flex',flexDirection:'column',gap:'10px',marginTop:'8px'}});
+
+  pm.itens.forEach(function(it,idx){
+    var prod=prodCatalogo.find(function(p){return p.id===it.produtoId;})||{};
+    var setor=allSetores2.find(function(s){return s.id===(it.setorImpressao||prod.setorImpressao);})||{};
+
+    var itCard=el('div',{style:{background:'var(--bg3)',borderRadius:'8px',padding:'10px 12px',border:'1px solid var(--border)'}});
+    var itHead=el('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}});
+
+    var qtdInp=el('input',{type:'number',min:'1',value:it.qtd||1,
+      style:{width:'56px',padding:'4px 6px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--bg2)',color:'var(--text)',fontFamily:'inherit',fontSize:'13px'},
+      onchange:function(){it.qtd=parseInt(this.value)||1;}});
+    itHead.appendChild(qtdInp);
+    itHead.appendChild(el('span',{style:{fontWeight:'600',fontSize:'13px',flex:'1'}},it.nome));
+    if(setor.nome){
+      itHead.appendChild(el('span',{style:{fontSize:'10px',padding:'2px 6px',borderRadius:'8px',background:(setor.cor||'var(--gold)')+'22',color:setor.cor||'var(--gold)',fontWeight:'600'}},setor.nome));
+    }
+    var delItBtn=el('button',{class:'btn-icon',style:{color:'var(--danger)',flexShrink:'0'}});
+    delItBtn.textContent='🗑';
+    delItBtn.onclick=(function(i){return function(){pm.itens.splice(i,1);reRenderModal();};})(idx);
+    itHead.appendChild(delItBtn);
+    itCard.appendChild(itHead);
+
+    var compList=el('div',{style:{paddingLeft:'8px'}});
+    (it.complementos||[]).forEach(function(c,ci){
+      var cRow=el('div',{style:{display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px',fontSize:'12px',color:'var(--text3)'}});
+      cRow.textContent='  └ '+c.nome;
+      var cDel=el('button',{style:{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:'11px',padding:'0 2px'}});
+      cDel.textContent='×';
+      cDel.onclick=(function(ii,ci2){return function(){pm.itens[ii].complementos.splice(ci2,1);reRenderModal();};})(idx,ci);
+      cRow.appendChild(cDel);
+      compList.appendChild(cRow);
+    });
+    itCard.appendChild(compList);
+
+    var addCompSel=el('select',{style:{fontSize:'11px',padding:'3px 6px',borderRadius:'4px',border:'1px solid var(--border)',background:'var(--bg2)',color:'var(--text)',maxWidth:'180px',marginRight:'6px'}},
+      [el('option',{value:''},'+ Complemento...')].concat(compCatalogo.map(function(c){return el('option',{value:c.id},c.nome);})));
+    addCompSel.onchange=(function(ii){return function(){
+      if(!this.value)return;
+      var c=compCatalogo.find(function(x){return x.id===this.value;},this);
+      if(c){pm.itens[ii].complementos=pm.itens[ii].complementos||[];pm.itens[ii].complementos.push({id:c.id,nome:c.nome,qtd:1,preco:c.preco||0});}
+      reRenderModal();
+    };})(idx);
+
+    var obsItInp=el('input',{style:{fontSize:'11px',padding:'3px 6px',borderRadius:'4px',border:'1px solid var(--border)',background:'var(--bg2)',color:'var(--text)',flex:'1'},
+      placeholder:'Obs do item...',value:it.obs||'',oninput:(function(ii){return function(){pm.itens[ii].obs=this.value;};})(idx)});
+
+    var itFoot=el('div',{style:{display:'flex',gap:'6px',marginTop:'6px',alignItems:'center'}});
+    itFoot.appendChild(addCompSel);itFoot.appendChild(obsItInp);
+    itCard.appendChild(itFoot);
+    itensEl.appendChild(itCard);
+  });
+
+  var addProdSel=el('select',{class:'form-input'},
+    [el('option',{value:''},'+ Adicionar produto ao pedido...')].concat(
+      prodCatalogo.map(function(p){return el('option',{value:p.id},p.nome+(p.categoria?' ('+p.categoria+')':''));})));
+  addProdSel.onchange=function(){
+    if(!this.value)return;
+    var p=prodCatalogo.find(function(x){return x.id===addProdSel.value;});
+    if(p){pm.itens.push({id:uid(),produtoId:p.id,nome:p.nome,qtd:1,complementos:[],obs:'',setorImpressao:p.setorImpressao||'',preco:p.precoVenda||0});}
+    reRenderModal();
+  };
+
+  function salvarPedido(){
+    if(!pm.itens.length){showToast('Adicione ao menos 1 item','error');return;}
+    // Snapshot campos antes de qualquer setState
+    var cliVal  = cliInp.value;
+    var mesaVal = mesaInp.value;
+    var obsVal  = obsInp.value;
+    var itens   = pm.itens.map(function(it){return Object.assign({},it,{complementos:(it.complementos||[]).slice()});});
+    var total   = itens.reduce(function(acc,it){return acc+(it.preco||0)*(it.qtd||1);},0);
+    var item={
+      id:isEdP?pm.id:uid(), profile:perfil,
+      numero:isEdP?pm.numero:_nextPedidoNum(),
+      status:pm.status||'novo',
+      cliente:cliVal, mesa:mesaVal, obs:obsVal,
+      itens:itens, total:total, origem:'manual',
+      criadoEm:pm.criadoEm||new Date().toISOString(),
+      atualizadoEm:new Date().toISOString(),
+    };
+    var arr=(state.pedidos||[]);
+    var novos=arr.find(function(x){return x.id===item.id;})
+      ?arr.map(function(x){return x.id===item.id?item:x;})
+      :arr.concat([item]);
+    lsSet('pedidos',novos);
+    logAudit((isEdP?'editou':'criou')+' pedido','#'+item.numero+' '+item.cliente);
+    // Um único setState fecha modal e salva pedidos simultaneamente
+    setState({pedidos:novos, pedidoModal:null});
+    scheduleSave();
+    showToast(isEdP?'Pedido atualizado!':'Pedido lançado!','success');
+  }
+
+  var pmEl=el('div',{class:'modal',style:{maxWidth:'560px',maxHeight:'92vh',overflowY:'auto'}},[
+    el('div',{class:'modal-header'},[
+      el('h3',{class:'modal-title'},(isEdP?'✏️ Editar':'➕ Nova')+(isEdP?' Pedido #'+pm.numero:' Comanda')),
+      el('button',{class:'modal-close',onclick:function(){setState({pedidoModal:null});}},'✕'),
+    ]),
+    el('div',{class:'modal-body'},[
+      el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'14px'}},[
+        div('form-group',[el('label',{class:'form-label'},'Cliente'),cliInp]),
+        div('form-group',[el('label',{class:'form-label'},'Mesa / Comanda'),mesaInp]),
+        el('div',{style:{gridColumn:'1/-1'}},div('form-group',[el('label',{class:'form-label'},'Observação geral'),obsInp])),
+      ]),
+      el('div',{style:{fontWeight:'700',fontSize:'12px',textTransform:'uppercase',letterSpacing:'.6px',color:'var(--text3)',marginBottom:'8px'}},'Itens do pedido'),
+      addProdSel,
+      itensEl,
+    ]),
+    el('div',{class:'modal-footer'},[
+      btn('btn-secondary','Cancelar',function(){setState({pedidoModal:null});}),
+      btn('btn-primary',isEdP?'💾 Salvar':'✅ Lançar pedido',salvarPedido),
+    ]),
+  ]);
+  var pmOv=div('modal-overlay',[pmEl]);
+  pmOv.onclick=function(e){if(e.target===pmOv)setState({pedidoModal:null});};
+  return pmOv;
+}
+
 function renderKDS() {
   var perfil  = state.profile;
   var kdsArr  = (state.kdsConfigs||[]).filter(function(k){return k.profile===perfil;});
   var pedidos = (state.pedidos||[]).filter(function(p){return p.profile===perfil;});
-
-  var COR_OPCOES=['#c9a84c','#dc2626','#2563eb','#16a34a','#9333ea','#ea580c','#0891b2','#be185d'];
-
-  // ── Modal KDS ─────────────────────────────────────────────────────────────
-  var kdsModal=null;
-  if (state.kdsModal!==null&&state.kdsModal!==undefined) {
-    var km  = state.kdsModal;
-    var isEdK=!!km.id;
-    var allSetores=(state.setoresImpressao||[]).filter(function(s){return s.profile===perfil;});
-
-    var nomeInp=el('input',{class:'form-input',value:km.nome||'',placeholder:'Ex: KDS Cozinha, KDS Chapa, KDS Bar...',oninput:function(){km.nome=this.value;}});
-    var identInp=el('input',{class:'form-input',value:km.identificador||'',placeholder:'Ex: CHAPA, COZINHA, BAR...',
-      style:{textTransform:'uppercase'},oninput:function(){km.identificador=this.value.toUpperCase();}});
-
-    var corSel=el('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'4px'}},
-      COR_OPCOES.map(function(cor){
-        var b=el('button',{});
-        b.style.cssText='width:28px;height:28px;border-radius:50%;background:'+cor+';border:3px solid '
-          +((km.cor||COR_OPCOES[0])===cor?'var(--text)':'transparent')+';cursor:pointer;';
-        b.onclick=function(e){e.preventDefault();km.cor=cor;setState({kdsModal:Object.assign({},state.kdsModal,{cor:cor})});};
-        return b;
-      }));
-
-    // Checkboxes de setores visíveis
-    var setoresCheck=el('div',{style:{display:'flex',flexDirection:'column',gap:'6px',marginTop:'6px'}},
-      allSetores.map(function(s){
-        var vis=km.setoresVisiveis||[];
-        var chk=el('input',{type:'checkbox',style:{accentColor:s.cor||'var(--gold)'}});
-        chk.checked=!vis.length||vis.indexOf(s.id)>=0;
-        chk.onchange=function(){
-          var v=km.setoresVisiveis?[].concat(km.setoresVisiveis):[];
-          if(this.checked){if(v.indexOf(s.id)<0)v.push(s.id);}
-          else{v=v.filter(function(x){return x!==s.id;});}
-          km.setoresVisiveis=v;
-        };
-        var lbl=el('label',{style:{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'13px'}});
-        var dot=el('span',{style:{width:'10px',height:'10px',borderRadius:'50%',background:s.cor||'var(--gold)',flexShrink:'0'}});
-        lbl.appendChild(chk);lbl.appendChild(dot);lbl.appendChild(document.createTextNode(s.nome));
-        return lbl;
-      }));
-
-    // Checkboxes de categorias visíveis
-    var catsCheck=el('div',{style:{display:'flex',flexDirection:'column',gap:'6px',marginTop:'6px'}},
-      estCats().map(function(cat){
-        var vis=km.categoriasVisiveis||[];
-        var chkC=el('input',{type:'checkbox',style:{accentColor:'var(--gold)'}});
-        chkC.checked=!vis.length||vis.indexOf(cat)>=0;
-        chkC.onchange=function(){
-          var v=km.categoriasVisiveis?[].concat(km.categoriasVisiveis):[];
-          if(this.checked){if(v.indexOf(cat)<0)v.push(cat);}
-          else{v=v.filter(function(x){return x!==cat;});}
-          km.categoriasVisiveis=v;
-        };
-        var lblC=el('label',{style:{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'13px'}});
-        lblC.appendChild(chkC);lblC.appendChild(document.createTextNode(cat));
-        return lblC;
-      }));
-
-    function salvarKDS(){
-      if(!(km.nome||'').trim()){showToast('Informe o nome do KDS','error');return;}
-      var item={
-        id:isEdK?km.id:uid(),profile:perfil,
-        nome:(km.nome||'').trim(),
-        identificador:(km.identificador||km.nome||'').trim().toUpperCase(),
-        cor:km.cor||COR_OPCOES[0],
-        setoresVisiveis:km.setoresVisiveis||[],
-        categoriasVisiveis:km.categoriasVisiveis||[],
-        ativo:km.ativo!==false,
-        criadoEm:km.criadoEm||today(),
-      };
-      var arr=isEdK
-        ?(state.kdsConfigs||[]).map(function(x){return x.id===item.id?item:x;})
-        :(state.kdsConfigs||[]).concat([item]);
-      lsSet('kdsConfigs',arr);
-      logAudit((isEdK?'editou':'criou')+' KDS',item.nome);
-      setState({kdsConfigs:arr,kdsModal:null});
-      scheduleSave();
-      showToast(isEdK?'KDS atualizado!':'KDS cadastrado!');
-    }
-
-    function fg(lbl,inp,hint){
-      var g=div('form-group',[el('label',{class:'form-label'},lbl),inp,hint?el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'4px'}},hint):null].filter(Boolean));
-      return g;
-    }
-
-    var mEl=el('div',{class:'modal',style:{maxWidth:'520px',maxHeight:'88vh',overflowY:'auto'}},[
-      el('div',{class:'modal-header'},[
-        el('h3',{class:'modal-title'},(isEdK?'✏️ Editar':'➕ Novo')+' KDS'),
-        el('button',{class:'modal-close',onclick:function(){setState({kdsModal:null});}},'✕'),
-      ]),
-      el('div',{class:'modal-body'},[
-        el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}},[
-          el('div',{style:{gridColumn:'1/-1'}},fg('Nome do KDS *',nomeInp,'Nome completo — Ex: KDS Cozinha Principal')),
-          el('div',{style:{gridColumn:'1/-1'}},fg('Identificador (curto)',identInp,'Aparece no header do KDS — Ex: CHAPA, BAR, COZINHA')),
-        ]),
-        fg('Cor identificadora',corSel),
-        el('div',{style:{marginTop:'14px',paddingTop:'14px',borderTop:'1px solid var(--border)'}},[
-          el('div',{style:{fontWeight:'700',fontSize:'11px',textTransform:'uppercase',letterSpacing:'.8px',color:'var(--text3)',marginBottom:'10px'}},'🖨️ Setores visíveis neste KDS'),
-          el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'8px'}},'Marque todos os setores cujos itens aparecerão nesta tela.'),
-          allSetores.length ? setoresCheck : el('div',{style:{color:'var(--text3)',fontSize:'12px'}},'Nenhum setor cadastrado ainda — crie em Setores de Impressão.'),
-        ]),
-        el('div',{style:{marginTop:'14px',paddingTop:'14px',borderTop:'1px solid var(--border)'}},[
-          el('div',{style:{fontWeight:'700',fontSize:'11px',textTransform:'uppercase',letterSpacing:'.8px',color:'var(--text3)',marginBottom:'10px'}},'📂 Categorias visíveis'),
-          el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'8px'}},'Deixe todos marcados para exibir todas as categorias.'),
-          catsCheck,
-        ]),
-      ]),
-      el('div',{class:'modal-footer'},[
-        btn('btn-secondary','Cancelar',function(){setState({kdsModal:null});}),
-        btn('btn-primary',isEdK?'💾 Salvar':'➕ Criar',salvarKDS),
-      ]),
-    ]);
-    var mOv=div('modal-overlay',[mEl]);
-    mOv.onclick=function(e){if(e.target===mOv)setState({kdsModal:null});};
-    kdsModal=mOv;
-  }
-
-  // ── Modal Pedido ──────────────────────────────────────────────────────────
-  var pedModal=null;
-  if (state.pedidoModal!==null&&state.pedidoModal!==undefined) {
-    var pm  = state.pedidoModal;
-    var isEdP=!!pm.id;
-    var prodCatalogo=(state.produtos||[]).filter(function(p){return p.profile===perfil&&p.tipo==='produto';});
-    var compCatalogo=(state.complementos||[]).filter(function(c){return c.profile===perfil;});
-    var allSetores2=(state.setoresImpressao||[]).filter(function(s){return s.profile===perfil;});
-
-    var cliInp=el('input',{class:'form-input',value:pm.cliente||'',placeholder:'Nome do cliente...',oninput:function(){pm.cliente=this.value;}});
-    var mesaInp=el('input',{class:'form-input',value:pm.mesa||'',placeholder:'Nº mesa / comanda...',oninput:function(){pm.mesa=this.value;}});
-    var obsInp=el('input',{class:'form-input',value:pm.obs||'',placeholder:'Observação geral do pedido...',oninput:function(){pm.obs=this.value;}});
-
-    pm.itens=pm.itens||[];
-
-    function reRenderModal(){setState({pedidoModal:Object.assign({},state.pedidoModal)});}
-
-    var itensEl=el('div',{style:{display:'flex',flexDirection:'column',gap:'10px',marginTop:'8px'}});
-
-    pm.itens.forEach(function(it,idx){
-      var prod=prodCatalogo.find(function(p){return p.id===it.produtoId;})||{};
-      var setor=allSetores2.find(function(s){return s.id===(it.setorImpressao||prod.setorImpressao);})||{};
-
-      var itCard=el('div',{style:{background:'var(--bg3)',borderRadius:'8px',padding:'10px 12px',border:'1px solid var(--border)'}});
-
-      var itHead=el('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}});
-      var qtdInp=el('input',{type:'number',min:'1',value:it.qtd||1,style:{width:'56px',padding:'4px 6px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--bg2)',color:'var(--text)',fontFamily:'inherit',fontSize:'13px'},
-        onchange:function(){it.qtd=parseInt(this.value)||1;}});
-      itHead.appendChild(qtdInp);
-
-      var itNome=el('span',{style:{fontWeight:'600',fontSize:'13px',flex:'1'}},it.nome);
-      itHead.appendChild(itNome);
-
-      if(setor.nome){
-        var sBadge=el('span',{style:{fontSize:'10px',padding:'2px 6px',borderRadius:'8px',background:(setor.cor||'var(--gold)')+'22',color:setor.cor||'var(--gold)',fontWeight:'600'}},setor.nome);
-        itHead.appendChild(sBadge);
-      }
-
-      var delItBtn=el('button',{class:'btn-icon',style:{color:'var(--danger)',flexShrink:'0'}});
-      delItBtn.textContent='🗑';
-      delItBtn.onclick=function(){pm.itens.splice(idx,1);reRenderModal();};
-      itHead.appendChild(delItBtn);
-      itCard.appendChild(itHead);
-
-      // Complementos do item
-      var compList=el('div',{style:{paddingLeft:'8px'}});
-      (it.complementos||[]).forEach(function(c,ci){
-        var cRow=el('div',{style:{display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px',fontSize:'12px',color:'var(--text3)'}});
-        cRow.textContent='  └ '+c.nome;
-        var cDel=el('button',{style:{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:'11px',padding:'0 2px'}});
-        cDel.textContent='×';
-        cDel.onclick=function(){it.complementos.splice(ci,1);reRenderModal();};
-        cRow.appendChild(cDel);
-        compList.appendChild(cRow);
-      });
-      itCard.appendChild(compList);
-
-      // Adicionar complemento ao item
-      var addCompSel=el('select',{style:{fontSize:'11px',padding:'3px 6px',borderRadius:'4px',border:'1px solid var(--border)',background:'var(--bg2)',color:'var(--text)',maxWidth:'180px',marginRight:'6px'}},
-        [el('option',{value:''},'+ Complemento...')].concat(compCatalogo.map(function(c){return el('option',{value:c.id},c.nome);})));
-      addCompSel.onchange=function(){
-        if(!this.value)return;
-        var c=compCatalogo.find(function(x){return x.id===addCompSel.value;});
-        if(c){it.complementos=it.complementos||[];it.complementos.push({id:c.id,nome:c.nome,qtd:1,preco:c.preco||0});}
-        reRenderModal();
-      };
-
-      var obsItInp=el('input',{style:{fontSize:'11px',padding:'3px 6px',borderRadius:'4px',border:'1px solid var(--border)',background:'var(--bg2)',color:'var(--text)',flex:'1'},
-        placeholder:'Obs do item...',value:it.obs||'',oninput:function(){it.obs=this.value;}});
-
-      var itFoot=el('div',{style:{display:'flex',gap:'6px',marginTop:'6px',alignItems:'center'}});
-      itFoot.appendChild(addCompSel);
-      itFoot.appendChild(obsItInp);
-      itCard.appendChild(itFoot);
-
-      itensEl.appendChild(itCard);
-    });
-
-    // Seletor produto para adicionar
-    var addProdSel=el('select',{class:'form-input'},
-      [el('option',{value:''},'+ Adicionar produto ao pedido...')].concat(
-        prodCatalogo.map(function(p){return el('option',{value:p.id},p.nome+(p.categoria?' ('+p.categoria+')':''));})));
-    addProdSel.onchange=function(){
-      if(!this.value)return;
-      var p=prodCatalogo.find(function(x){return x.id===addProdSel.value;});
-      if(p){pm.itens.push({id:uid(),produtoId:p.id,nome:p.nome,qtd:1,complementos:[],obs:'',setorImpressao:p.setorImpressao||'',preco:p.precoVenda||0});}
-      reRenderModal();
-    };
-
-    function salvarPedido(){
-      if(!pm.itens.length){showToast('Adicione ao menos 1 item','error');return;}
-      var total=pm.itens.reduce(function(acc,it){return acc+(it.preco||0)*(it.qtd||1);},0);
-      var item={
-        id:isEdP?pm.id:uid(),profile:perfil,
-        numero:isEdP?pm.numero:_nextPedidoNum(),
-        status:pm.status||'novo',
-        cliente:pm.cliente||'',mesa:pm.mesa||'',obs:pm.obs||'',
-        itens:pm.itens,total:total,
-        origem:'manual',
-        criadoEm:pm.criadoEm||new Date().toISOString(),
-        atualizadoEm:new Date().toISOString(),
-      };
-      _salvarPedido(item);
-      logAudit((isEdP?'editou':'criou')+' pedido','#'+item.numero+' '+item.cliente);
-      setState({pedidoModal:null});
-      showToast(isEdP?'Pedido atualizado!':'Pedido lançado!');
-    }
-
-    var pmEl=el('div',{class:'modal',style:{maxWidth:'560px',maxHeight:'92vh',overflowY:'auto'}},[
-      el('div',{class:'modal-header'},[
-        el('h3',{class:'modal-title'},(isEdP?'✏️ Editar':'➕ Nova')+(isEdP?' Pedido #'+pm.numero:' Comanda')),
-        el('button',{class:'modal-close',onclick:function(){setState({pedidoModal:null});}},'✕'),
-      ]),
-      el('div',{class:'modal-body'},[
-        el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'14px'}},[
-          div('form-group',[el('label',{class:'form-label'},'Cliente'),cliInp]),
-          div('form-group',[el('label',{class:'form-label'},'Mesa / Comanda'),mesaInp]),
-          el('div',{style:{gridColumn:'1/-1'}},div('form-group',[el('label',{class:'form-label'},'Observação geral'),obsInp])),
-        ]),
-        el('div',{style:{fontWeight:'700',fontSize:'12px',textTransform:'uppercase',letterSpacing:'.6px',color:'var(--text3)',marginBottom:'8px'}},'Itens do pedido'),
-        addProdSel,
-        itensEl,
-      ]),
-      el('div',{class:'modal-footer'},[
-        btn('btn-secondary','Cancelar',function(){setState({pedidoModal:null});}),
-        btn('btn-primary',isEdP?'💾 Salvar':'✅ Lançar pedido',salvarPedido),
-      ]),
-    ]);
-    var pmOv=div('modal-overlay',[pmEl]);
-    pmOv.onclick=function(e){if(e.target===pmOv)setState({pedidoModal:null});};
-    pedModal=pmOv;
-  }
 
   // ── Tab: KDSs ─────────────────────────────────────────────────────────────
   function renderKdsList() {
@@ -713,9 +720,5 @@ function renderKDS() {
     _kdsTab==='pedidos' ? renderPedidosList() : null,
   ].filter(Boolean));
 
-  var root=el('div',{});
-  root.appendChild(page);
-  if(kdsModal) root.appendChild(kdsModal);
-  if(pedModal) root.appendChild(pedModal);
-  return root;
+  return page;
 }

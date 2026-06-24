@@ -2225,6 +2225,9 @@ function render(){
   if(orcamentoModal)app.appendChild(orcamentoModal);
   if(buscaModal)app.appendChild(buscaModal);
   if(perfilModal)app.appendChild(perfilModal);
+  // Modais KDS — appendados direto ao #app para z-index correto
+  if(typeof renderKDSModal==='function'){var kdsM=renderKDSModal();if(kdsM)app.appendChild(kdsM);}
+  if(typeof renderKDSPedidoModal==='function'){var kdsP=renderKDSPedidoModal();if(kdsP)app.appendChild(kdsP);}
   var alertaBanner=typeof renderAlertaBanner==='function'?renderAlertaBanner():null;
   if(alertaBanner)app.appendChild(alertaBanner);
   if(state.toast){

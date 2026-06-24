@@ -252,7 +252,10 @@ function renderAlertaBanner() {
       'padding:12px;font-size:13px;font-weight:700;cursor:pointer;',
     ].join('');
     verTodasBtn.textContent = '📋 Ver todas as tarefas';
-    verTodasBtn.onclick = function() { setState({ page: 'tarefas' }); };
+    verTodasBtn.onclick = function() {
+      _tarefaAlertaSnozeAte = Date.now() + 300000; // fecha popup por 5 min ao navegar
+      setState({ page: 'tarefas' });
+    };
 
     var snoze15Btn = el('button', {});
     snoze15Btn.style.cssText = [

@@ -1227,6 +1227,24 @@ function renderEstoque() {
     acoes.push(btn('btn-ghost','📤 Saída',function(){setState({movModal:{tipo:'saida',data:today()}});}));
   }
 
+  var vencendo = _lotesVencendoEmBreve();
+  var bannerVenc = vencendo.length ? el('div',{style:{
+    background:'rgba(224,82,82,0.12)',border:'1px solid var(--red)',borderRadius:'8px',
+    padding:'10px 14px',marginBottom:'14px',fontSize:'12px',color:'var(--red)',
+    display:'flex',alignItems:'flex-start',gap:'8px'
+  }},[
+    el('span',{},'⚠️'),
+    el('div',{},[
+      el('b',{},'Lotes próximos ao vencimento: '),
+      vencendo.map(function(v){
+        return el('span',{style:{marginRight:'12px'}},
+          (v.prod.nome||'')+(v.mov.lote?' lote '+v.mov.lote:'')+' — '+
+          (v.diff<0?'vencido há '+Math.abs(v.diff)+'d':v.diff===0?'vence hoje':'vence em '+v.diff+'d')+' ('+v.venc+')'
+        );
+      }),
+    ]),
+  ]) : null;
+
   var content =
     tab==='produtos' ? renderEstProdutos() :
     tab==='movs'     ? renderEstMovs()     :
@@ -1241,6 +1259,7 @@ function renderEstoque() {
       ]),
       acoes.length ? el('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap'}},acoes) : null,
     ].filter(Boolean)),
+    bannerVenc,
     tabNav,
     content,
     state.produtoModal!==null ? renderProdutoModal() : null,

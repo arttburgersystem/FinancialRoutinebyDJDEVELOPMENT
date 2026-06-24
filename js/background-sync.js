@@ -41,6 +41,7 @@ function enviarTarefasAoSW() {
 
 function _bgFirebasePoll() {
   if (typeof fbGet !== 'function') return;
+  var toArr = typeof objToArr === 'function' ? objToArr : function(){return[];};
   Promise.all([
     fbGet('/tarefas'),
     fbGet('/contas'),
@@ -48,24 +49,39 @@ function _bgFirebasePoll() {
     fbGet('/bancos'),
     fbGet('/produtos'),
     fbGet('/movEstoque'),
+    fbGet('/setoresImpressao'),
+    fbGet('/complementos'),
+    fbGet('/kdsConfigs'),
+    fbGet('/pedidos'),
+    fbGet('/notas'),
+    fbGet('/impressorasCadastradas'),
   ]).then(function(results) {
-    var tarefas    = typeof objToArr === 'function' ? objToArr(results[0]) : [];
-    var contas     = typeof objToArr === 'function' ? objToArr(results[1]) : [];
-    var receitas   = typeof objToArr === 'function' ? objToArr(results[2]) : [];
-    var bancos     = results[3] && Object.keys(results[3]).length > 0
-                      ? (typeof objToArr === 'function' ? objToArr(results[3]) : state.bancos)
-                      : state.bancos;
-    var produtos   = typeof objToArr === 'function' ? objToArr(results[4]) : [];
-    var movEstoque = typeof objToArr === 'function' ? objToArr(results[5]) : [];
+    var tarefas              = toArr(results[0]);
+    var contas               = toArr(results[1]);
+    var receitas             = toArr(results[2]);
+    var bancos               = results[3] && Object.keys(results[3]).length > 0 ? toArr(results[3]) : state.bancos;
+    var produtos             = toArr(results[4]);
+    var movEstoque           = toArr(results[5]);
+    var setoresImpressao     = toArr(results[6]||[]);
+    var complementos         = toArr(results[7]||[]);
+    var kdsConfigs           = toArr(results[8]||[]);
+    var pedidos              = toArr(results[9]||[]);
+    var notas                = toArr(results[10]||[]);
+    var impressorasCadastradas = toArr(results[11]||[]);
 
-    // Só atualiza se algo mudou (compara por comprimento + ids)
     var patch = {};
-    if (_dadosMudou(state.tarefas, tarefas))       { patch.tarefas    = tarefas;    if(typeof lsSet==='function') lsSet('tarefas',tarefas); }
-    if (_dadosMudou(state.contas, contas))          { patch.contas     = contas;     if(typeof lsSet==='function') lsSet('contas',contas); }
-    if (_dadosMudou(state.receitas, receitas))      { patch.receitas   = receitas;   if(typeof lsSet==='function') lsSet('receitas',receitas); }
-    if (_dadosMudou(state.bancos, bancos))          { patch.bancos     = bancos;     if(typeof lsSet==='function') lsSet('bancos',bancos); }
-    if (_dadosMudou(state.produtos, produtos))      { patch.produtos   = produtos;   if(typeof lsSet==='function') lsSet('produtos',produtos); }
-    if (_dadosMudou(state.movEstoque, movEstoque))  { patch.movEstoque = movEstoque; if(typeof lsSet==='function') lsSet('movEstoque',movEstoque); }
+    if (_dadosMudou(state.tarefas, tarefas))            { patch.tarefas    = tarefas;    if(typeof lsSet==='function') lsSet('tarefas',tarefas); }
+    if (_dadosMudou(state.contas, contas))              { patch.contas     = contas;     if(typeof lsSet==='function') lsSet('contas',contas); }
+    if (_dadosMudou(state.receitas, receitas))          { patch.receitas   = receitas;   if(typeof lsSet==='function') lsSet('receitas',receitas); }
+    if (_dadosMudou(state.bancos, bancos))              { patch.bancos     = bancos;     if(typeof lsSet==='function') lsSet('bancos',bancos); }
+    if (_dadosMudou(state.produtos, produtos))          { patch.produtos   = produtos;   if(typeof lsSet==='function') lsSet('produtos',produtos); }
+    if (_dadosMudou(state.movEstoque, movEstoque))      { patch.movEstoque = movEstoque; if(typeof lsSet==='function') lsSet('movEstoque',movEstoque); }
+    if (_dadosMudou(state.setoresImpressao, setoresImpressao))     { patch.setoresImpressao = setoresImpressao; if(typeof lsSet==='function') lsSet('setoresImpressao',setoresImpressao); }
+    if (_dadosMudou(state.complementos, complementos))             { patch.complementos = complementos; if(typeof lsSet==='function') lsSet('complementos',complementos); }
+    if (_dadosMudou(state.kdsConfigs, kdsConfigs))                 { patch.kdsConfigs = kdsConfigs; if(typeof lsSet==='function') lsSet('kdsConfigs',kdsConfigs); }
+    if (_dadosMudou(state.pedidos, pedidos))                       { patch.pedidos = pedidos; if(typeof lsSet==='function') lsSet('pedidos',pedidos); }
+    if (_dadosMudou(state.notas, notas))                           { patch.notas = notas; if(typeof lsSet==='function') lsSet('notas',notas); }
+    if (_dadosMudou(state.impressorasCadastradas, impressorasCadastradas)) { patch.impressorasCadastradas = impressorasCadastradas; if(typeof lsSet==='function') lsSet('impressorasCadastradas',impressorasCadastradas); }
 
     if (Object.keys(patch).length > 0) {
       Object.assign(state, patch);
@@ -95,7 +111,8 @@ function _temModalAberto() {
   return !!(state.modal || state.produtoModal !== null || state.movModal !== null ||
     state.tarefaModal !== null || state.usuarioModal !== null || state.recorrModal !== null ||
     state.bancoModal || state.transfModal || state.receitaModal || state.cartaoModal ||
-    state.perfilModal || state.metaModal || state.orcamentoModal || state.buscaModal);
+    state.perfilModal || state.metaModal || state.orcamentoModal || state.buscaModal ||
+    state.kdsModal || state.pedidoModal || state.impModal);
 }
 
 // ── INDICADOR VISUAL DE SINCRONIZAÇÃO ─────────────────────────────────────────

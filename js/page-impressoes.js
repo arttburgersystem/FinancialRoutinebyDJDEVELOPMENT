@@ -179,7 +179,7 @@ function renderTabImpressoras() {
 
     function salvarImp() {
       if(!(im.nome||'').trim()){showToast('Informe o nome da impressora','error');return;}
-      var nova = {id:uid(),nome:im.nome.trim(),tipo:im.tipo||'usb',ip:im.ip||'',porta:im.porta||'9100',padrao:im.padrao||false,profile:state.profile};
+      var nova = {id:im.id||uid(),nome:im.nome.trim(),tipo:im.tipo||'usb',ip:im.ip||'',porta:im.porta||'9100',padrao:im.padrao||false,profile:state.profile};
       var arr = (state.impressorasCadastradas||[]);
       if(im.id) {
         arr = arr.map(function(x){return x.id===im.id?Object.assign({},x,nova):x;});

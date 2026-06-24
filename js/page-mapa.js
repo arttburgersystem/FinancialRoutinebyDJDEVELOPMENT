@@ -11,6 +11,7 @@ function initLeafletMap() {
   if (_djfMapInstance) {
     try{ _djfMapInstance.remove(); }catch(e){}
     _djfMapInstance = null;
+    _djfMapMarkers = [];
   }
 
   // Brasil: centro quando sem geolocalização

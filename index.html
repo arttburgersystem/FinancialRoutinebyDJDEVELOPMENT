@@ -414,6 +414,7 @@ var state={
   complementos:    lsGet('complementos',[]),
   complementoModal:null,
   crdDropOpen:     null,
+  configImpressao: lsGet('configImpressao',{logoUrl:'',mostrarLogo:true,mostrarCnpj:true,mostrarEndereco:true,largura:'80mm',rodape:'Obrigado pela preferência!\nVolte sempre!'}),
   empresaData: lsGet('empresaData',{}),
   estTab: 'produtos',
   produtoModal: null,
@@ -632,7 +633,7 @@ function scheduleSave(){
   clearTimeout(syncTimer);
   syncTimer=setTimeout(function(){
     setState({syncStatus:'syncing'});
-    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);
+    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});
     Promise.all([
       fbPut('/contas',arrToObj(state.contas)),
       fbPut('/metas',arrToObj(state.metas)),

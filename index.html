@@ -649,7 +649,8 @@ var syncTimer=null;
 function scheduleSave(){
   clearTimeout(syncTimer);
   syncTimer=setTimeout(function(){
-    setState({syncStatus:'syncing'});
+    // Atualiza badge diretamente — sem setState para não destruir inputs ativos
+    _updateSyncDOM('syncing');
     lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);lsSet('notas',state.notas||[]);lsSet('impressorasCadastradas',state.impressorasCadastradas||[]);lsSet('auditLog',state.auditLog||[]);
     Promise.all([
       fbPut('/contas',arrToObj(state.contas)),
@@ -675,8 +676,8 @@ function scheduleSave(){
       fbPut('/impressorasCadastradas',arrToObj(state.impressorasCadastradas||[])),
       fbPut('/configImpressao',state.configImpressao||{}),
       fbPut('/auditLog',arrToObj(state.auditLog||[])),
-    ]).then(function(){setState({syncStatus:'ok'});})
-      .catch(function(e){console.error(e);setState({syncStatus:'error'});showToast('Erro ao salvar no Firebase','error');});
+    ]).then(function(){_updateSyncDOM('ok');})
+      .catch(function(e){console.error(e);_updateSyncDOM('error');showToast('Erro ao salvar no Firebase','error');});
   },1500);
 }
 
@@ -860,10 +861,19 @@ function btn(cls,text,onclick){var b=el('button',{class:cls,onclick:onclick});b.
 function renderSyncBadge(){
   var labels={idle:'Firebase',syncing:'Salvando...',ok:'Firebase sincronizado',error:'Erro no sync'};
   var dotClass='sync-dot'+(state.syncStatus==='syncing'?' syncing':state.syncStatus==='error'?' error':'');
-  return div('sync-badge',[
-    el('div',{class:dotClass}),
-    el('span',{},labels[state.syncStatus]||''),
+  return el('div',{class:'sync-badge',id:'_djf-sync-badge'},[
+    el('div',{class:dotClass,id:'_djf-sync-dot'}),
+    el('span',{class:'_sync-lbl'},labels[state.syncStatus]||''),
   ]);
+}
+// Atualiza o badge sem re-render (evita destruir inputs/textareas durante sync)
+function _updateSyncDOM(status){
+  state.syncStatus=status;
+  var dot=document.getElementById('_djf-sync-dot');
+  var lbl=document.querySelector('._sync-lbl');
+  var labels={idle:'Firebase',syncing:'Salvando...',ok:'Firebase sincronizado',error:'Erro no sync'};
+  if(dot)dot.className='sync-dot'+(status==='syncing'?' syncing':status==='error'?' error':'');
+  if(lbl)lbl.textContent=labels[status]||'';
 }
 
 // ── LOGIN SCREEN (pós-PIN) ────────────────────────────────────────────────────

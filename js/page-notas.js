@@ -1,19 +1,19 @@
 // ── BLOCO DE NOTAS ────────────────────────────────────────────────────────────
 
-// Retorna notas do perfil atual, ordenadas por mais recente
 function _notasDoPerfil() {
   return (state.notas||[])
     .filter(function(n){return n.profile===state.profile;})
     .sort(function(a,b){return new Date(b.atualizadoEm)-new Date(a.atualizadoEm);});
 }
 
-function _salvarNota(nota) {
+// Salva uma nota com um único setState (1 re-render)
+function _salvarNotaComPatch(nota, extraPatch) {
   var arr = (state.notas||[]);
   var idx = arr.findIndex(function(n){return n.id===nota.id;});
   var novas = idx>=0 ? arr.map(function(n){return n.id===nota.id?nota:n;}) : arr.concat([nota]);
   lsSet('notas', novas);
-  setState({notas: novas});
   scheduleSave();
+  setState(Object.assign({notas:novas}, extraPatch||{}));
 }
 
 var _notaAutoSave = null;
@@ -23,14 +23,17 @@ function _autoSaveNota(id, conteudo) {
     var arr = (state.notas||[]);
     var idx = arr.findIndex(function(n){return n.id===id;});
     if (idx >= 0) {
-      // Mutação direta para não causar re-render (mantém foco no textarea)
+      // Mutação direta — sem setState, sem re-render, sem destruir o textarea
       arr[idx] = Object.assign({}, arr[idx], {conteudo:conteudo, atualizadoEm:new Date().toISOString()});
       state.notas = arr.slice();
       lsSet('notas', state.notas);
-      scheduleSave();
+      // Salva direto no Firebase sem passar pelo scheduleSave (evita re-render do badge)
+      if(typeof fbPut==='function'&&typeof arrToObj==='function')
+        fbPut('/notas', arrToObj(state.notas)).catch(function(){});
     }
   }, 800);
 }
+
 function _autoSaveTituloNota(id, titulo) {
   var arr = (state.notas||[]);
   var idx = arr.findIndex(function(n){return n.id===id;});
@@ -39,7 +42,9 @@ function _autoSaveTituloNota(id, titulo) {
     state.notas = arr.slice();
     lsSet('notas', state.notas);
     scheduleSave();
-    setState({}); // re-render para atualizar sidebar com novo título
+    // Atualiza apenas o título na sidebar sem re-render completo
+    var sidItems = document.querySelectorAll('._nota-sid-titulo[data-id="'+id+'"]');
+    sidItems.forEach(function(el){el.textContent=titulo||'Sem título';});
   }
 }
 
@@ -64,8 +69,10 @@ function renderNotaPanel() {
   newBtn.textContent='+ Nova';
   newBtn.onclick = function(){
     var n={id:uid(),profile:state.profile,titulo:'Nova nota',conteudo:'',cor:NOTA_CORES[0],criadoEm:new Date().toISOString(),atualizadoEm:new Date().toISOString()};
-    _salvarNota(n);
-    setState({notaAtualId:n.id});
+    var arr=(state.notas||[]).concat([n]);
+    lsSet('notas',arr);
+    scheduleSave();
+    setState({notas:arr, notaAtualId:n.id});
   };
   hd.appendChild(newBtn);
   panel.appendChild(hd);
@@ -90,9 +97,9 @@ function renderNotaPanel() {
     item.onmouseenter=function(){if(!isAt)this.style.background='var(--bg3)';};
     item.onmouseleave=function(){if(!isAt)this.style.background='transparent';};
     var dot=el('div',{style:{width:'8px',height:'8px',borderRadius:'50%',background:n.cor||'var(--gold)',marginBottom:'4px'}});
-    var titulo=el('div',{style:{fontSize:'11px',fontWeight:isAt?'700':'500',color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},n.titulo||'Sem título');
+    var tituloEl=el('div',{'data-id':n.id,class:'_nota-sid-titulo',style:{fontSize:'11px',fontWeight:isAt?'700':'500',color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},n.titulo||'Sem título');
     var data=el('div',{style:{fontSize:'9px',color:'var(--text3)',marginTop:'2px'}},new Date(n.atualizadoEm).toLocaleDateString('pt-BR'));
-    item.appendChild(dot);item.appendChild(titulo);item.appendChild(data);
+    item.appendChild(dot);item.appendChild(tituloEl);item.appendChild(data);
     item.onclick=function(){setState({notaAtualId:n.id});};
     lista.appendChild(item);
   });
@@ -102,7 +109,7 @@ function renderNotaPanel() {
   var editor = el('div',{style:{flex:'1',display:'flex',flexDirection:'column',overflow:'hidden'}});
 
   if (nota) {
-    // Título da nota
+    // Título
     var tituloRow = el('div',{style:{display:'flex',alignItems:'center',gap:'6px',padding:'8px 10px',borderBottom:'1px solid var(--border)',flexShrink:'0'}});
     var tituloInp = el('input',{style:{flex:'1',background:'none',border:'none',fontWeight:'700',fontSize:'13px',color:'var(--text)',fontFamily:'inherit',outline:'none'}});
     tituloInp.value = nota.titulo||'';
@@ -114,16 +121,26 @@ function renderNotaPanel() {
     tituloRow.appendChild(tituloInp);
     tituloRow.appendChild(corBtn);
 
-    // Color picker popup
     if (state._notaCorPicker===nota.id) {
-      var picker=el('div',{style:{position:'absolute',top:'100%',right:'0',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'8px',padding:'8px',display:'flex',gap:'6px',flexWrap:'wrap',zIndex:'601',boxShadow:'0 4px 12px rgba(0,0,0,.2)',width:'120px'}});
+      var picker=el('div',{style:{position:'fixed',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'8px',padding:'8px',display:'flex',gap:'6px',flexWrap:'wrap',zIndex:'601',boxShadow:'0 4px 12px rgba(0,0,0,.3)',width:'120px'}});
       NOTA_CORES.forEach(function(c){
         var cb=el('button',{style:{width:'22px',height:'22px',borderRadius:'50%',background:c,border:'2px solid '+(c===nota.cor?'var(--text)':'transparent'),cursor:'pointer'}});
-        cb.onclick=function(e){e.stopPropagation();_salvarNota(Object.assign({},nota,{cor:c}));setState({_notaCorPicker:null});};
+        cb.onclick=function(e){
+          e.stopPropagation();
+          var newNota=Object.assign({},nota,{cor:c});
+          var arr=(state.notas||[]).map(function(n){return n.id===nota.id?newNota:n;});
+          lsSet('notas',arr);scheduleSave();
+          setState({notas:arr,_notaCorPicker:null});
+        };
         picker.appendChild(cb);
       });
-      corBtn.style.position='relative';
-      corBtn.appendChild(picker);
+      // Posiciona o picker próximo ao botão de cor
+      setTimeout(function(){
+        var rect=corBtn.getBoundingClientRect();
+        picker.style.top=(rect.bottom+4)+'px';
+        picker.style.left=Math.max(4,rect.left-60)+'px';
+      },0);
+      document.body.appendChild(picker);
     }
 
     var delBtn=el('button',{style:{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:'13px',flexShrink:'0'}});
@@ -133,17 +150,18 @@ function renderNotaPanel() {
       var arr=(state.notas||[]).filter(function(n){return n.id!==nota.id;});
       lsSet('notas',arr);
       var novoPrimeiro=(arr.filter(function(n){return n.profile===state.profile;})[0]||{}).id||null;
-      setState({notas:arr,notaAtualId:novoPrimeiro});
       scheduleSave();
+      setState({notas:arr,notaAtualId:novoPrimeiro});
     };
     tituloRow.appendChild(delBtn);
     editor.appendChild(tituloRow);
 
     // Textarea
-    var ta = el('textarea',{style:{flex:'1',resize:'none',background:'transparent',border:'none',padding:'12px',fontSize:'13px',color:'var(--text)',fontFamily:'inherit',outline:'none',lineHeight:'1.6'},
-      placeholder:'Escreva sua nota aqui...',
-      oninput:function(){_autoSaveNota(nota.id,this.value);}});
+    var ta = el('textarea',{});
+    ta.style.cssText='flex:1;resize:none;background:transparent;border:none;padding:12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;line-height:1.6;';
+    ta.placeholder='Escreva sua nota aqui...';
     ta.value = nota.conteudo||'';
+    ta.oninput=function(){_autoSaveNota(nota.id,this.value);};
     editor.appendChild(ta);
   }
 
@@ -160,8 +178,15 @@ function renderNotas() {
 
   function novaNotaFn(){
     var n={id:uid(),profile:state.profile,titulo:'Nova nota',conteudo:'',cor:NOTA_CORES[0],criadoEm:new Date().toISOString(),atualizadoEm:new Date().toISOString()};
-    _salvarNota(n);
-    setState({notaAtualId:n.id});
+    var arr=(state.notas||[]).concat([n]);
+    lsSet('notas',arr);
+    scheduleSave();
+    setState({notas:arr, notaAtualId:n.id});
+    // Foca o textarea após re-render
+    setTimeout(function(){
+      var ta=document.querySelector('._nota-editor-ta');
+      if(ta)ta.focus();
+    },50);
   }
 
   var sidebar = el('div',{style:{width:'240px',flexShrink:'0',borderRight:'1px solid var(--border)',display:'flex',flexDirection:'column',background:'var(--bg2)',borderRadius:'10px 0 0 10px'}});
@@ -179,10 +204,10 @@ function renderNotas() {
     item.onmouseenter=function(){if(!isAt)this.style.background='var(--bg3)';};
     item.onmouseleave=function(){if(!isAt)this.style.background='transparent';};
     var dot=el('div',{style:{width:'10px',height:'10px',borderRadius:'50%',background:n.cor||'var(--gold)',marginBottom:'4px',display:'inline-block',marginRight:'6px'}});
-    var titulo=el('span',{style:{fontSize:'13px',fontWeight:isAt?'700':'500',color:'var(--text)'}},n.titulo||'Sem título');
+    var tituloEl=el('span',{'data-id':n.id,class:'_nota-sid-titulo',style:{fontSize:'13px',fontWeight:isAt?'700':'500',color:'var(--text)'}},n.titulo||'Sem título');
     var data=el('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'3px',paddingLeft:'16px'}},new Date(n.atualizadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}));
     var row=el('div',{style:{display:'flex',alignItems:'center'}});
-    row.appendChild(dot);row.appendChild(titulo);
+    row.appendChild(dot);row.appendChild(tituloEl);
     item.appendChild(row);item.appendChild(data);
     item.onclick=function(){setState({notaAtualId:n.id});};
     lista.appendChild(item);
@@ -201,12 +226,11 @@ function renderNotas() {
   if(!nota){
     var noSel=el('div',{style:{flex:'1',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'14px',color:'var(--text3)'}});
     noSel.innerHTML='<div style="font-size:48px">📝</div><div style="font-size:14px">Selecione ou crie uma nota</div>';
-    var novaBtn2=btn('btn-primary','+ Nova nota',novaNotaFn);
-    noSel.appendChild(novaBtn2);
+    noSel.appendChild(btn('btn-primary','+ Nova nota',novaNotaFn));
     editorArea.appendChild(noSel);
   } else {
     // Toolbar
-    var toolbar=el('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'10px 16px',borderBottom:'1px solid var(--border)',flexShrink:'0'}});
+    var toolbar=el('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'10px 16px',borderBottom:'1px solid var(--border)',flexShrink:'0',background:'var(--bg3)'}});
     var tituloInp2=el('input',{style:{flex:'1',background:'none',border:'none',fontWeight:'700',fontSize:'16px',color:'var(--text)',fontFamily:'inherit',outline:'none'}});
     tituloInp2.value=nota.titulo||'';
     tituloInp2.onchange=function(){_autoSaveTituloNota(nota.id,this.value);};
@@ -216,24 +240,29 @@ function renderNotas() {
     var corRow=el('div',{style:{display:'flex',gap:'5px'}});
     NOTA_CORES.forEach(function(c){
       var cb=el('button',{style:{width:'18px',height:'18px',borderRadius:'50%',background:c,border:'2px solid '+(c===nota.cor?'var(--text)':'transparent'),cursor:'pointer',flexShrink:'0'}});
-      cb.onclick=function(){_salvarNota(Object.assign({},nota,{cor:c}));};
+      cb.onclick=function(){
+        var newNota=Object.assign({},nota,{cor:c});
+        var arr=(state.notas||[]).map(function(n){return n.id===nota.id?newNota:n;});
+        lsSet('notas',arr);scheduleSave();
+        setState({notas:arr});
+      };
       corRow.appendChild(cb);
     });
     toolbar.appendChild(corRow);
 
-    var delBtn2=btn('btn-secondary','🗑 Excluir',function(){
+    var delBtn2=btn('btn-ghost','🗑 Excluir',function(){
       if(!window.confirm('Excluir nota "'+nota.titulo+'"?'))return;
       var arr=(state.notas||[]).filter(function(n){return n.id!==nota.id;});
-      lsSet('notas',arr);
-      var novoPrimeiro=(_notasDoPerfil().filter(function(n){return n.id!==nota.id;})[0]||{}).id||null;
+      lsSet('notas',arr);scheduleSave();
+      var lista2=arr.filter(function(n){return n.profile===state.profile;});
+      var novoPrimeiro=(lista2[0]||{}).id||null;
       setState({notas:arr,notaAtualId:novoPrimeiro});
-      scheduleSave();
     });
     toolbar.appendChild(delBtn2);
     editorArea.appendChild(toolbar);
 
     // Editor text
-    var ta2=el('textarea',{});
+    var ta2=el('textarea',{class:'_nota-editor-ta'});
     ta2.style.cssText='flex:1;resize:none;background:var(--bg2);border:none;padding:20px;font-size:14px;color:var(--text);font-family:inherit;outline:none;line-height:1.7;';
     ta2.placeholder='Escreva aqui...';
     ta2.value=nota.conteudo||'';
@@ -242,7 +271,7 @@ function renderNotas() {
 
     // Status bar
     var statusBar=el('div',{style:{padding:'6px 16px',borderTop:'1px solid var(--border)',fontSize:'10px',color:'var(--text3)',display:'flex',gap:'16px',flexShrink:'0'}});
-    var wc=(nota.conteudo||'').split(/\s+/).filter(Boolean).length;
+    var wc=(nota.conteudo||'').trim().split(/\s+/).filter(Boolean).length;
     statusBar.textContent=wc+' palavras · '+((nota.conteudo||'').length)+' caracteres · Salvo automaticamente';
     editorArea.appendChild(statusBar);
   }
@@ -253,8 +282,10 @@ function renderNotas() {
 
   return el('div',{class:'page-content'},[
     el('div',{class:'page-header'},[
-      el('h2',{class:'page-title'},'📝 Bloco de Notas'),
-      el('p',{class:'page-sub'},'Anotações rápidas, lembretes e textos importantes'),
+      el('div',{},[
+        el('h2',{class:'page-title'},'📝 Bloco de Notas'),
+        el('p',{class:'page-sub'},'Anotações rápidas, lembretes e textos importantes'),
+      ]),
       btn('btn-primary','+ Nova nota',novaNotaFn),
     ]),
     container,

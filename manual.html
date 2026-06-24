@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manual do Sistema — Financial Routine v1.1.1</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  :root{
+    --gold:#c9a84c;
+    --dark:#0d0d0d;
+    --text:#1a1916;
+    --text2:#4a4744;
+    --border:#ddd;
+    --bg:#f8f7f5;
+    --bg2:#ffffff;
+    --green:#27805a;
+    --red:#c0392b;
+    --blue:#2860a8;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;color:var(--text);background:#fff;font-size:13px;line-height:1.6}
+
+  /* CAPA */
+  .cover{
+    width:100%;min-height:100vh;background:var(--dark);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:60px 40px;page-break-after:always;
+  }
+  .cover-logo{font-size:52px;font-weight:900;color:#fff;letter-spacing:-1px;margin-bottom:4px}
+  .cover-sub{font-size:13px;font-weight:700;color:var(--gold);letter-spacing:4px;text-transform:uppercase;margin-bottom:48px}
+  .cover-badge{background:var(--gold);color:#000;font-size:11px;font-weight:800;padding:4px 14px;border-radius:20px;letter-spacing:1px;margin-bottom:48px;display:inline-block}
+  .cover-title{font-size:32px;font-weight:800;color:#fff;margin-bottom:12px}
+  .cover-desc{font-size:14px;color:#a09d98;max-width:480px;line-height:1.8;margin-bottom:60px}
+  .cover-divider{width:60px;height:3px;background:var(--gold);margin:0 auto 60px}
+  .cover-info{display:flex;gap:60px;color:#6b6866;font-size:12px}
+  .cover-info-item span{display:block;color:var(--gold);font-weight:700;font-size:14px;margin-bottom:2px}
+
+  /* LAYOUT */
+  .page{max-width:800px;margin:0 auto;padding:40px 48px}
+  @media print{
+    .page{padding:20px 32px;max-width:100%}
+    .no-print{display:none}
+    .page-break{page-break-before:always}
+    .cover{min-height:auto;padding:80px 60px}
+  }
+
+  /* SUMÁRIO */
+  .toc{background:var(--bg);border-radius:12px;padding:32px;margin:32px 0;page-break-after:always}
+  .toc-title{font-size:18px;font-weight:800;color:var(--dark);margin-bottom:24px;padding-bottom:12px;border-bottom:2px solid var(--gold)}
+  .toc-section{margin-bottom:4px}
+  .toc-section a{text-decoration:none;color:var(--text2);font-size:13px;display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dotted #ddd}
+  .toc-section a:hover{color:var(--gold)}
+  .toc-section a strong{color:var(--text);font-weight:600}
+  .toc-num{color:var(--gold);font-size:11px;font-weight:700;min-width:24px}
+  .toc-group{font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-top:16px;margin-bottom:4px}
+
+  /* SEÇÕES */
+  .section{margin-bottom:48px}
+  .section-header{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid var(--gold)}
+  .section-icon{width:40px;height:40px;background:var(--dark);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .section-num{font-size:11px;font-weight:700;color:var(--gold);letter-spacing:1px;text-transform:uppercase}
+  .section-title{font-size:20px;font-weight:800;color:var(--dark)}
+
+  /* CONTEÚDO */
+  h3{font-size:14px;font-weight:700;color:var(--dark);margin:20px 0 8px}
+  p{color:var(--text2);margin-bottom:10px;font-size:13px}
+  ul,ol{padding-left:20px;color:var(--text2);font-size:13px;margin-bottom:12px}
+  li{margin-bottom:5px}
+  strong{color:var(--text);font-weight:600}
+
+  /* CARDS */
+  .card{background:var(--bg);border-radius:10px;padding:20px;margin-bottom:14px}
+  .card-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+  .card h4{font-size:12px;font-weight:700;color:var(--dark);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .card p{font-size:12px;color:var(--text2);margin:0}
+
+  /* BADGES */
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+  .badge-gold{background:#c9a84c22;color:#a07830}
+  .badge-green{background:#27805a18;color:#27805a}
+  .badge-red{background:#c0392b18;color:#c0392b}
+  .badge-blue{background:#2860a818;color:#2860a8}
+
+  /* STEPS */
+  .steps{counter-reset:step;list-style:none;padding:0}
+  .steps li{counter-increment:step;display:flex;gap:12px;margin-bottom:12px;align-items:flex-start}
+  .steps li::before{content:counter(step);min-width:24px;height:24px;background:var(--dark);color:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;margin-top:1px}
+  .steps li p{margin:0;color:var(--text2);font-size:13px}
+
+  /* ALERTA */
+  .tip{background:#c9a84c12;border-left:3px solid var(--gold);padding:12px 16px;border-radius:0 8px 8px 0;margin:14px 0;font-size:12px;color:var(--text2)}
+  .tip strong{color:var(--dark)}
+  .warn{background:#c0392b10;border-left:3px solid var(--red);padding:12px 16px;border-radius:0 8px 8px 0;margin:14px 0;font-size:12px;color:var(--text2)}
+
+  /* TABELA */
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:12px}
+  th{background:var(--dark);color:var(--gold);padding:8px 10px;text-align:left;font-weight:700;font-size:11px;letter-spacing:.5px}
+  td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2)}
+  tr:nth-child(even) td{background:var(--bg)}
+
+  /* TELA ILUSTRAÇÃO */
+  .screen{background:var(--dark);border-radius:12px;padding:16px;margin:14px 0;font-family:monospace;font-size:11px;color:#a09d98;border:1px solid #2e2e2e}
+  .screen .topbar-mock{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2e2e2e;padding-bottom:10px;margin-bottom:10px}
+  .screen .gold{color:#c9a84c;font-weight:700}
+  .screen .green{color:#4caf82}
+  .screen .red{color:#e05252}
+
+  /* RODAPÉ */
+  .footer{text-align:center;padding:20px;color:#aaa;font-size:11px;border-top:1px solid var(--border);margin-top:48px}
+  .print-btn{position:fixed;bottom:24px;right:24px;background:var(--gold);color:#000;border:none;padding:12px 24px;border-radius:30px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 4px 20px rgba(201,168,76,.4);z-index:99}
+  .print-btn:hover{background:#e8c96a}
+
+  /* PRINT */
+  @media print{
+    .section{page-break-inside:avoid}
+    h3{page-break-after:avoid}
+    .card-row{grid-template-columns:1fr 1fr}
+  }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">🖨️ Salvar como PDF</button>
+
+<!-- CAPA -->
+<div class="cover">
+  <div class="cover-logo">Financial Routine</div>
+  <div class="cover-sub">DJ Development</div>
+  <div class="cover-badge">Versão 1.1.1</div>
+  <div class="cover-divider"></div>
+  <div class="cover-title">Manual de Operação</div>
+  <div class="cover-desc">Guia completo para operação do sistema de gestão financeira. Aprenda a utilizar todos os módulos, configurar usuários, controlar despesas, receitas, cartões de crédito e muito mais.</div>
+  <div class="cover-divider"></div>
+  <div class="cover-info">
+    <div class="cover-info-item"><span>Sistema</span>Financial Routine</div>
+    <div class="cover-info-item"><span>Versão</span>1.1.1</div>
+    <div class="cover-info-item"><span>Desenvolvido por</span>DJ Development</div>
+    <div class="cover-info-item"><span>Ano</span>2025</div>
+  </div>
+</div>
+
+<div class="page">
+
+<!-- SUMÁRIO -->
+<div class="toc">
+  <div class="toc-title">📋 Sumário</div>
+
+  <div class="toc-group">Introdução</div>
+  <div class="toc-section"><a href="#sec-acesso"><span class="toc-num">01</span> <strong>Acesso ao Sistema</strong> <span>PIN, Biometria, Perfis</span></a></div>
+  <div class="toc-section"><a href="#sec-navegacao"><span class="toc-num">02</span> <strong>Navegação</strong> <span>Sidebar, Topbar, Mobile</span></a></div>
+
+  <div class="toc-group">Módulos Financeiros</div>
+  <div class="toc-section"><a href="#sec-dashboard"><span class="toc-num">03</span> <strong>Dashboard — Visão Geral</strong> <span>KPIs, Gráficos, Alertas</span></a></div>
+  <div class="toc-section"><a href="#sec-bancos"><span class="toc-num">04</span> <strong>Bancos e Contas</strong> <span>Saldos, Transferências</span></a></div>
+  <div class="toc-section"><a href="#sec-receitas"><span class="toc-num">05</span> <strong>Receitas</strong> <span>Registrar, Categorizar</span></a></div>
+  <div class="toc-section"><a href="#sec-despesas"><span class="toc-num">06</span> <strong>Despesas (A Pagar)</strong> <span>Contas, Vencimentos</span></a></div>
+  <div class="toc-section"><a href="#sec-receber"><span class="toc-num">07</span> <strong>Contas a Receber</strong> <span>Clientes, Cobranças</span></a></div>
+  <div class="toc-section"><a href="#sec-recorrencias"><span class="toc-num">08</span> <strong>Recorrências</strong> <span>Despesas e Receitas Fixas</span></a></div>
+  <div class="toc-section"><a href="#sec-cartoes"><span class="toc-num">09</span> <strong>Cartões de Crédito</strong> <span>Faturas, Inteligência de Float</span></a></div>
+  <div class="toc-section"><a href="#sec-emprestimos"><span class="toc-num">10</span> <strong>Empréstimos</strong> <span>Controle de Parcelas</span></a></div>
+
+  <div class="toc-group">Análise e Relatórios</div>
+  <div class="toc-section"><a href="#sec-fluxo"><span class="toc-num">11</span> <strong>Fluxo de Caixa</strong> <span>Projeção 30/60/90 dias</span></a></div>
+  <div class="toc-section"><a href="#sec-dre"><span class="toc-num">12</span> <strong>DRE — Resultado</strong> <span>Receitas vs Despesas</span></a></div>
+  <div class="toc-section"><a href="#sec-orcamento"><span class="toc-num">13</span> <strong>Orçamento</strong> <span>Metas vs Realizado</span></a></div>
+  <div class="toc-section"><a href="#sec-relatorios"><span class="toc-num">14</span> <strong>Relatórios e Exportação</strong> <span>CSV, JSON, Backup</span></a></div>
+
+  <div class="toc-group">Operação</div>
+  <div class="toc-section"><a href="#sec-fornecedores"><span class="toc-num">15</span> <strong>Fornecedores</strong> <span>Cadastro e Gestão</span></a></div>
+  <div class="toc-section"><a href="#sec-funcionarios"><span class="toc-num">16</span> <strong>Funcionários</strong> <span>Equipe e Custos</span></a></div>
+  <div class="toc-section"><a href="#sec-tarefas"><span class="toc-num">17</span> <strong>Tarefas & Agenda</strong> <span>Compromissos, Lembretes</span></a></div>
+  <div class="toc-section"><a href="#sec-planejamento"><span class="toc-num">18</span> <strong>Metas e Objetivos</strong> <span>Planejamento Financeiro</span></a></div>
+
+  <div class="toc-group">Sistema</div>
+  <div class="toc-section"><a href="#sec-usuarios"><span class="toc-num">19</span> <strong>Usuários e Permissões</strong> <span>Controle de Acesso</span></a></div>
+  <div class="toc-section"><a href="#sec-auditoria"><span class="toc-num">20</span> <strong>Auditoria</strong> <span>Histórico de Ações</span></a></div>
+  <div class="toc-section"><a href="#sec-atalhos"><span class="toc-num">21</span> <strong>Atalhos da Topbar</strong> <span>Calculadora, Calendário</span></a></div>
+</div>
+
+<!-- 01 ACESSO -->
+<div class="section" id="sec-acesso">
+  <div class="section-header">
+    <div class="section-icon">🔐</div>
+    <div><div class="section-num">Seção 01</div><div class="section-title">Acesso ao Sistema</div></div>
+  </div>
+
+  <h3>PIN de Segurança</h3>
+  <p>O sistema é protegido por um PIN de 8 dígitos. Na primeira vez que acessar, você criará seu PIN pessoal. Nas entradas seguintes, basta digitar o PIN para desbloquear.</p>
+  <ol class="steps">
+    <li><p>Acesse o sistema pelo navegador (Chrome recomendado)</p></li>
+    <li><p>Digite seu PIN de 8 dígitos nos círculos exibidos na tela</p></li>
+    <li><p>O sistema abrirá automaticamente após a validação</p></li>
+  </ol>
+  <div class="tip"><strong>💡 Dica:</strong> O PIN padrão do sistema é <strong>741258</strong>. Recomenda-se alterar após o primeiro acesso.</div>
+
+  <h3>Biometria (Face ID / Digital)</h3>
+  <p>Em dispositivos compatíveis (iPhone, Android, computadores com Windows Hello), é possível ativar o acesso por biometria:</p>
+  <ol class="steps">
+    <li><p>Na primeira entrada com PIN correto, o sistema perguntará se deseja ativar a biometria</p></li>
+    <li><p>Clique em <strong>"Ativar Face ID / Digital"</strong> e siga as instruções do dispositivo</p></li>
+    <li><p>Nas próximas entradas, um botão de biometria aparecerá automaticamente</p></li>
+  </ol>
+  <div class="tip"><strong>📱 iPhone/Chrome:</strong> Funciona com Face ID. Para o melhor resultado, adicione o sistema à tela inicial (Compartilhar → Adicionar à Tela de Início).</div>
+
+  <h3>Perfis de Empresa</h3>
+  <p>O sistema suporta múltiplos perfis de empresa. O perfil ativo aparece na barra lateral. Para trocar:</p>
+  <ul>
+    <li>Clique no <strong>nome do perfil</strong> no topo da barra lateral esquerda</li>
+    <li>Selecione o perfil desejado no menu suspenso</li>
+    <li>Todos os dados serão filtrados automaticamente para o perfil selecionado</li>
+  </ul>
+
+  <h3>Seleção de Usuário</h3>
+  <p>Após entrar no sistema, você pode identificar qual usuário está operando clicando no <strong>avatar no rodapé da barra lateral</strong>. Isso é útil quando múltiplos colaboradores usam o mesmo dispositivo.</p>
+</div>
+
+<!-- 02 NAVEGAÇÃO -->
+<div class="section page-break" id="sec-navegacao">
+  <div class="section-header">
+    <div class="section-icon">🗺️</div>
+    <div><div class="section-num">Seção 02</div><div class="section-title">Navegação</div></div>
+  </div>
+
+  <h3>Barra Lateral (Sidebar)</h3>
+  <p>Todos os módulos do sistema estão na barra lateral esquerda, organizados por categoria:</p>
+  <div class="card-row">
+    <div class="card"><h4>📊 Principal</h4><p>Dashboard com visão geral</p></div>
+    <div class="card"><h4>💰 Financeiro</h4><p>Bancos, Receitas, Despesas, Cartões, Empréstimos, Fornecedores, Funcionários, DRE, Fluxo</p></div>
+    <div class="card"><h4>🎯 Planejamento</h4><p>Tarefas, Orçamento, Metas, Alertas, Recorrências</p></div>
+    <div class="card"><h4>🔐 Sistema</h4><p>Usuários, Auditoria, Relatórios</p></div>
+  </div>
+  <p>Clique em <strong>"← Recolher"</strong> no rodapé da sidebar para compactar e ganhar mais espaço na tela.</p>
+
+  <h3>Barra Superior (Topbar)</h3>
+  <p>A topbar exibe em tempo real:</p>
+  <ul>
+    <li><strong>📍 Localização:</strong> Bairro/cidade detectado pelo GPS</li>
+    <li><strong>🌡️ Temperatura:</strong> Graus Celsius atualizados a cada 10 minutos</li>
+    <li><strong>📅 Data e hora:</strong> Dia da semana, data por extenso e hora com segundos</li>
+    <li><strong>🧮 Calculadora:</strong> Clique no ícone para abrir calculadora flutuante</li>
+    <li><strong>📅 Calendário:</strong> Clique no ícone para ver o mês com marcadores de tarefas</li>
+  </ul>
+
+  <h3>Tema Claro / Escuro</h3>
+  <p>No rodapé da barra lateral, clique em <strong>"☀️ Tema claro"</strong> ou <strong>"🌙 Tema escuro"</strong> para alternar. A preferência é salva automaticamente.</p>
+
+  <h3>Uso no Celular (Mobile)</h3>
+  <p>O sistema se adapta automaticamente ao tamanho da tela:</p>
+  <ul>
+    <li>No celular, a barra lateral fica oculta. Toque no <strong>☰</strong> para abri-la</li>
+    <li>Na parte inferior da tela, há 5 atalhos rápidos para os módulos mais usados</li>
+    <li>Um botão <strong>+</strong> dourado no canto inferior direito permite criar lançamentos rapidamente</li>
+    <li>Para melhor experiência: <strong>Compartilhar → Adicionar à Tela de Início</strong> no iPhone</li>
+  </ul>
+</div>
+
+<!-- 03 DASHBOARD -->
+<div class="section page-break" id="sec-dashboard">
+  <div class="section-header">
+    <div class="section-icon">📊</div>
+    <div><div class="section-num">Seção 03</div><div class="section-title">Dashboard — Visão Geral</div></div>
+  </div>
+  <p>O Dashboard é a tela inicial e mostra um resumo completo da situação financeira atual.</p>
+
+  <h3>Indicadores (KPIs)</h3>
+  <div class="card-row">
+    <div class="card"><h4>🟢 A Receber</h4><p>Total de contas a receber em aberto. Clique no módulo correspondente para ver o detalhamento.</p></div>
+    <div class="card"><h4>🔴 A Pagar</h4><p>Total de despesas pendentes de pagamento.</p></div>
+    <div class="card"><h4>🟡 Saldo Projetado</h4><p>Resultado de A Receber menos A Pagar. Indica se o caixa será positivo ou negativo.</p></div>
+    <div class="card"><h4>⚠️ Vencendo em 7 dias</h4><p>Quantidade e valor total das contas que vencem nos próximos 7 dias.</p></div>
+  </div>
+
+  <h3>Gráfico de Evolução (6 meses)</h3>
+  <p>Barras comparando Receitas (verde) vs Despesas (vermelho) dos últimos 6 meses. Permite identificar rapidamente tendências de crescimento ou queda.</p>
+
+  <h3>Gastos por Categoria</h3>
+  <p>Lista das principais categorias de despesa com percentual e barra de progresso. Ideal para identificar onde o dinheiro está sendo gasto.</p>
+
+  <h3>Alertas de Vencimento</h3>
+  <p>Se houver contas vencendo nos próximos 7 dias, aparecem em destaque com cor:</p>
+  <ul>
+    <li><span class="badge badge-red">🔴 Vermelho</span> — Vencida (prazo expirado)</li>
+    <li><span class="badge badge-gold">🟡 Amarelo</span> — Vencendo em breve</li>
+  </ul>
+
+  <h3>Metas</h3>
+  <p>Resumo das metas cadastradas em Planejamento, com barra de progresso indicando o quanto foi atingido.</p>
+</div>
+
+<!-- 04 BANCOS -->
+<div class="section page-break" id="sec-bancos">
+  <div class="section-header">
+    <div class="section-icon">🏦</div>
+    <div><div class="section-num">Seção 04</div><div class="section-title">Bancos e Contas</div></div>
+  </div>
+
+  <h3>Cadastrar Banco / Conta</h3>
+  <ol class="steps">
+    <li><p>Clique em <strong>"+ Novo banco"</strong></p></li>
+    <li><p>Informe o nome do banco, saldo atual e escolha uma cor identificadora</p></li>
+    <li><p>Clique em <strong>"Salvar"</strong></p></li>
+  </ol>
+
+  <h3>Atualizar Saldo</h3>
+  <p>Clique no ícone de edição (✏️) no cartão do banco para corrigir o saldo a qualquer momento.</p>
+
+  <h3>Transferências entre Contas</h3>
+  <ol class="steps">
+    <li><p>Clique em <strong>"Transferir"</strong></p></li>
+    <li><p>Selecione a conta de origem e a de destino</p></li>
+    <li><p>Informe o valor e a data</p></li>
+    <li><p>O sistema atualiza os saldos automaticamente</p></li>
+  </ol>
+  <div class="tip"><strong>💡 Dica:</strong> O saldo total consolidado de todas as contas aparece no topo da página.</div>
+</div>
+
+<!-- 05 RECEITAS -->
+<div class="section" id="sec-receitas">
+  <div class="section-header">
+    <div class="section-icon">💵</div>
+    <div><div class="section-num">Seção 05</div><div class="section-title">Receitas</div></div>
+  </div>
+
+  <h3>Registrar uma Receita</h3>
+  <ol class="steps">
+    <li><p>Clique em <strong>"+ Nova receita"</strong></p></li>
+    <li><p>Preencha: descrição, valor, data, categoria e banco onde foi recebida</p></li>
+    <li><p>Opcionalmente, adicione notas ou comprovante</p></li>
+    <li><p>Clique em <strong>"Salvar"</strong></p></li>
+  </ol>
+
+  <h3>Categorias Comuns</h3>
+  <table>
+    <tr><th>Categoria</th><th>Uso</th></tr>
+    <tr><td>Vendas</td><td>Receita de produtos/serviços vendidos</td></tr>
+    <tr><td>Prestação de Serviços</td><td>Honorários, consultorias, freelas</td></tr>
+    <tr><td>Aluguel Recebido</td><td>Receita de imóveis alugados</td></tr>
+    <tr><td>Investimentos</td><td>Rendimentos, dividendos, juros</td></tr>
+    <tr><td>Outros</td><td>Receitas diversas não classificadas</td></tr>
+  </table>
+
+  <h3>Filtrar por Mês</h3>
+  <p>Use os chips de mês no topo da tela para visualizar receitas de um período específico.</p>
+</div>
+
+<!-- 06 DESPESAS -->
+<div class="section page-break" id="sec-despesas">
+  <div class="section-header">
+    <div class="section-icon">💸</div>
+    <div><div class="section-num">Seção 06</div><div class="section-title">Despesas (A Pagar)</div></div>
+  </div>
+
+  <h3>Lançar uma Despesa</h3>
+  <ol class="steps">
+    <li><p>Clique em <strong>"+ Nova despesa"</strong> ou use o botão + no celular</p></li>
+    <li><p>Preencha: descrição, valor, data de vencimento, categoria e prioridade</p></li>
+    <li><p>Se for uma despesa que se repete todo mês, marque <strong>"Recorrente"</strong></p></li>
+    <li><p>Clique em <strong>"Salvar"</strong></p></li>
+  </ol>
+
+  <h3>Status das Despesas</h3>
+  <table>
+    <tr><th>Status</th><th>Significado</th></tr>
+    <tr><td><span class="badge badge-red">Vencida</span></td><td>Data de vencimento já passou e não foi paga</td></tr>
+    <tr><td><span class="badge badge-gold">Urgente</span></td><td>Vence em até 3 dias</td></tr>
+    <tr><td><span class="badge badge-blue">Pendente</span></td><td>Aguardando pagamento</td></tr>
+    <tr><td><span class="badge badge-green">Pago</span></td><td>Pagamento confirmado</td></tr>
+  </table>
+
+  <h3>Marcar como Pago</h3>
+  <p>Clique no botão <strong>"✓ Pago"</strong> ao lado da despesa para registrar o pagamento. O sistema atualiza os indicadores automaticamente.</p>
+
+  <h3>Prioridades</h3>
+  <ul>
+    <li><strong>Alta:</strong> Pagamentos críticos (impostos, folha, aluguel)</li>
+    <li><strong>Normal:</strong> Despesas regulares do negócio</li>
+    <li><strong>Baixa:</strong> Gastos não urgentes</li>
+  </ul>
+</div>
+
+<!-- 07 CONTAS A RECEBER -->
+<div class="section" id="sec-receber">
+  <div class="section-header">
+    <div class="section-icon">📥</div>
+    <div><div class="section-num">Seção 07</div><div class="section-title">Contas a Receber</div></div>
+  </div>
+  <p>Gerencie valores que clientes ou devedores devem à empresa.</p>
+
+  <h3>Registrar Conta a Receber</h3>
+  <ol class="steps">
+    <li><p>Clique em <strong>"+ Nova conta a receber"</strong></p></li>
+    <li><p>Informe: cliente/descrição, valor, data prevista de recebimento e categoria</p></li>
+    <li><p>Clique em <strong>"Salvar"</strong></p></li>
+  </ol>
+
+  <h3>Marcar como Recebido</h3>
+  <p>Quando o pagamento chegar, clique em <strong>"✓ Recebido"</strong> na conta correspondente.</p>
+  <div class="tip"><strong>💡 Dica:</strong> Contas a receber em atraso ficam destacadas em vermelho no Dashboard.</div>
+</div>
+
+<!-- 08 RECORRÊNCIAS -->
+<div class="section page-break" id="sec-recorrencias">
+  <div class="section-header">
+    <div class="section-icon">🔄</div>
+    <div><div class="section-num">Seção 08</div><div class="section-title">Recorrências</div></div>
+  </div>
+  <p>Gerencie despesas e receitas que se repetem automaticamente todo mês (aluguel, assinaturas, salários, etc.).</p>
+
+  <h3>Criar uma Recorrência</h3>
+  <ol class="steps">
+    <li><p>Vá em <strong>Recorrências</strong> no menu lateral</p></li>
+    <li><p>Clique em <strong>"+ Nova Recorrência"</strong></p></li>
+    <li><p>Preencha: descrição, valor, tipo (despesa ou receita), frequência e categoria</p></li>
+    <li><p>Informe a data do primeiro vencimento</p></li>
+    <li><p>Clique em <strong>"Criar"</strong></p></li>
+  </ol>
+
+  <h3>Frequências Disponíveis</h3>
+  <table>
+    <tr><th>Frequência</th><th>Quando gera</th></tr>
+    <tr><td>Semanal</td><td>A cada 7 dias</td></tr>
+    <tr><td>Quinzenal</td><td>A cada 15 dias</td></tr>
+    <tr><td>Mensal</td><td>Todo mês na mesma data</td></tr>
+    <tr><td>Bimestral</td><td>A cada 2 meses</td></tr>
+    <tr><td>Trimestral</td><td>A cada 3 meses</td></tr>
+    <tr><td>Anual</td><td>Uma vez por ano</td></tr>
+  </table>
+
+  <h3>Geração Automática</h3>
+  <p>O sistema gera as parcelas automaticamente ao abrir o app. Para forçar a geração imediata, clique em <strong>"▶ Gerar agora"</strong>.</p>
+  <div class="tip"><strong>💡 Dica:</strong> Recorrências geram lançamentos automaticamente para os próximos 2 meses.</div>
+</div>
+
+<!-- 09 CARTÕES -->
+<div class="section page-break" id="sec-cartoes">
+  <div class="section-header">
+    <div class="section-icon">💳</div>
+    <div><div class="section-num">Seção 09</div><div class="section-title">Cartões de Crédito</div></div>
+  </div>
+
+  <h3>Cadastrar Cartão</h3>
+  <ol class="steps">
+    <li><p>Acesse <strong>Cartões de Crédito</strong> no menu</p></li>
+    <li><p>Clique em <strong>"+ Novo Cartão"</strong></p></li>
+    <li><p>Preencha: banco, bandeira (Visa/Master/etc.), 4 últimos dígitos, limite, dia de fechamento e dia de vencimento</p></li>
+    <li><p>Escolha uma cor identificadora</p></li>
+  </ol>
+
+  <h3>Inteligência de Float 💡</h3>
+  <p>O sistema calcula automaticamente o <strong>melhor dia para comprar</strong> em cada cartão, maximizando o tempo que o dinheiro fica na sua conta:</p>
+  <ul>
+    <li><strong>Dias de float:</strong> Quantos dias até o pagamento da fatura</li>
+    <li><strong>Janela ótima:</strong> Logo após o fechamento — você tem o prazo máximo para pagar</li>
+    <li><strong>Status colorido:</strong> Verde (janela ótima), Amarelo (atenção), Vermelho (próximo ao fechamento)</li>
+  </ul>
+  <div class="tip"><strong>💡 Exemplo:</strong> Cartão fecha dia 10, vence dia 5. Uma compra feita no dia 11 te dá ~25 dias de float — o dinheiro fica na sua conta por mais tempo.</div>
+
+  <h3>Importar Fatura (CSV)</h3>
+  <ol class="steps">
+    <li><p>Exporte o extrato do seu banco em formato CSV</p></li>
+    <li><p>No cartão desejado, clique em <strong>"Importar Fatura"</strong></p></li>
+    <li><p>Selecione o arquivo CSV — o sistema detecta automaticamente as colunas</p></li>
+    <li><p>Revise os lançamentos e confirme a importação</p></li>
+  </ol>
+  <div class="tip"><strong>✅ Compatível com:</strong> Nubank, Itaú, C6, Bradesco, Santander e qualquer banco que exporte CSV.</div>
+</div>
+
+<!-- 10 EMPRÉSTIMOS -->
+<div class="section" id="sec-emprestimos">
+  <div class="section-header">
+    <div class="section-icon">🤝</div>
+    <div><div class="section-num">Seção 10</div><div class="section-title">Empréstimos</div></div>
+  </div>
+  <p>Controle empréstimos tomados ou concedidos, com acompanhamento de parcelas.</p>
+
+  <h3>Cadastrar Empréstimo</h3>
+  <ol class="steps">
+    <li><p>Clique em <strong>"+ Novo empréstimo"</strong></p></li>
+    <li><p>Informe: credor/devedor, valor total, taxa de juros, número de parcelas e data de início</p></li>
+    <li><p>O sistema calcula automaticamente as parcelas mensais</p></li>
+  </ol>
+  <div class="tip"><strong>💡 Dica:</strong> Empréstimos ativos aparecem no fluxo de caixa impactando a projeção futura.</div>
+</div>
+
+<!-- 11 FLUXO DE CAIXA -->
+<div class="section page-break" id="sec-fluxo">
+  <div class="section-header">
+    <div class="section-icon">📈</div>
+    <div><div class="section-num">Seção 11</div><div class="section-title">Fluxo de Caixa</div></div>
+  </div>
+
+  <h3>Projeção de Saldo</h3>
+  <p>No topo da página, o sistema mostra automaticamente o saldo projetado para os próximos:</p>
+  <div class="card-row">
+    <div class="card"><h4>📅 30 dias</h4><p>Saldo bancário atual + recebimentos previstos − pagamentos previstos nos próximos 30 dias</p></div>
+    <div class="card"><h4>📅 60 dias</h4><p>Mesma lógica considerando o período de 60 dias</p></div>
+    <div class="card"><h4>📅 90 dias</h4><p>Projeção para o trimestre — ideal para planejamento</p></div>
+  </div>
+  <div class="warn"><strong>⚠️ Atenção:</strong> Se algum dos valores aparecer em vermelho, você terá saldo negativo naquele período. Tome providências com antecedência.</div>
+
+  <h3>Análise por Mês</h3>
+  <p>Use os chips de mês para analisar entradas e saídas de qualquer mês do ano. A tabela de projeção anual mostra todos os 12 meses lado a lado.</p>
+</div>
+
+<!-- 12 DRE -->
+<div class="section" id="sec-dre">
+  <div class="section-header">
+    <div class="section-icon">📋</div>
+    <div><div class="section-num">Seção 12</div><div class="section-title">DRE — Demonstrativo de Resultado</div></div>
+  </div>
+  <p>O DRE consolida o resultado financeiro do período: receitas menos despesas, mostrando se o negócio está lucrando ou tendo prejuízo.</p>
+
+  <h3>Como Interpretar o DRE</h3>
+  <table>
+    <tr><th>Linha</th><th>Significado</th></tr>
+    <tr><td>Receita Bruta</td><td>Total de receitas do período</td></tr>
+    <tr><td>(−) Despesas Fixas</td><td>Custos que não variam com a produção (aluguel, salários)</td></tr>
+    <tr><td>(−) Despesas Variáveis</td><td>Custos que variam com a operação (matéria-prima, comissões)</td></tr>
+    <tr><td>= Resultado</td><td>Lucro (positivo) ou Prejuízo (negativo)</td></tr>
+  </table>
+  <div class="tip"><strong>💡 Dica:</strong> Analise o DRE mensalmente para identificar onde reduzir custos ou onde aumentar receitas.</div>
+</div>
+
+<!-- 13 ORÇAMENTO -->
+<div class="section" id="sec-orcamento">
+  <div class="section-header">
+    <div class="section-icon">🎯</div>
+    <div><div class="section-num">Seção 13</div><div class="section-title">Orçamento vs Realizado</div></div>
+  </div>
+  <p>Compare o que foi planejado gastar com o que realmente foi gasto.</p>
+
+  <h3>Criar Orçamento</h3>
+  <ol class="steps">
+    <li><p>Clique em <strong>"+ Novo orçamento"</strong></p></li>
+    <li><p>Defina a categoria e o valor máximo previsto para o período</p></li>
+    <li><p>O sistema monitora automaticamente os gastos reais naquela categoria</p></li>
+  </ol>
+
+  <h3>Leitura do Orçamento</h3>
+  <ul>
+    <li><span class="badge badge-green">Verde</span> — Dentro do orçamento</li>
+    <li><span class="badge badge-gold">Amarelo</span> — Acima de 75% do limite</li>
+    <li><span class="badge badge-red">Vermelho</span> — Orçamento estourado</li>
+  </ul>
+</div>
+
+<!-- 14 RELATÓRIOS -->
+<div class="section page-break" id="sec-relatorios">
+  <div class="section-header">
+    <div class="section-icon">📤</div>
+    <div><div class="section-num">Seção 14</div><div class="section-title">Relatórios e Exportação</div></div>
+  </div>
+
+  <h3>Exportações Disponíveis</h3>
+  <table>
+    <tr><th>Exportação</th><th>Conteúdo</th><th>Formato</th></tr>
+    <tr><td>Despesas e Contas a Receber</td><td>Todos os lançamentos financeiros</td><td>CSV</td></tr>
+    <tr><td>Receitas</td><td>Todas as receitas registradas</td><td>CSV</td></tr>
+    <tr><td>Completo</td><td>Tudo em um único arquivo</td><td>CSV</td></tr>
+    <tr><td>Backup completo</td><td>100% dos dados do sistema</td><td>JSON</td></tr>
+  </table>
+
+  <h3>Backup e Restore</h3>
+  <p>Para fazer backup completo do sistema:</p>
+  <ol class="steps">
+    <li><p>Clique em <strong>"⬇️ Exportar backup completo"</strong></p></li>
+    <li><p>O arquivo JSON será baixado no seu dispositivo</p></li>
+    <li><p>Guarde em local seguro (Google Drive, pendrive, etc.)</p></li>
+  </ol>
+  <p>Para restaurar a partir de um backup:</p>
+  <ol class="steps">
+    <li><p>Clique em <strong>"⬆️ Restaurar backup"</strong></p></li>
+    <li><p>Selecione o arquivo JSON do backup</p></li>
+    <li><p>Confirme a restauração — <strong>atenção: os dados atuais serão substituídos</strong></p></li>
+  </ol>
+  <div class="warn"><strong>⚠️ Importante:</strong> Sempre faça um backup antes de restaurar. A restauração substitui todos os dados atuais.</div>
+
+  <h3>Abertura no Excel</h3>
+  <ol class="steps">
+    <li><p>Exporte o arquivo CSV desejado</p></li>
+    <li><p>No Excel: Dados → De Texto/CSV → selecione o arquivo</p></li>
+    <li><p>Escolha delimitador <strong>vírgula</strong> e codificação <strong>UTF-8</strong></p></li>
+  </ol>
+</div>
+
+<!-- 15 FORNECEDORES -->
+<div class="section" id="sec-fornecedores">
+  <div class="section-header">
+    <div class="section-icon">🏭</div>
+    <div><div class="section-num">Seção 15</div><div class="section-title">Fornecedores</div></div>
+  </div>
+  <p>Cadastre e gerencie todos os fornecedores da empresa.</p>
+
+  <h3>Cadastrar Fornecedor</h3>
+  <ol class="steps">
+    <li><p>Clique em <strong>"+ Novo fornecedor"</strong></p></li>
+    <li><p>Preencha: nome, CNPJ/CPF, contato, categoria de fornecimento</p></li>
+    <li><p>Adicione observações relevantes</p></li>
+  </ol>
+  <div class="tip"><strong>💡 Dica:</strong> Vincule os lançamentos de despesa ao fornecedor correspondente para ter um histórico de gastos por fornecedor.</div>
+</div>
+
+<!-- 16 FUNCIONÁRIOS -->
+<div class="section" id="sec-funcionarios">
+  <div class="section-header">
+    <div class="section-icon">👥</div>
+    <div><div class="section-num">Seção 16</div><div class="section-title">Funcionários</div></div>
+  </div>
+  <p>Controle a equipe e os custos com pessoal.</p>
+
+  <h3>Cadastrar Funcionário</h3>
+  <ol class="steps">
+    <li><p>Clique em <strong>"+ Novo funcionário"</strong></p></li>
+    <li><p>Informe: nome, cargo, salário, data de admissão</p></li>
+    <li><p>Adicione benefícios e outras informações relevantes</p></li>
+  </ol>
+</div>
+
+<!-- 17 TAREFAS -->
+<div class="section page-break" id="sec-tarefas">
+  <div class="section-header">
+    <div class="section-icon">📋</div>
+    <div><div class="section-num">Seção 17</div><div class="section-title">Tarefas & Agenda</div></div>
+  </div>
+  <p>Organize compromissos, reuniões e lembretes financeiros.</p>
+
+  <h3>Criar Tarefa</h3>
+  <ol class="steps">
+    <li><p>Clique em <strong>"+ Nova tarefa"</strong></p></li>
+    <li><p>Preencha: título, data, prioridade e descrição</p></li>
+    <li><p>Defina o status inicial (pendente, em andamento)</p></li>
+  </ol>
+
+  <h3>Status das Tarefas</h3>
+  <table>
+    <tr><th>Status</th><th>Uso</th></tr>
+    <tr><td><span class="badge badge-blue">Pendente</span></td><td>Ainda não iniciada</td></tr>
+    <tr><td><span class="badge badge-gold">Em andamento</span></td><td>Em execução</td></tr>
+    <tr><td><span class="badge badge-green">Concluída</span></td><td>Finalizada</td></tr>
+    <tr><td><span class="badge badge-red">Cancelada</span></td><td>Não será realizada</td></tr>
+  </table>
+
+  <h3>Calendário na Topbar</h3>
+  <p>O ícone 📅 na barra superior abre um mini-calendário onde os dias com tarefas pendentes aparecem com um ponto dourado. Clique para navegar entre meses.</p>
+</div>
+
+<!-- 18 PLANEJAMENTO -->
+<div class="section" id="sec-planejamento">
+  <div class="section-header">
+    <div class="section-icon">🏆</div>
+    <div><div class="section-num">Seção 18</div><div class="section-title">Metas e Objetivos</div></div>
+  </div>
+  <p>Defina metas financeiras e acompanhe o progresso ao longo do tempo.</p>
+
+  <h3>Criar Meta</h3>
+  <ol class="steps">
+    <li><p>Acesse <strong>Metas</strong> no menu lateral</p></li>
+    <li><p>Clique em <strong>"+ Nova meta"</strong></p></li>
+    <li><p>Descreva o objetivo e o valor total a atingir</p></li>
+    <li><p>Atualize periodicamente o valor atual para ver o progresso</p></li>
+  </ol>
+  <div class="tip"><strong>💡 Exemplos de metas:</strong> Reserva de emergência (R$ 50.000), Capital de giro (R$ 20.000), Reforma da loja (R$ 15.000).</div>
+</div>
+
+<!-- 19 USUÁRIOS -->
+<div class="section page-break" id="sec-usuarios">
+  <div class="section-header">
+    <div class="section-icon">🔐</div>
+    <div><div class="section-num">Seção 19</div><div class="section-title">Usuários e Permissões</div></div>
+  </div>
+  <p>Gerencie quem pode acessar o sistema e o que cada pessoa pode fazer.</p>
+
+  <h3>Hierarquia de Papéis</h3>
+  <table>
+    <tr><th>Papel</th><th>Acesso</th></tr>
+    <tr><td><span class="badge" style="background:#ff6b3520;color:#ff6b35">Desenvolvedor</span></td><td>Acesso total, incluindo gerenciar usuários e permissões</td></tr>
+    <tr><td><span class="badge badge-gold">Administrador</span></td><td>Acesso total, exceto gerenciar usuários</td></tr>
+    <tr><td><span class="badge badge-green">Gerente</span></td><td>Operações e relatórios, sem exclusões</td></tr>
+    <tr><td><span class="badge badge-blue">Operador</span></td><td>Operações básicas do dia a dia</td></tr>
+    <tr><td><span class="badge" style="background:#9e9e9e20;color:#666">Visualizador</span></td><td>Somente leitura em todos os módulos</td></tr>
+  </table>
+
+  <h3>Criar Usuário</h3>
+  <ol class="steps">
+    <li><p>Acesse <strong>Usuários & Permissões</strong> no menu lateral (seção Sistema)</p></li>
+    <li><p>Clique em <strong>"+ Novo Usuário"</strong> — será solicitada a senha do desenvolvedor</p></li>
+    <li><p>Preencha: nome, e-mail, senha de acesso e papel</p></li>
+    <li><p>Configure as permissões por módulo na matriz abaixo do formulário</p></li>
+    <li><p>Clique em <strong>"Criar usuário"</strong></p></li>
+  </ol>
+
+  <h3>Matriz de Permissões</h3>
+  <p>Para cada módulo (Dashboard, Bancos, Receitas, etc.) é possível configurar individualmente:</p>
+  <ul>
+    <li><strong>Ver</strong> — Visualizar os dados do módulo</li>
+    <li><strong>Criar</strong> — Adicionar novos registros</li>
+    <li><strong>Editar</strong> — Modificar registros existentes</li>
+    <li><strong>Excluir</strong> — Remover registros</li>
+    <li><strong>Exportar</strong> — Baixar relatórios (módulo Relatórios)</li>
+  </ul>
+  <div class="tip"><strong>⚡ Presets rápidos:</strong> Clique no nome de um papel (Administrador, Gerente, etc.) para aplicar automaticamente as permissões padrão daquele papel.</div>
+
+  <h3>Segurança</h3>
+  <ul>
+    <li>Qualquer criação ou edição de usuário exige a senha do <strong>Desenvolvedor</strong></li>
+    <li>O usuário Desenvolvedor não pode ser excluído</li>
+    <li>Senhas são armazenadas como hash (não em texto puro)</li>
+    <li>A sessão do desenvolvedor fica ativa enquanto o navegador estiver aberto</li>
+  </ul>
+
+  <h3>Trocar Usuário Ativo</h3>
+  <p>Clique no avatar no <strong>rodapé da barra lateral</strong> para ver o picker de usuários. Selecione outro usuário para trocar a sessão ativa sem precisar sair do sistema.</p>
+</div>
+
+<!-- 20 AUDITORIA -->
+<div class="section" id="sec-auditoria">
+  <div class="section-header">
+    <div class="section-icon">📋</div>
+    <div><div class="section-num">Seção 20</div><div class="section-title">Auditoria do Sistema</div></div>
+  </div>
+  <p>Acompanhe todas as ações realizadas no sistema com data, horário e usuário responsável.</p>
+
+  <h3>O que é Registrado</h3>
+  <ul>
+    <li>Login e logout de usuários</li>
+    <li>Criação, edição e exclusão de lançamentos (despesas, receitas)</li>
+    <li>Criação e edição de recorrências</li>
+    <li>Criação e edição de usuários</li>
+    <li>Exportação e restauração de backups</li>
+  </ul>
+
+  <h3>Buscar no Histórico</h3>
+  <p>Use o campo de busca no topo da página de Auditoria para filtrar por usuário, ação ou detalhe. O histórico armazena os últimos 200 eventos.</p>
+
+  <h3>Limpeza do Histórico</h3>
+  <p>Clique em <strong>"🗑️ Limpar histórico"</strong> para apagar todos os registros. Esta ação não pode ser desfeita e requer confirmação.</p>
+</div>
+
+<!-- 21 ATALHOS -->
+<div class="section page-break" id="sec-atalhos">
+  <div class="section-header">
+    <div class="section-icon">⚡</div>
+    <div><div class="section-num">Seção 21</div><div class="section-title">Atalhos da Topbar</div></div>
+  </div>
+
+  <h3>🧮 Calculadora</h3>
+  <p>Clique no ícone 🧮 na barra superior para abrir a calculadora flutuante estilo iOS:</p>
+  <ul>
+    <li>Suporta as 4 operações: +, −, ×, ÷</li>
+    <li>Encadeia operações em sequência</li>
+    <li>Botão AC limpa tudo, C limpa o último número</li>
+    <li>% converte para porcentagem, ± inverte o sinal</li>
+    <li>Clique fora ou no ícone novamente para fechar</li>
+  </ul>
+
+  <h3>📅 Calendário</h3>
+  <p>Clique no ícone 📅 na barra superior para ver o calendário do mês:</p>
+  <ul>
+    <li>O dia atual aparece destacado em dourado</li>
+    <li>Dias com tarefas pendentes têm um ponto dourado abaixo da data</li>
+    <li>Use ‹ e › para navegar entre meses</li>
+    <li>O rodapé mostra quantas tarefas pendentes você tem hoje</li>
+  </ul>
+
+  <h3>Botão + (Mobile)</h3>
+  <p>No celular, o botão dourado + no canto inferior direito abre um menu rápido com:</p>
+  <ul>
+    <li><strong>💵 Nova Receita</strong> — Lançar receita rapidamente</li>
+    <li><strong>💸 Nova Despesa</strong> — Lançar despesa rapidamente</li>
+    <li><strong>📋 Nova Tarefa</strong> — Criar tarefa rapidamente</li>
+  </ul>
+</div>
+
+<!-- DICAS GERAIS -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon">💡</div>
+    <div><div class="section-num">Dicas Gerais</div><div class="section-title">Boas Práticas de Uso</div></div>
+  </div>
+
+  <div class="card-row">
+    <div class="card">
+      <h4>📆 Rotina Diária</h4>
+      <p>Ao abrir o sistema, confira o Dashboard: alertas de vencimento e saldo projetado. Lance as entradas e saídas do dia.</p>
+    </div>
+    <div class="card">
+      <h4>📅 Rotina Semanal</h4>
+      <p>Revise as contas a pagar da semana seguinte. Confira se há lançamentos pendentes de baixa.</p>
+    </div>
+    <div class="card">
+      <h4>🗓️ Rotina Mensal</h4>
+      <p>Analise o DRE e o Orçamento vs Realizado. Faça o backup completo dos dados. Verifique as metas.</p>
+    </div>
+    <div class="card">
+      <h4>☁️ Sincronização</h4>
+      <p>Os dados são salvos automaticamente no Firebase (nuvem) e no armazenamento local. A bolinha colorida na sidebar indica o status: verde = sincronizado.</p>
+    </div>
+  </div>
+
+  <div class="tip">
+    <strong>🔒 Segurança:</strong> Nunca compartilhe seu PIN. Use senhas diferentes para cada usuário do sistema. Faça backup mensal dos dados.
+  </div>
+  <div class="tip">
+    <strong>📱 iPhone — Adicionar à Tela Inicial:</strong> Abra o sistema no Safari ou Chrome → toque em Compartilhar → "Adicionar à Tela de Início". O sistema abrirá como um app nativo, sem barras do navegador, com ícone dourado FR.
+  </div>
+</div>
+
+<div class="footer">
+  Financial Routine v1.1.1 &nbsp;·&nbsp; DJ Development &nbsp;·&nbsp; Documento gerado em 2025<br>
+  Este manual cobre todas as funcionalidades disponíveis na versão 1.1.1 do sistema.
+</div>
+
+</div><!-- end .page -->
+</body>
+</html>

@@ -82,10 +82,17 @@ function renderModal(){
   function inp(id,type,ph,val){var i=el('input',{class:'form-input',type:type||'text',id:'mf-'+id,placeholder:ph||''});i.value=val!==undefined?String(val):'';return i;}
   function sel(id,opts,val){var s=el('select',{class:'form-input',id:'mf-'+id});opts.forEach(function(o){var op=el('option',{value:typeof o==='object'?o.v:o},typeof o==='object'?o.l:o);if((typeof o==='object'?o.v:o)===String(val))op.selected=true;s.appendChild(op);});return s;}
 
-  var ck=el('input',{type:'checkbox',id:'mf-rec',style:{accentColor:'var(--gold)',width:'15px',height:'15px'}});
+  var ck=el('input',{type:'checkbox',id:'mf-rec',style:{accentColor:'var(--gold)',width:'16px',height:'16px',cursor:'pointer',flexShrink:'0'}});
   ck.checked=vals.recorrente;
+  ck.onchange=function(){
+    var rf=document.getElementById('mf-rec-fields');
+    if(rf)rf.style.display=this.checked?'block':'none';
+    var lbl=document.getElementById('mf-rec-label');
+    if(lbl)lbl.style.color=this.checked?'var(--gold)':'var(--text2)';
+  };
 
-  var recFields=el('div',{id:'mf-rec-fields',style:{display:'block',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'14px',marginBottom:'14px'}},[
+  // Campos só aparecem se recorrência estiver ativada
+  var recFields=el('div',{id:'mf-rec-fields',style:{display:vals.recorrente?'block':'none',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'14px',marginBottom:'14px'}},[
     div('form-row',[
       div('form-group',[el('label',{class:'form-label'},'Repetição'),sel('rec-tipo',[{v:'diario',l:'Diário'},{v:'semanal',l:'Semanal'},{v:'mensal',l:'Mensal'},{v:'anual',l:'Anual'},{v:'personalizado',l:'Personalizado...'}],vals.recorrencia_tipo)]),
       div('form-group',[el('label',{class:'form-label'},'A cada'),el('div',{style:{display:'flex',gap:'6px',alignItems:'center'}},[el('input',{class:'form-input',type:'number',id:'mf-rec-intervalo',min:'1',style:{width:'70px'},value:String(vals.recorrencia_intervalo)}),el('span',{style:{fontSize:'12px',color:'var(--text3)'}},'vez(es)')])]),
@@ -219,7 +226,19 @@ function renderModal(){
       el('label',{class:'form-label'},'🎯 Prioridade'),
       el('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'6px'}},[...priorBtns,priorHidden]),
     ]),
-    el('div',{style:{fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'.8px',color:'var(--text3)',margin:'14px 0 10px'}},'🔁 Recorrência'),
+    // ── Toggle de Recorrência ─────────────────────────────────────────────
+    el('div',{style:{display:'flex',alignItems:'center',gap:'10px',margin:'18px 0 10px',padding:'10px 12px',background:'var(--bg3)',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)'}},[
+      el('label',{style:{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',flex:'1',userSelect:'none'}},[
+        ck,
+        el('div',{},[
+          el('span',{id:'mf-rec-label',style:{fontSize:'12px',fontWeight:'700',color:vals.recorrente?'var(--gold)':'var(--text2)'}},'🔁 Ativar Recorrência'),
+          el('span',{style:{fontSize:'11px',color:'var(--text3)',marginLeft:'8px'}},'— gera lançamentos automáticos'),
+        ]),
+      ]),
+      el('button',{type:'button',style:{fontSize:'11px',color:'var(--gold)',background:'none',border:'1px solid var(--border)',borderRadius:'20px',cursor:'pointer',padding:'4px 10px',whiteSpace:'nowrap',flexShrink:'0'},
+        onclick:function(){setState({modal:null});setTimeout(function(){setState({page:'recorrencias'});},60);},
+      },'Ver recorrências →'),
+    ]),
     recFields,
     div('form-group',[el('label',{class:'form-label',for:'mf-notas'},'Notas'),el('textarea',{class:'form-input',id:'mf-notas',rows:'2',placeholder:'Observações...',style:{resize:'vertical'}},vals.notas)]),
     div('modal-actions',[btn('btn-ghost','Cancelar',function(){setState({modal:null});}),btn('btn-primary',edit.id?'Salvar':'Adicionar',save)]),

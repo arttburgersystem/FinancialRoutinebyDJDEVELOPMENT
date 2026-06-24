@@ -565,6 +565,85 @@ var AJUDA_SECOES = [
     ],
   },
   {
+    id: 'estoque',
+    icon: '📦',
+    titulo: 'Estoque & CMV',
+    subtitulo: 'Produtos, movimentações, CMV e Curva ABC',
+    conteudo: [
+      {
+        tipo: 'intro',
+        texto: 'O módulo de Estoque controla entradas e saídas de insumos/produtos, calcula o CMV (Custo das Mercadorias Vendidas) real e classifica os itens por impacto financeiro (Curva ABC). Tudo integrado ao financeiro.',
+      },
+      {
+        tipo: 'tabela',
+        titulo: '4 Abas do Módulo',
+        cols: ['Aba', 'O que faz'],
+        rows: [
+          ['📦 Produtos', 'Cadastro de todos os insumos com estoque atual, mínimo, custo médio e preço de venda'],
+          ['↕️ Movimentações', 'Histórico completo de entradas, saídas e ajustes com custo total por período'],
+          ['📊 CMV', 'CMV% do mês vs meta, gráfico 6 meses, ranking de custo por produto'],
+          ['🔢 Curva ABC', 'Classifica produtos por impacto no custo: A (80%), B (15%), C (5%)'],
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Cadastrar Produto / Insumo',
+        items: [
+          'Acesse Estoque & CMV no menu lateral (seção Financeiro)',
+          'Clique em "+ Produto"',
+          'Preencha: nome, categoria, unidade (kg/un/L/etc.), custo médio, estoque atual e mínimo',
+          'Vincule ao fornecedor principal — opcional mas recomendado',
+          'Clique em "Criar"',
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Registrar Entrada (Compra)',
+        items: [
+          'Clique em "📥 Entrada" no produto desejado (ou no botão do header)',
+          'Selecione o produto, informe a quantidade e o custo unitário da nota',
+          'O sistema recalcula o custo médio ponderado automaticamente',
+          'Marque "Gerar conta a pagar" para criar a despesa vinculada no financeiro',
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Registrar Saída (Consumo/Venda)',
+        items: [
+          'Clique em "📤 Saída" no produto',
+          'Informe a quantidade consumida ou vendida',
+          'O sistema debita do estoque e registra o custo na composição do CMV',
+          'Motivos disponíveis: Consumo/Venda, Perda/Vencimento, Devolução a fornecedor',
+        ],
+      },
+      {
+        tipo: 'lista',
+        titulo: 'CMV — Como calcular',
+        items: [
+          'CMV Real = soma de (quantidade × custo unitário) de todas as SAÍDAS do mês',
+          'CMV% = CMV Real ÷ Receita Bruta × 100',
+          'Meta padrão food service: 28% a 35%',
+          'Configure sua meta no slider da aba CMV — o sistema mostra se está dentro ou fora',
+          'O custo médio ponderado garante precisão mesmo com compras a preços diferentes',
+        ],
+      },
+      {
+        tipo: 'lista',
+        titulo: 'Curva ABC — Como usar',
+        items: [
+          'Classe A: ~20% dos produtos mas 80% do custo — controle rigoroso e negociação com fornecedores',
+          'Classe B: 15% do custo — revisão semanal suficiente',
+          'Classe C: 5% do custo — compra em volume, controle simplificado',
+          'Selecione o período de análise: 1, 3, 6 ou 12 meses',
+        ],
+      },
+      {
+        tipo: 'tip',
+        texto: '💡 Integração financeira: ao registrar uma entrada com "Gerar conta a pagar", a despesa aparece automaticamente na aba Despesas com a descrição da compra.',
+      },
+    ],
+  },
+  {
     id: 'atalhos',
     icon: '⚡',
     titulo: 'Atalhos da Topbar',

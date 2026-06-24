@@ -161,6 +161,7 @@
   <div class="toc-section"><a href="#sec-recorrencias"><span class="toc-num">08</span> <strong>Recorrências</strong> <span>Despesas e Receitas Fixas</span></a></div>
   <div class="toc-section"><a href="#sec-cartoes"><span class="toc-num">09</span> <strong>Cartões de Crédito</strong> <span>Faturas, Inteligência de Float</span></a></div>
   <div class="toc-section"><a href="#sec-emprestimos"><span class="toc-num">10</span> <strong>Empréstimos</strong> <span>Controle de Parcelas</span></a></div>
+  <div class="toc-section"><a href="#sec-estoque"><span class="toc-num">11</span> <strong>Estoque & CMV</strong> <span>Produtos, Movimentações, Curva ABC</span></a></div>
 
   <div class="toc-group">Análise e Relatórios</div>
   <div class="toc-section"><a href="#sec-fluxo"><span class="toc-num">11</span> <strong>Fluxo de Caixa</strong> <span>Projeção 30/60/90 dias</span></a></div>
@@ -485,7 +486,61 @@
   <div class="tip"><strong>💡 Dica:</strong> Empréstimos ativos aparecem no fluxo de caixa impactando a projeção futura.</div>
 </div>
 
-<!-- 11 FLUXO DE CAIXA -->
+<!-- 11 ESTOQUE & CMV -->
+<div class="section page-break" id="sec-estoque">
+  <div class="section-header">
+    <div class="section-icon">📦</div>
+    <div><div class="section-num">Seção 11</div><div class="section-title">Estoque & CMV</div></div>
+  </div>
+  <p>Controle completo de estoque de produtos e insumos, com cálculo automático do CMV (Custo das Mercadorias Vendidas) real e análise Curva ABC para decisão de compras.</p>
+
+  <h3>As 4 Abas do Módulo</h3>
+  <table>
+    <tr><th>Aba</th><th>Função</th></tr>
+    <tr><td>📦 Produtos</td><td>Cadastro de insumos com estoque atual, mínimo, custo médio e preço de venda</td></tr>
+    <tr><td>↕️ Movimentações</td><td>Histórico de entradas, saídas e ajustes com custo total por período</td></tr>
+    <tr><td>📊 CMV</td><td>CMV% do mês vs meta, gráfico 6 meses e ranking de custo por produto</td></tr>
+    <tr><td>🔢 Curva ABC</td><td>Classifica produtos por impacto no custo: A (80%), B (15%), C (5%)</td></tr>
+  </table>
+
+  <h3>Cadastrar Produto / Insumo</h3>
+  <ol class="steps">
+    <li><p>Acesse <strong>Estoque & CMV</strong> no menu lateral (seção Financeiro)</p></li>
+    <li><p>Clique em <strong>"+ Produto"</strong></p></li>
+    <li><p>Preencha: nome, categoria, unidade (kg/un/L/etc.), custo médio e estoques (atual e mínimo)</p></li>
+    <li><p>Vincule ao fornecedor principal — permite rastrear gastos por fornecedor</p></li>
+  </ol>
+
+  <h3>Registrar Entrada (Compra)</h3>
+  <ol class="steps">
+    <li><p>Clique em <strong>"📥 Entrada"</strong> no produto desejado</p></li>
+    <li><p>Informe a quantidade e o custo unitário da nota fiscal</p></li>
+    <li><p>O sistema recalcula o <strong>custo médio ponderado</strong> automaticamente</p></li>
+    <li><p>Marque <strong>"Gerar conta a pagar"</strong> para criar a despesa vinculada no financeiro</p></li>
+  </ol>
+
+  <h3>CMV — Custo das Mercadorias Vendidas</h3>
+  <p>O CMV real é calculado automaticamente com base nas saídas de estoque registradas:</p>
+  <ul>
+    <li><strong>CMV Real:</strong> soma de (quantidade × custo unitário) de todas as saídas do mês</li>
+    <li><strong>CMV%:</strong> CMV Real ÷ Receita Bruta × 100</li>
+    <li><strong>Meta food service:</strong> 28% a 35% é o intervalo saudável</li>
+    <li>Configure sua meta — o gauge mostra em tempo real se está dentro ou fora</li>
+  </ul>
+
+  <h3>Curva ABC — Estratégia de Compras</h3>
+  <table>
+    <tr><th>Classe</th><th>% do Custo</th><th>Estratégia</th></tr>
+    <tr><td><strong>A (críticos)</strong></td><td>80%</td><td>Controle rigoroso, negociar preço e prazo com fornecedor, monitorar diariamente</td></tr>
+    <tr><td><strong>B (importantes)</strong></td><td>15%</td><td>Controle periódico — revisão semanal é suficiente</td></tr>
+    <tr><td><strong>C (baixo impacto)</strong></td><td>5%</td><td>Compra em volume, simplificar controle, pouco impacto no CMV</td></tr>
+  </table>
+
+  <div class="tip"><strong>💡 Integração financeira:</strong> Ao registrar uma entrada com "Gerar conta a pagar", a despesa aparece automaticamente na aba Despesas com a descrição da compra e o valor calculado.</div>
+  <div class="tip"><strong>📊 DRE integrado:</strong> O CMV das saídas compõe automaticamente o resultado do DRE — quanto mais preciso o controle de estoque, mais fiel é o lucro bruto apurado.</div>
+</div>
+
+<!-- 12 FLUXO DE CAIXA (renumerado) -->
 <div class="section page-break" id="sec-fluxo">
   <div class="section-header">
     <div class="section-icon">📈</div>

@@ -659,30 +659,30 @@ function renderCartoes() {
             return c._cardId===card.id && c._faturaRef===mesFiltro && c.categoria==='Fatura Cartão' && c.pago;
           });
 
-          // Botão / badge de pagamento
-          if (totalFatura > 0) {
-            var payRow = el('div',{style:{marginTop:'12px',paddingTop:'10px',borderTop:'1px solid rgba(255,255,255,.2)'}});
-            if(faturaPaga){
-              payRow.appendChild(el('div',{style:{display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'rgba(255,255,255,.9)',fontWeight:'600'}},[
-                el('span',{},'✅ Fatura paga'),
-                el('span',{style:{opacity:'.6',fontWeight:'400'}}, faturaPaga.dataPagamento ? '· '+fmtDate(faturaPaga.dataPagamento) : ''),
-              ]));
-            } else {
-              var payBtn = el('button',{});
-              payBtn.style.cssText = 'width:100%;padding:8px 0;border-radius:8px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
-              payBtn.textContent = '💳 Pagar fatura — ' + fmtMoney(totalFatura);
-              payBtn.onclick = function(e){
-                e.stopPropagation();
-                setState({pagamentoFaturaModal:{cardId:card.id,mes:mesFiltro,total:totalFatura,count:transCard.length}});
-              };
-              payRow.appendChild(payBtn);
-            }
+          // Botão / badge de pagamento — sempre visível
+          var payRow = el('div',{style:{marginTop:'12px',paddingTop:'10px',borderTop:'1px solid rgba(255,255,255,.2)'}});
+          if(faturaPaga){
+            payRow.appendChild(el('div',{style:{display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'rgba(255,255,255,.9)',fontWeight:'600'}},[
+              el('span',{},'✅ Fatura paga'),
+              el('span',{style:{opacity:'.6',fontWeight:'400'}}, faturaPaga.dataPagamento ? '· '+fmtDate(faturaPaga.dataPagamento) : ''),
+            ]));
+          } else {
+            var payBtn = el('button',{});
+            payBtn.style.cssText = 'width:100%;padding:8px 0;border-radius:8px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
+            payBtn.textContent = totalFatura > 0
+              ? '💳 Pagar fatura — ' + fmtMoney(totalFatura)
+              : '💳 Registrar pagamento';
+            payBtn.onclick = function(e){
+              e.stopPropagation();
+              setState({pagamentoFaturaModal:{cardId:card.id,mes:mesFiltro,total:totalFatura,count:transCard.length}});
+            };
+            payRow.appendChild(payBtn);
           }
 
           cardEl.appendChild(topRow);
           cardEl.appendChild(final4);
           cardEl.appendChild(limiteInfo);
-          if(totalFatura > 0) cardEl.appendChild(payRow);
+          cardEl.appendChild(payRow);
           cardEl.appendChild(actions);
           return cardEl;
         })

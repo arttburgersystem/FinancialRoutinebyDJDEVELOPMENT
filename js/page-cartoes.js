@@ -369,6 +369,118 @@ function renderCartoes() {
     return ovCard;
   }
 
+  // ── MODAL: PAGAR FATURA ────────────────────────────────────────────────────
+  if (state.pagamentoFaturaModal) {
+    var pm    = state.pagamentoFaturaModal;
+    var pmCard = cartoes.find(function(c){ return c.id === pm.cardId; });
+    var bancos = (state.bancos||[]).filter(function(b){ return !b.profile || b.profile === state.profile; });
+    var MESES_PM = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    function fmtMesPM(m){ var p=m.split('-'); return MESES_PM[parseInt(p[1])-1]+'/'+p[0]; }
+
+    function gpm(id){ var e=document.getElementById('pm-'+id); return e?e.value:''; }
+
+    function confirmarPagamento(){
+      var valorRaw = gpm('valor').replace(',','.').replace(/[^\d\.]/g,'');
+      var valor = parseFloat(valorRaw) || pm.total;
+      if(valor <= 0){ showToast('Valor inválido','error'); return; }
+      var dataPag   = gpm('data') || today();
+      var bancoId   = gpm('banco');
+      var chkEl     = document.getElementById('pm-deduzir');
+      var deduzir   = bancoId && chkEl && chkEl.checked;
+
+      var novaConta = {
+        id:            'conta_' + Date.now(),
+        tipo:          'pagar',
+        descricao:     'Fatura ' + (pmCard ? pmCard.nome : 'Cartão') + ' — ' + fmtMesPM(pm.mes),
+        categoria:     'Fatura Cartão',
+        valor:         valor,
+        valorPago:     valor,
+        vencimento:    dataPag,
+        dataPagamento: dataPag,
+        pago:          true,
+        profile:       state.profile,
+        _cardId:       pm.cardId,
+        _faturaRef:    pm.mes,
+        bancoId:       bancoId || '',
+      };
+      var newContas = (state.contas||[]).concat([novaConta]);
+
+      var newBancos = state.bancos || [];
+      if(deduzir && bancoId){
+        newBancos = newBancos.map(function(b){
+          if(b.id !== bancoId) return b;
+          return Object.assign({},b,{saldo: Math.round(((b.saldo||0) - valor)*100)/100});
+        });
+        lsSet('bancos', newBancos);
+      }
+
+      lsSet('contas', newContas);
+      setState({contas: newContas, bancos: newBancos, pagamentoFaturaModal: null});
+      scheduleSave();
+      if(typeof logAudit==='function') logAudit('pagou fatura cartão', (pmCard?pmCard.nome:'Cartão')+' '+pm.mes+' — '+fmtMoney(valor));
+      showToast('✅ Fatura paga! Lançado em Despesas'+(deduzir?' e deduzido do banco':'')+'.', 'success', 3500);
+    }
+
+    var pmValorInp = el('input',{class:'form-input',type:'number',id:'pm-valor',step:'0.01',min:'0'});
+    pmValorInp.value = pm.total.toFixed(2);
+
+    var pmDataInp = el('input',{class:'form-input',type:'date',id:'pm-data'});
+    pmDataInp.value = today();
+
+    var bancoOpts = [el('option',{value:''},'— Não deduzir de nenhuma conta —')].concat(
+      bancos.map(function(b){
+        var op = el('option',{value:b.id}, b.nome + (b.saldo!=null?' ('+fmtMoney(b.saldo)+')':''));
+        return op;
+      })
+    );
+    var pmBancoSel = el('select',{class:'form-input',id:'pm-banco'}, bancoOpts);
+
+    var pmDeduzirChk = el('input',{type:'checkbox',id:'pm-deduzir'});
+    pmDeduzirChk.checked = true;
+
+    var mPm = div('modal',[
+      div('modal-title',[
+        el('span',{},'💳 Pagar Fatura'),
+        el('button',{class:'modal-close',onclick:function(){setState({pagamentoFaturaModal:null});}},'×'),
+      ]),
+      el('div',{style:{background:'rgba(201,168,76,0.08)',border:'1px solid var(--gold)',borderRadius:'8px',padding:'12px 14px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'14px'}},[
+        pmCard ? el('div',{style:{width:'40px',height:'26px',borderRadius:'6px',background:pmCard.cor,flexShrink:'0',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',color:'#fff',fontWeight:'700'}},'••'+pmCard.final) : null,
+        el('div',{},[
+          el('div',{style:{fontWeight:'700',fontSize:'14px'}}, pmCard ? pmCard.nome+' ••••'+pmCard.final : 'Cartão'),
+          el('div',{style:{fontSize:'12px',color:'var(--text3)',marginTop:'2px'}}, 'Fatura de '+fmtMesPM(pm.mes)+' — '+pm.count+' transação'+(pm.count!==1?'ões':'')),
+        ]),
+        el('div',{style:{marginLeft:'auto',textAlign:'right'}},[
+          el('div',{style:{fontSize:'11px',color:'var(--text3)'}},'Total da fatura'),
+          el('div',{style:{fontSize:'20px',fontWeight:'800',color:'var(--red)'}},fmtMoney(pm.total)),
+        ]),
+      ].filter(Boolean)),
+      el('div',{class:'form-row'},[
+        div('form-group',[el('label',{class:'form-label'},'Valor pago'), pmValorInp]),
+        div('form-group',[el('label',{class:'form-label'},'Data do pagamento'), pmDataInp]),
+      ]),
+      div('form-group',[
+        el('label',{class:'form-label'},'Débitar de qual conta bancária'),
+        pmBancoSel,
+      ]),
+      bancos.length > 0 ? el('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginTop:'10px',padding:'10px 12px',background:'var(--bg3)',borderRadius:'8px',fontSize:'13px'}},[
+        pmDeduzirChk,
+        el('label',{for:'pm-deduzir',style:{cursor:'pointer'}},'Deduzir do saldo bancário ao confirmar'),
+      ]) : null,
+      el('div',{style:{background:'rgba(76,175,130,0.08)',border:'1px solid rgba(76,175,130,0.3)',borderRadius:'8px',padding:'10px 12px',marginTop:'12px',fontSize:'12px',color:'var(--text2)'}},[
+        el('b',{},'O que será registrado: '),
+        el('span',{},'Uma despesa "Fatura Cartão" marcada como paga aparece em Despesas e, se selecionado, o saldo da conta bancária é deduzido automaticamente.'),
+      ]),
+      div('modal-actions',[
+        btn('btn-ghost','Cancelar',function(){setState({pagamentoFaturaModal:null});}),
+        btn('btn-primary','✅ Confirmar pagamento', confirmarPagamento),
+      ]),
+    ].filter(Boolean));
+    mPm.style.maxWidth = '500px';
+    var ovPm = div('modal-overlay',[mPm]);
+    ovPm.onclick = function(e){ if(e.target===ovPm) setState({pagamentoFaturaModal:null}); };
+    return ovPm;
+  }
+
   // ── PAINEL DE INTELIGÊNCIA ─────────────────────────────────────────────────
   var intel = null;
   if (cartoes.length > 0) {
@@ -542,9 +654,35 @@ function renderCartoes() {
           ]);
           actions.onclick = function(e) { e.stopPropagation(); };
 
+          // Verificar se a fatura deste mês já foi paga
+          var faturaPaga = (state.contas||[]).find(function(c){
+            return c._cardId===card.id && c._faturaRef===mesFiltro && c.categoria==='Fatura Cartão' && c.pago;
+          });
+
+          // Botão / badge de pagamento
+          if (totalFatura > 0) {
+            var payRow = el('div',{style:{marginTop:'12px',paddingTop:'10px',borderTop:'1px solid rgba(255,255,255,.2)'}});
+            if(faturaPaga){
+              payRow.appendChild(el('div',{style:{display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'rgba(255,255,255,.9)',fontWeight:'600'}},[
+                el('span',{},'✅ Fatura paga'),
+                el('span',{style:{opacity:'.6',fontWeight:'400'}}, faturaPaga.dataPagamento ? '· '+fmtDate(faturaPaga.dataPagamento) : ''),
+              ]));
+            } else {
+              var payBtn = el('button',{});
+              payBtn.style.cssText = 'width:100%;padding:8px 0;border-radius:8px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
+              payBtn.textContent = '💳 Pagar fatura — ' + fmtMoney(totalFatura);
+              payBtn.onclick = function(e){
+                e.stopPropagation();
+                setState({pagamentoFaturaModal:{cardId:card.id,mes:mesFiltro,total:totalFatura,count:transCard.length}});
+              };
+              payRow.appendChild(payBtn);
+            }
+          }
+
           cardEl.appendChild(topRow);
           cardEl.appendChild(final4);
           cardEl.appendChild(limiteInfo);
+          if(totalFatura > 0) cardEl.appendChild(payRow);
           cardEl.appendChild(actions);
           return cardEl;
         })
@@ -673,12 +811,33 @@ function renderCartoes() {
       ]),
       el('div', {}, [
         div('card', [
-          el('div', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}, [
+          el('div', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '10px', flexWrap: 'wrap'}}, [
             el('div', {}, [
               el('div', {style: {fontWeight: '700', fontSize: '14px'}}, fmtMesLabel(mesFiltro) + (cardFiltro && cardMap[cardFiltro] ? ' — ' + cardMap[cardFiltro].nome : '')),
               el('div', {style: {fontSize: '12px', color: 'var(--text3)'}}, transFiltradas.length + ' transações · Total: ' + fmtMoney(totalFiltrado)),
             ]),
-            cardFiltro ? btn('btn-ghost', '× Limpar filtro', function() { setState({cartaoFiltro: null}); }) : null,
+            el('div', {style: {display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap'}}, [
+              // Botão pagar (só aparece se há transações e cartão filtrado)
+              (function(){
+                if(transFiltradas.length === 0) return null;
+                var pmCardId = cardFiltro || (cartoes.length === 1 ? cartoes[0].id : null);
+                var pmCardObj = pmCardId ? cartoes.find(function(c){return c.id===pmCardId;}) : null;
+                var jaPaga = (state.contas||[]).some(function(c){
+                  return c._cardId===pmCardId && c._faturaRef===mesFiltro && c.categoria==='Fatura Cartão' && c.pago;
+                });
+                if(jaPaga) return el('span',{style:{fontSize:'12px',color:'var(--green)',fontWeight:'700',display:'flex',alignItems:'center',gap:'4px'}},'✅ Fatura paga');
+                if(!pmCardId && cartoes.length > 1) return null; // múltiplos cartões sem filtro: usar botão no card
+                return btn('btn-primary', '💳 Pagar fatura', function(){
+                  setState({pagamentoFaturaModal:{
+                    cardId: pmCardId,
+                    mes: mesFiltro,
+                    total: totalFiltrado,
+                    count: transFiltradas.length,
+                  }});
+                });
+              })(),
+              cardFiltro ? btn('btn-ghost', '× Limpar filtro', function() { setState({cartaoFiltro: null}); }) : null,
+            ].filter(Boolean)),
           ].filter(Boolean)),
           el('div', {style: {overflowX: 'auto'}}, [
             el('table', {style: {width: '100%', borderCollapse: 'collapse'}}, [

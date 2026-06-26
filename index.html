@@ -489,6 +489,7 @@ var state={
   pagarAtrasadoModal: null,
   administradores: lsGet('administradores',[]),
   adminModal: null,
+  pagamentoFaturaModal: null,
 };
 
 function lsGet(k,d){try{var v=localStorage.getItem('djf_'+k);return v?JSON.parse(v):d;}catch(e){return d;}}

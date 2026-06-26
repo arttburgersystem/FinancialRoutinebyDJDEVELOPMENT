@@ -578,8 +578,14 @@ function renderCartoes() {
           var info = calcCartaoInteligencia(card);
           var transCard = transacoes.filter(function(t) { return t.cardId === card.id && t.fatura === mesFiltro; });
           var totalFatura = transCard.reduce(function(s, t) { return s + (t.valor || 0); }, 0);
-          var pctUsado = card.limite > 0 ? Math.min(100, (totalFatura / card.limite) * 100) : 0;
-          var disponivel = Math.max(0, (card.limite || 0) - totalFatura);
+
+          // Se a fatura deste mês foi paga, crédito volta ao limite total
+          var faturaMesPaga = (state.contas||[]).find(function(c){
+            return c._cardId===card.id && c._faturaRef===mesFiltro && c.categoria==='Fatura Cartão' && c.pago;
+          });
+          var gastoEfetivo = faturaMesPaga ? 0 : totalFatura;
+          var pctUsado  = card.limite > 0 ? Math.min(100, (gastoEfetivo / card.limite) * 100) : 0;
+          var disponivel = card.limite > 0 ? Math.max(0, card.limite - gastoEfetivo) : null;
 
           var cardEl = el('div', {});
           cardEl.style.cssText = [
@@ -620,14 +626,19 @@ function renderCartoes() {
 
           var limiteInfo = el('div', {}, [
             el('div', {style: {display: 'flex', justifyContent: 'space-between', fontSize: '11px', opacity: '.7', marginBottom: '4px'}}, [
-              el('span', {}, 'Fatura ' + mesFiltro),
-              el('span', {}, fmtMoney(totalFatura) + ' / ' + fmtMoney(card.limite)),
+              el('span', {}, faturaMesPaga ? '✅ Fatura ' + mesFiltro + ' paga' : 'Fatura ' + mesFiltro),
+              el('span', {}, faturaMesPaga
+                ? fmtMoney(totalFatura) + ' (quitado)'
+                : (card.limite > 0 ? fmtMoney(totalFatura) + ' / ' + fmtMoney(card.limite) : fmtMoney(totalFatura))),
             ]),
             el('div', {style: {height: '4px', background: 'rgba(255,255,255,.2)', borderRadius: '2px', overflow: 'hidden'}}, [
-              el('div', {style: {height: '100%', width: pctUsado + '%', background: pctUsado > 80 ? '#ef4444' : '#fff', borderRadius: '2px', transition: 'width .5s'}}),
+              el('div', {style: {height: '100%', width: pctUsado + '%', background: faturaMesPaga ? '#22c55e' : (pctUsado > 80 ? '#ef4444' : '#fff'), borderRadius: '2px', transition: 'width .5s'}}),
             ]),
             el('div', {style: {display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '6px'}}, [
-              el('span', {style: {opacity: '.7'}}, 'Disponível: ' + fmtMoney(disponivel)),
+              disponivel !== null
+                ? el('span', {style: {opacity: '.7', color: faturaMesPaga ? '#86efac' : ''}},
+                    'Disponível: ' + fmtMoney(disponivel) + (faturaMesPaga ? ' (limite total)' : ''))
+                : el('span', {style: {opacity: '.5'}}, 'Limite não definido'),
               el('span', {style: {opacity: '.7'}}, 'Fecha dia ' + card.diaFechamento + ' · Vence dia ' + card.diaVencimento),
             ]),
           ]);

@@ -45,7 +45,19 @@ function renderModal(){
     var fornecedorIdInp=document.getElementById('mf-fornecedor-id');
     d.fornecedor=fornecedorInp?fornecedorInp.value.trim():'';
     d.fornecedorId=fornecedorIdInp?fornecedorIdInp.value:'';
-    if(!d.descricao||!d.valor){showToast('Preencha descrição e valor','error');return;}
+    if(!d.descricao||!d.valor){
+      function _fldErr(id){
+        var e2=document.getElementById('mf-'+id);if(!e2)return;
+        e2.classList.remove('_fldshake');
+        void e2.offsetWidth; // força reflow para reiniciar animação
+        e2.classList.add('_fldshake');
+        setTimeout(function(){e2.classList.remove('_fldshake');},2000);
+      }
+      if(!d.descricao)_fldErr('descricao');
+      if(!d.valor||parseFloat(d.valor)<=0)_fldErr('valor');
+      showToast('Preencha os campos destacados em vermelho','error');
+      return;
+    }
 
     // ── Lançamento em cartão de crédito com parcelamento ─────────────────────
     var _fAtual   = document.getElementById('mf-formaPgto') ? document.getElementById('mf-formaPgto').value : d.formaPgto;

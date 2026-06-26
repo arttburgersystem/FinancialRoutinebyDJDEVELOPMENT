@@ -134,8 +134,12 @@ td.text-main{color:var(--text);font-weight:500}
 .empty{text-align:center;padding:36px 20px;color:var(--text3)}
 .empty-icon{font-size:28px;margin-bottom:8px}
 .empty-title{font-size:14px;font-weight:600;color:var(--text2);margin-bottom:4px}
-.toast{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;font-size:13px;z-index:999;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;font-size:13px;z-index:9999;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:toastIn .2s ease-out}
 .toast.success{border-color:var(--green)}.toast.error{border-color:var(--red)}.toast.info{border-color:var(--blue)}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes _fldshake{0%,100%{transform:translateX(0)}15%{transform:translateX(-7px)}35%{transform:translateX(7px)}55%{transform:translateX(-5px)}75%{transform:translateX(4px)}}
+._fldshake{animation:_fldshake .45s ease;}
+.form-input._fldshake{border-color:var(--red)!important;box-shadow:0 0 0 3px rgba(239,68,68,.25)!important;}
 .page-header{margin-bottom:20px}
 .page-header h1{font-size:20px;font-weight:700}
 .page-header p{font-size:13px;color:var(--text3);margin-top:3px}
@@ -500,8 +504,14 @@ function uid(){try{var a=new Uint8Array(8);crypto.getRandomValues(a);return Arra
 function setState(patch){Object.assign(state,patch);render();}
 function showToast(msg,type,dur){
   type=type||'success';dur=dur||2800;
-  setState({toast:{msg:msg,type:type}});
-  setTimeout(function(){setState({toast:null});},dur);
+  var prev=document.getElementById('_djf-toast');if(prev)prev.remove();
+  var t=document.createElement('div');
+  t.id='_djf-toast';t.className='toast '+type;
+  var ic=document.createElement('span');ic.textContent=type==='success'?'✓':type==='error'?'✕':'ℹ';
+  var tx=document.createElement('span');tx.textContent=msg;
+  t.appendChild(ic);t.appendChild(tx);
+  (document.getElementById('app')||document.body).appendChild(t);
+  setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},dur);
 }
 
 // ── CLIMA & LOCALIZAÇÃO ───────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-// ── AJUDA — CENTRAL DE AJUDA v2.0.0 ─────────────────────────────────────────
+// ── AJUDA — CENTRAL DE AJUDA v2.2.0 ─────────────────────────────────────────
 
 var _ajudaSecao = null; // seção expandida atual
 
@@ -31,7 +31,12 @@ var AJUDA_SECOES = [
           'Clique em "Ativar Face ID / Digital" e siga as instruções do dispositivo',
           'Nas próximas entradas um botão biométrico aparecerá automaticamente',
           'Compatível com iPhone (Face ID), Android e computadores com Windows Hello',
+          'Dica rápida: pressione Enter na tela de Face ID para dispensar e entrar sem biometria',
         ],
+      },
+      {
+        tipo: 'tip',
+        texto: '⌨️ Atalho: após digitar o PIN, pressione Enter na tela de "Ativar Face ID?" para dispensá-la sem usar o mouse — vai direto para o sistema.',
       },
       {
         tipo: 'tip',
@@ -213,16 +218,44 @@ var AJUDA_SECOES = [
     id: 'despesas',
     icon: '💸',
     titulo: 'Despesas (A Pagar)',
-    subtitulo: 'Lançamentos, status e vencimentos',
+    subtitulo: 'Lançamentos, filtro por mês, cartão e parcelamento',
     conteudo: [
       {
         tipo: 'steps',
         titulo: 'Lançar uma Despesa',
         items: [
-          'Clique em "+ Nova despesa" ou use o botão + no celular',
-          'Preencha: descrição, valor, vencimento, categoria e prioridade',
-          'Se a despesa se repete todo mês, marque "Recorrente"',
-          'Clique em "Salvar"',
+          'Clique em "+ Nova conta" ou use o botão + no celular',
+          'Preencha: descrição, valor, data, categoria e prioridade',
+          'Selecione a forma de pagamento — se for cartão de crédito, campos extras aparecem',
+          'Campos obrigatórios ficam com borda vermelha pulsante se não preenchidos',
+          'Os dados digitados nunca são apagados em caso de erro — corrija e salve',
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Lançar Compra Parcelada no Cartão de Crédito',
+        items: [
+          'Clique em "+ Nova conta"',
+          'Preencha descrição e valor total da compra',
+          'Em Forma de Pagamento, selecione "💳 Cartão de Crédito"',
+          'Escolha o cartão, número de parcelas (1x a 24x) e o mês da 1ª cobrança',
+          'Clique em "Adicionar" — o sistema cria automaticamente uma parcela por mês',
+          'Cada parcela aparece em Despesas E na fatura do cartão no mês correto',
+        ],
+      },
+      {
+        tipo: 'warn',
+        texto: '⚠️ Não ative "Recorrência" ao parcelar no cartão. O parcelamento já gera todas as parcelas automaticamente. Recorrência é para despesas que nunca terminam (aluguel, assinatura).',
+      },
+      {
+        tipo: 'lista',
+        titulo: 'Filtro de Mês com Navegação',
+        items: [
+          'Clique em Pendente, Pago ou Vencido para ver somente o mês atual',
+          'Use as setas ‹ e › ao lado do mês para navegar para meses anteriores ou futuros',
+          'Clique no nome do mês (ex: "Junho 2026") para voltar ao mês atual',
+          'Ao filtrar por status, 4 KPIs aparecem: Total do mês / Pendente / Vencido / Pago',
+          'O filtro "Todos" mostra todos os meses sem restrição',
         ],
       },
       {
@@ -237,12 +270,14 @@ var AJUDA_SECOES = [
         ],
       },
       {
-        tipo: 'lista',
-        titulo: 'Prioridades',
-        items: [
-          'Alta: pagamentos críticos (impostos, folha, aluguel)',
-          'Normal: despesas regulares do negócio',
-          'Baixa: gastos não urgentes',
+        tipo: 'tabela',
+        titulo: 'Parcelamento vs Recorrência — quando usar cada um',
+        cols: ['Situação', 'O que usar'],
+        rows: [
+          ['Comprei algo em 6x no cartão', 'Parcelamento no cartão (tem fim definido)'],
+          ['Aluguel todo mês sem prazo', 'Recorrência (sem data de encerramento)'],
+          ['Netflix cobrado no cartão todo mês', 'Recorrência'],
+          ['Geladeira em 12x no cartão', 'Parcelamento no cartão'],
         ],
       },
     ],
@@ -255,7 +290,7 @@ var AJUDA_SECOES = [
     conteudo: [
       {
         tipo: 'intro',
-        texto: 'Recorrências são despesas ou receitas que se repetem automaticamente (aluguel, assinaturas, salários). O sistema gera os lançamentos automaticamente ao abrir o app.',
+        texto: 'Recorrências são despesas ou receitas que se repetem indefinidamente (aluguel, assinaturas, salários, pro-labore). O sistema gera os lançamentos automaticamente ao abrir o app, cobrindo os próximos 13 meses.',
       },
       {
         tipo: 'steps',
@@ -265,7 +300,7 @@ var AJUDA_SECOES = [
           'Clique em "+ Nova Recorrência"',
           'Preencha: descrição, valor, tipo (despesa ou receita), frequência e categoria',
           'Informe a data do primeiro vencimento',
-          'Clique em "Criar"',
+          'Clique em "Criar" — os próximos 13 meses são gerados imediatamente',
         ],
       },
       {
@@ -282,8 +317,12 @@ var AJUDA_SECOES = [
         ],
       },
       {
+        tipo: 'warn',
+        texto: '⚠️ Recorrência ≠ Parcelamento. Use recorrência para gastos sem prazo de término. Para compras parceladas no cartão (com fim definido), use o parcelamento na aba Despesas.',
+      },
+      {
         tipo: 'tip',
-        texto: 'Para forçar a geração imediata dos lançamentos, clique em "▶ Gerar agora" no topo da página.',
+        texto: 'Para forçar a geração imediata dos lançamentos, clique em "▶ Gerar agora" no topo da página. O sistema sempre gera 13 meses à frente.',
       },
     ],
   },
@@ -291,7 +330,7 @@ var AJUDA_SECOES = [
     id: 'cartoes',
     icon: '💳',
     titulo: 'Cartões de Crédito',
-    subtitulo: 'Faturas, float e importação CSV',
+    subtitulo: 'Faturas, limite disponível, pagamento e float',
     conteudo: [
       {
         tipo: 'steps',
@@ -299,8 +338,31 @@ var AJUDA_SECOES = [
         items: [
           'Acesse Cartões de Crédito no menu',
           'Clique em "+ Novo Cartão"',
-          'Preencha: banco, bandeira, 4 últimos dígitos, limite, dia de fechamento e vencimento',
+          'Preencha: nome, banco, bandeira, 4 últimos dígitos, limite, dia de fechamento e vencimento',
           'Escolha uma cor identificadora',
+          'Com o limite cadastrado, o sistema calcula automaticamente o saldo disponível',
+        ],
+      },
+      {
+        tipo: 'lista',
+        titulo: 'Saldo Disponível',
+        items: [
+          'Cada card mostra "Disponível: R$ X" — limite menos gastos da fatura atual',
+          'Após pagar a fatura, o disponível volta ao limite total automaticamente (em verde)',
+          'Se o cartão não tem limite cadastrado, aparece "Limite não definido" — edite o cartão para definir',
+          'A barra de uso muda de cor: branca (normal) → vermelha (acima de 80%)',
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Pagar Fatura',
+        items: [
+          'Na aba Cartões, localize o cartão e o mês desejado',
+          'Clique em "💳 Pagar fatura — R$ X,XX"',
+          'Confirme o valor (pode ajustar), data do pagamento e conta de origem',
+          'Marque "Deduzir do banco" para descontar o valor do saldo bancário',
+          'O pagamento aparece em Despesas com categoria "Fatura Cartão"',
+          'Após pagar, o saldo disponível volta ao limite total',
         ],
       },
       {
@@ -322,6 +384,10 @@ var AJUDA_SECOES = [
           'Selecione o arquivo CSV — o sistema detecta as colunas automaticamente',
           'Revise os lançamentos e confirme a importação',
         ],
+      },
+      {
+        tipo: 'tip',
+        texto: 'Para lançar uma compra parcelada no cartão, vá em Despesas → + Nova conta → selecione Cartão de Crédito e informe as parcelas. Os lançamentos aparecem automaticamente na fatura do mês correto.',
       },
       {
         tipo: 'tip',
@@ -1043,6 +1109,99 @@ var AJUDA_SECOES = [
     ],
   },
   {
+    id: 'administrador',
+    icon: '👥',
+    titulo: 'Administrador & Sócios',
+    subtitulo: 'Cadastro, retiradas e histórico de pro-labore',
+    conteudo: [
+      {
+        tipo: 'intro',
+        texto: 'O módulo Administrador & Sócios permite cadastrar os sócios e administradores do negócio, registrar retiradas e pro-labore, e acompanhar o histórico completo com KPIs.',
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Cadastrar Sócio / Administrador',
+        items: [
+          'Acesse "Administrador & Sócios" no menu lateral',
+          'Clique em "+ Novo Administrador"',
+          'Preencha: nome completo, CPF, e-mail, telefone, cargo e participação (%)',
+          'Clique em "Salvar"',
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Registrar Retirada / Pro-labore',
+        items: [
+          'Na aba Sócios, clique em "💸 Retirada" no card do sócio desejado',
+          'Informe o valor, data, categoria (Pro-labore, Retirada, Adiantamento) e banco de origem',
+          'A retirada é registrada em Despesas e deduzida do banco automaticamente',
+          'Clique em "📋 Histórico" para ver todas as retiradas daquele sócio',
+        ],
+      },
+      {
+        tipo: 'lista',
+        titulo: 'Aba Histórico — KPIs e Filtros',
+        items: [
+          '4 KPIs: Total retirado / Total de retiradas / Média por retirada / Último mês',
+          'Filtro por sócio: veja as retiradas de um sócio específico',
+          'Filtro por mês: navegue pelo histórico mês a mês',
+          'Lista cronológica com status de pagamento e badge por categoria',
+          'Sidebar direita: total retirado por cada sócio no período filtrado',
+          'Breakdown mensal: barras mostrando volume de retiradas por mês',
+        ],
+      },
+      {
+        tipo: 'tabela',
+        titulo: 'Cargos Disponíveis',
+        cols: ['Cargo', 'Uso'],
+        rows: [
+          ['Sócio', 'Participante do negócio com quota'],
+          ['Sócio-Administrador', 'Sócio que também administra'],
+          ['Administrador', 'Gestor sem participação societária'],
+          ['Diretor', 'Cargo executivo'],
+          ['Representante Legal', 'Responsável legal perante terceiros'],
+        ],
+      },
+    ],
+  },
+  {
+    id: 'formularios',
+    icon: '✍️',
+    titulo: 'Preenchimento de Formulários',
+    subtitulo: 'Validação, corretor ortográfico e preservação de dados',
+    conteudo: [
+      {
+        tipo: 'intro',
+        texto: 'O sistema preserva todos os dados digitados mesmo em caso de erro ao salvar. Campos obrigatórios são destacados visualmente para facilitar a correção.',
+      },
+      {
+        tipo: 'lista',
+        titulo: 'Validação Visual dos Campos',
+        items: [
+          'Ao clicar em "Salvar" ou "Adicionar" com campos obrigatórios vazios, o campo sacude e fica com borda vermelha pulsante',
+          'Uma mensagem "⚠ Campo obrigatório" aparece abaixo do campo com erro',
+          'A borda e a mensagem somem automaticamente ao começar a digitar no campo',
+          'Os dados já preenchidos nos outros campos nunca são apagados — corrija só o que falta',
+        ],
+      },
+      {
+        tipo: 'lista',
+        titulo: 'Corretor Ortográfico em Português',
+        items: [
+          'Todos os campos de texto têm corretor ortográfico ativado em Português Brasileiro',
+          'Palavras com erro aparecem sublinhadas (vermelho ou tracejado, dependendo do navegador)',
+          'Clique com o botão direito sobre a palavra sublinhada para ver sugestões de correção',
+          'Funciona automaticamente em: Descrição, Fornecedor, Notas, Categoria e todos os outros campos de texto',
+          'Requer Chrome, Edge ou Firefox — o corretor usa o dicionário instalado no dispositivo',
+        ],
+      },
+      {
+        tipo: 'tip',
+        texto: '💡 Os dados do formulário são preservados mesmo se a página sincronizar com a nuvem enquanto você está preenchendo. Nada é perdido.',
+      },
+    ],
+  },
+  {
     id: 'dicas',
     icon: '💡',
     titulo: 'Boas Práticas',
@@ -1253,7 +1412,7 @@ function renderAjuda() {
     el('div', {class:'page-header'}, [
       el('div', {}, [
         el('h2', {class:'page-title'}, '❓ Central de Ajuda'),
-        el('p', {class:'page-sub'}, 'Guia completo de operação — v2.0.0'),
+        el('p', {class:'page-sub'}, 'Guia completo de operação — v2.2.0'),
       ]),
     ]),
 

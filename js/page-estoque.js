@@ -1558,6 +1558,9 @@ function renderNFModal() {
 
   var fornecedores = (state.fornecedores||[]).filter(function(f){return f.profile===state.profile;});
 
+  var cnpjInp = el('input',{type:'text',class:'form-input',value:m.cnpj||'',placeholder:'Preenchido automaticamente',
+    oninput:function(){m.cnpj=this.value;}});
+
   var despCampos = m.gerarDespesa ? el('div',{style:{
     marginTop:'12px',padding:'14px',background:'var(--bg3)',
     border:'1px solid var(--gold)',borderRadius:'8px',
@@ -1655,7 +1658,16 @@ function renderNFModal() {
           el('label',{class:'form-label'},'Fornecedor *'),
           el('input',{type:'text',class:'form-input',value:m.fornecedor||'',placeholder:'Nome do fornecedor',
             list:'_nf_forn_list',
-            oninput:function(){m.fornecedor=this.value;}}),
+            oninput:function(){
+              m.fornecedor = this.value;
+              var match = fornecedores.find(function(f){
+                return (f.nome||f.razaoSocial||'').toLowerCase() === (this.value||'').toLowerCase();
+              }.bind(this));
+              if (match && match.documento) {
+                m.cnpj = match.documento;
+                cnpjInp.value = match.documento;
+              }
+            }}),
           el('datalist',{id:'_nf_forn_list'},
             fornecedores.map(function(f){return el('option',{value:f.nome||f.razaoSocial||''});})),
         ]),
@@ -1666,8 +1678,7 @@ function renderNFModal() {
         ]),
         el('div',{},[
           el('label',{class:'form-label'},'CNPJ do fornecedor'),
-          el('input',{type:'text',class:'form-input',value:m.cnpj||'',placeholder:'00.000.000/0001-00',
-            oninput:function(){m.cnpj=this.value;}}),
+          cnpjInp,
         ]),
         el('div',{},[
           el('label',{class:'form-label'},'Data de emissão'),

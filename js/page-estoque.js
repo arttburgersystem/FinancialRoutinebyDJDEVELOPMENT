@@ -1083,19 +1083,41 @@ function renderEstMovs() {
   };
 
   var rows = movsMes.length===0
-    ? [el('tr',{},[el('td',{colspan:'7',style:{textAlign:'center',padding:'24px',color:'var(--text3)',fontSize:'12px'}},'Nenhuma movimentação neste mês')])]
+    ? [el('tr',{},[el('td',{colspan:'8',style:{textAlign:'center',padding:'32px',color:'var(--text3)',fontSize:'13px'}},[
+        el('div',{style:{fontSize:'32px',marginBottom:'8px'}},'📋'),
+        el('div',{},'Nenhuma movimentação em '+MESES[mesFlt]+' '+anoFlt+'.'),
+        el('div',{style:{fontSize:'11px',marginTop:'4px'}},'Use "+ Nova Movimentação" na aba Insumos para registrar entradas ou saídas.'),
+      ])])]
     : movsMes.map(function(m){
         var ts = tsMap[m.tipo]||tsMap.ajuste;
-        return el('tr',{style:{borderBottom:'1px solid var(--border)'}},[
+        var custoZero = m.tipo==='entrada' && !(m.custoUnitario||0);
+        return el('tr',{style:{borderBottom:'1px solid var(--border)',background:custoZero?'rgba(192,57,43,.06)':'transparent'}},[
           el('td',{style:{padding:'8px 10px',fontSize:'12px',color:'var(--text3)',whiteSpace:'nowrap'}},m.data||'—'),
           el('td',{style:{padding:'8px 10px',fontSize:'12px',fontWeight:'600',color:'var(--text)'}},m.produtoNome||'—'),
           el('td',{style:{padding:'8px 10px'}},[
             el('span',{style:{background:ts.bg,color:ts.cor,padding:'2px 8px',borderRadius:'20px',fontSize:'11px',fontWeight:'700'}},ts.lbl),
           ]),
           el('td',{style:{padding:'8px 10px',fontSize:'12px',color:'var(--text2)',textAlign:'right'}},String(m.quantidade||0)),
-          el('td',{style:{padding:'8px 10px',fontSize:'12px',color:'var(--text2)',textAlign:'right'}},fmtMoney(m.custoUnitario||0)),
-          el('td',{style:{padding:'8px 10px',fontSize:'13px',fontWeight:'700',color:ts.cor,textAlign:'right'}},fmtMoney((m.custoUnitario||0)*(m.quantidade||0))),
+          el('td',{style:{padding:'8px 10px',fontSize:'12px',color:custoZero?'var(--danger)':'var(--text2)',textAlign:'right'}},[
+            custoZero ? el('span',{title:'Custo não informado — refaça a entrada com custo correto'},'⚠️ '+fmtMoney(0)) : fmtMoney(m.custoUnitario||0),
+          ]),
+          el('td',{style:{padding:'8px 10px',fontSize:'13px',fontWeight:'700',color:custoZero?'var(--danger)':ts.cor,textAlign:'right'}},fmtMoney((m.custoUnitario||0)*(m.quantidade||0))),
           el('td',{style:{padding:'8px 10px',fontSize:'11px',color:'var(--text3)'}},m.motivo||'—'),
+          el('td',{style:{padding:'8px 6px',textAlign:'center'}},
+            el('button',{style:{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:'14px',padding:'2px 6px'},title:'Excluir movimentação',
+              onclick:function(){
+                if(!confirm('Excluir esta movimentação? O estoque será revertido.')) return;
+                var prod2 = (state.produtos||[]).find(function(p){return p.id===m.produto_id;});
+                var novosProd2 = state.produtos;
+                if(prod2){
+                  var qtdRev = m.tipo==='entrada'?-(m.quantidade||0):(m.tipo==='saida'?(m.quantidade||0):0);
+                  var novoEst = (prod2.estoqueAtual||0)+qtdRev;
+                  novosProd2 = state.produtos.map(function(p){return p.id===prod2.id?Object.assign({},p,{estoqueAtual:novoEst}):p;});
+                }
+                setState({produtos:novosProd2, movEstoque:(state.movEstoque||[]).filter(function(x){return x.id!==m.id;})});
+              }
+            },'🗑️')
+          ),
         ]);
       });
 
@@ -1109,6 +1131,7 @@ function renderEstMovs() {
         el('th',{style:{padding:'8px 10px',textAlign:'right',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Custo Unit.'),
         el('th',{style:{padding:'8px 10px',textAlign:'right',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Total'),
         el('th',{style:{padding:'8px 10px',textAlign:'left',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Motivo'),
+        el('th',{style:{padding:'8px 6px',textAlign:'center',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},''),
       ])),
       el('tbody',{},rows),
     ]));
@@ -1152,7 +1175,10 @@ function renderEstCMV() {
   }
 
   // CMV por produto no mês
-  var saidasMes = estMovs().filter(function(m){return m.tipo==='saida'&&m.data&&m.data.startsWith(anoMes);});
+  var todasMovsMes = estMovs().filter(function(m){return m.data&&m.data.startsWith(anoMes);});
+  var saidasMes   = todasMovsMes.filter(function(m){return m.tipo==='saida';});
+  var entradasMes = todasMovsMes.filter(function(m){return m.tipo==='entrada';});
+  var totalCompras = entradasMes.reduce(function(a,m){return a+(m.custoUnitario||0)*(m.quantidade||0);},0);
   var agrupProd = {};
   saidasMes.forEach(function(m){
     if(!agrupProd[m.produto_id])agrupProd[m.produto_id]={nome:m.produtoNome,total:0};
@@ -1168,9 +1194,10 @@ function renderEstCMV() {
     onchange:function(){setState({metaCmvPct:parseFloat(this.value)||32});}});
 
   var kpis = el('div',{class:'kpi-grid',style:{gridTemplateColumns:'repeat(auto-fill,minmax(155px,1fr))'}},[
-    el('div',{class:'kpi-card green'},[el('div',{class:'kpi-label'},'Receita bruta'),   el('div',{class:'kpi-value green'},fmtMoney(recBruta)),     el('div',{class:'kpi-sub'},'do período')]),
-    el('div',{class:'kpi-card red'  },[el('div',{class:'kpi-label'},'CMV (custo)'),     el('div',{class:'kpi-value',style:{color:cmvCor}},fmtMoney(cmvReal)),el('div',{class:'kpi-sub'},cmvPct.toFixed(1)+'% da receita')]),
-    el('div',{class:'kpi-card gold' },[el('div',{class:'kpi-label'},'Margem bruta'),    el('div',{class:'kpi-value',style:{color:margemBruta>=0?'var(--green)':'var(--danger)'}},fmtMoney(margemBruta)),el('div',{class:'kpi-sub'},margemPct.toFixed(1)+'%')]),
+    el('div',{class:'kpi-card blue' },[el('div',{class:'kpi-label'},'Compras (entradas)'),el('div',{class:'kpi-value blue'},fmtMoney(totalCompras)),  el('div',{class:'kpi-sub'},entradasMes.length+' movim. no mês')]),
+    el('div',{class:'kpi-card green'},[el('div',{class:'kpi-label'},'Receita bruta'),    el('div',{class:'kpi-value green'},fmtMoney(recBruta)),       el('div',{class:'kpi-sub'},'do período')]),
+    el('div',{class:'kpi-card red'  },[el('div',{class:'kpi-label'},'CMV (saídas)'),     el('div',{class:'kpi-value',style:{color:cmvCor}},fmtMoney(cmvReal)),el('div',{class:'kpi-sub'},cmvPct.toFixed(1)+'% da receita')]),
+    el('div',{class:'kpi-card gold' },[el('div',{class:'kpi-label'},'Margem bruta'),     el('div',{class:'kpi-value',style:{color:margemBruta>=0?'var(--green)':'var(--danger)'}},fmtMoney(margemBruta)),el('div',{class:'kpi-sub'},margemPct.toFixed(1)+'%')]),
   ]);
 
   // Gauge
@@ -1231,8 +1258,45 @@ function renderEstCMV() {
   ]);
 
   // Ranking por produto
+  // Compras do período (entradas) — sempre visível
+  var semCusto2 = entradasMes.some(function(m){return !(m.custoUnitario||0);});
+  var comprasEl = entradasMes.length===0 ? null : el('div',{class:'card',style:{padding:'0',overflow:'hidden',marginBottom:'14px'}},[
+    el('div',{style:{padding:'14px 16px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}},[
+      el('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--text)'}},'🛒 Compras do período — '+MESES[mes]+' '+ano),
+      el('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--blue)',background:'rgba(52,152,219,.12)',padding:'4px 12px',borderRadius:'20px'}},fmtMoney(totalCompras)),
+    ]),
+    el('div',{style:{overflowX:'auto'}},
+      el('table',{style:{width:'100%',borderCollapse:'collapse'}},[
+        el('thead',{style:{background:'var(--dark)'}},el('tr',{},[
+          el('th',{style:{padding:'8px 12px',textAlign:'left',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Data'),
+          el('th',{style:{padding:'8px 12px',textAlign:'left',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Produto'),
+          el('th',{style:{padding:'8px 12px',textAlign:'right',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Qtd'),
+          el('th',{style:{padding:'8px 12px',textAlign:'right',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Custo Unit.'),
+          el('th',{style:{padding:'8px 12px',textAlign:'right',fontSize:'11px',color:'var(--gold)',fontWeight:'700'}},'Total'),
+        ])),
+        el('tbody',{},entradasMes.map(function(m,i){
+          var semCusto = !(m.custoUnitario||0);
+          return el('tr',{style:{borderBottom:'1px solid var(--border)',background:semCusto?'rgba(192,57,43,.06)':i%2===1?'var(--bg3)':'transparent'}},[
+            el('td',{style:{padding:'8px 12px',fontSize:'12px',color:'var(--text3)'}},m.data||'—'),
+            el('td',{style:{padding:'8px 12px',fontSize:'13px',color:'var(--text)',fontWeight:'600'}},m.produtoNome||'—'),
+            el('td',{style:{padding:'8px 12px',fontSize:'12px',color:'var(--text2)',textAlign:'right'}},String(m.quantidade||0)),
+            el('td',{style:{padding:'8px 12px',fontSize:'12px',color:semCusto?'var(--danger)':'var(--text2)',textAlign:'right'}},semCusto?'⚠️ R$0,00':fmtMoney(m.custoUnitario||0)),
+            el('td',{style:{padding:'8px 12px',fontSize:'13px',fontWeight:'700',color:semCusto?'var(--danger)':'var(--blue)',textAlign:'right'}},fmtMoney((m.custoUnitario||0)*(m.quantidade||0))),
+          ]);
+        }))
+      ])
+    ),
+    semCusto2 ? el('div',{style:{padding:'10px 16px',background:'rgba(192,57,43,.10)',fontSize:'12px',color:'var(--danger)',borderTop:'1px solid rgba(192,57,43,.2)'}},
+      '⚠️ Entradas com custo R$0,00 não contribuem para o valor de estoque. Exclua e refaça a entrada informando o custo correto na aba Movimentações.'
+    ) : null,
+  ].filter(Boolean));
+
   var rankEl = rankCMV.length===0
-    ? el('div',{class:'card',style:{padding:'24px',textAlign:'center',color:'var(--text3)',fontSize:'12px'}},'Registre saídas de estoque para ver o CMV por produto.')
+    ? el('div',{class:'card',style:{padding:'24px',textAlign:'center',color:'var(--text3)',fontSize:'12px'}},[
+        el('div',{style:{fontSize:'28px',marginBottom:'8px'}},'📊'),
+        el('div',{style:{fontWeight:'700',marginBottom:'4px'}},'CMV por produto vazio'),
+        el('div',{style:{fontSize:'11px',lineHeight:'1.7'}},'O CMV é calculado pelas saídas de estoque (consumo de insumos).\nPara preencher: registre saídas manualmente na aba Movimentações\nou vincule os produtos do cardápio com seus insumos para baixa automática.'),
+      ])
     : el('div',{class:'card',style:{padding:'0',overflow:'hidden'}},[
         el('div',{style:{padding:'14px 16px',borderBottom:'1px solid var(--border)',fontSize:'13px',fontWeight:'700',color:'var(--text)'}},'🏆 CMV por produto — '+MESES[mes]),
         el('div',{style:{overflowX:'auto'}},
@@ -1266,8 +1330,8 @@ function renderEstCMV() {
     el('div',{style:{display:'flex',gap:'8px',alignItems:'center',marginBottom:'12px'}},[
       el('span',{style:{fontSize:'12px',color:'var(--text3)'}},'Período:'),selMes,selAno,
     ]),
-    kpis, gauge, histEl, rankEl,
-  ]);
+    kpis, gauge, histEl, comprasEl, rankEl,
+  ].filter(Boolean));
 }
 
 // ── TAB: CURVA ABC ────────────────────────────────────────────────────────────
@@ -1325,7 +1389,17 @@ function renderEstABC() {
   ]);
 
   var tabela = lista.length===0
-    ? el('div',{class:'card',style:{padding:'24px',textAlign:'center',color:'var(--text3)',fontSize:'12px'}},'Registre saídas de estoque para gerar a Curva ABC.')
+    ? el('div',{class:'card',style:{padding:'32px',textAlign:'center',color:'var(--text3)',fontSize:'12px'}},[
+        el('div',{style:{fontSize:'32px',marginBottom:'12px'}},'📊'),
+        el('div',{style:{fontSize:'14px',fontWeight:'700',color:'var(--text)',marginBottom:'8px'}},'Nenhuma saída registrada'),
+        el('div',{style:{lineHeight:'1.8'}},'A Curva ABC é calculada pelas saídas de estoque (consumo de insumos).'),
+        el('div',{style:{marginTop:'8px',background:'var(--bg3)',borderRadius:'8px',padding:'12px',textAlign:'left',fontSize:'11px',lineHeight:'1.9'}},[
+          el('div',{style:{fontWeight:'700',color:'var(--gold)',marginBottom:'4px'}},'Como funciona:'),
+          el('div',{},'1️⃣  Registre saídas manualmente (aba Movimentações → Tipo: Saída)'),
+          el('div',{},'2️⃣  Ou vincule os itens do cardápio com os insumos para baixa automática ao vender no PDV'),
+          el('div',{},'3️⃣  A curva ABC classificará os insumos em A (80% do custo), B (15%) e C (5%)'),
+        ]),
+      ])
     : el('div',{class:'card',style:{padding:'0',overflow:'hidden'}},
         el('div',{style:{overflowX:'auto'}},
           el('table',{style:{width:'100%',borderCollapse:'collapse'}},[

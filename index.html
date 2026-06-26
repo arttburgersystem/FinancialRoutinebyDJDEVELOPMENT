@@ -894,6 +894,7 @@ function el(tag,attrs,children){
     else if(k==='style'&&typeof attrs[k]==='object'){Object.assign(e.style,attrs[k]);}
     else if(k.startsWith('on')&&typeof attrs[k]==='function'){e[k]=attrs[k];}
     else if(k==='checked'){e.checked=!!attrs[k];}
+    else if(k==='selected'){e.selected=!!attrs[k];}
     else{try{e.setAttribute(k,attrs[k]);}catch(ex){}}
   });}
   // Spell check PT-BR em campos de texto

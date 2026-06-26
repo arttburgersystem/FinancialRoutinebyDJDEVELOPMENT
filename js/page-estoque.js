@@ -713,15 +713,16 @@ function renderMovModal() {
     [{v:'entrada',l:'📥 Entrada (compra / recebimento)'},
      {v:'saida',  l:'📤 Saída (consumo / venda / perda)'},
      {v:'ajuste', l:'🔧 Ajuste de inventário'},
-    ].map(function(x){return el('option',{value:x.v,selected:tipo===x.v},x.l);}));
+    ].map(function(x){return el('option',{value:x.v},x.l);}));
+  tipoSel.value = tipo;
 
   var prodAtual = prods.find(function(p){return p.id===m.produto_id;});
 
   var _insOpts = prods.filter(function(p){return p.tipo==='insumo';}).map(function(p){
-    return el('option',{value:p.id,selected:m.produto_id===p.id},'⚙️ '+p.nome+' ('+formatQtd(p.estoqueAtual,p.unidade)+')');
+    return el('option',{value:p.id},'⚙️ '+p.nome+' ('+formatQtd(p.estoqueAtual,p.unidade)+')');
   });
   var _prdOpts = prods.filter(function(p){return p.tipo!=='insumo';}).map(function(p){
-    return el('option',{value:p.id,selected:m.produto_id===p.id},'🍔 '+p.nome+' ('+formatQtd(p.estoqueAtual,p.unidade)+')');
+    return el('option',{value:p.id},'🍔 '+p.nome+' ('+formatQtd(p.estoqueAtual,p.unidade)+')');
   });
   var prodSel = el('select',{class:'form-input',onchange:function(){
     var selVal = this.value;
@@ -730,6 +731,7 @@ function renderMovModal() {
     setState({movModal:Object.assign({},m,{produto_id:selVal,custoUnitario:novoCusto,qtdEmb:'',unidPorEmb:''})});
   }},
     [el('option',{value:''},'— Selecione o produto / insumo —')].concat(_insOpts).concat(_prdOpts));
+  prodSel.value = m.produto_id || '';
 
   var qtdInp = el('input',{class:'form-input',type:'number',min:'0',step:'0.001',value:m.quantidade||'',
     placeholder:tipo==='ajuste'?'Novo estoque total':'Quantidade',oninput:function(){m.quantidade=parseFloat(this.value)||0;}});
@@ -743,7 +745,8 @@ function renderMovModal() {
     placeholder:'0,00',oninput:function(){m.custoUnitario=parseFloat(this.value)||0;}});
   var dataInp   = el('input',{class:'form-input',type:'date',value:m.data||today(),oninput:function(){m.data=this.value;}});
   var motivoSel = el('select',{class:'form-input',onchange:function(){m.motivo=this.value;}},
-    motivos.map(function(mt){return el('option',{value:mt,selected:m.motivo===mt},mt);}));
+    motivos.map(function(mt){return el('option',{value:mt},mt);}));
+  motivoSel.value = m.motivo || motivos[0];
   var obsInp    = el('input',{class:'form-input',value:m.obs||'',placeholder:'Observação (opcional)',oninput:function(){m.obs=this.value;}});
   var loteInp = el('input',{class:'form-input',value:m.lote||'',placeholder:'Ex: L001, 2024-01...',oninput:function(){m.lote=this.value;}});
   var vencInp = el('input',{class:'form-input',type:'date',value:m.dataVencimento||'',oninput:function(){m.dataVencimento=this.value;}});
@@ -765,11 +768,13 @@ function renderMovModal() {
     oninput:function(){m.despValor=parseFloat(this.value)||0;}});
   var despVencInp=el('input',{class:'form-input',type:'date',value:m.despVenc||m.data||today(),oninput:function(){m.despVenc=this.value;}});
   var despFormSel=el('select',{class:'form-input',onchange:function(){setState({movModal:Object.assign({},m,{despFormPgto:this.value})});}},
-    ['Boleto','PIX','Dinheiro','Cartão Débito','Cartão Crédito','Parcelado'].map(function(f){return el('option',{value:f,selected:(m.despFormPgto||'Boleto')===f},f);}));
+    ['Boleto','PIX','Dinheiro','Cartão Débito','Cartão Crédito','Parcelado'].map(function(f){return el('option',{value:f},f);}));
+  despFormSel.value = m.despFormPgto||'Boleto';
   var despParcelasInp=el('input',{class:'form-input',type:'number',min:'2',step:'1',
     value:m.despParcelas||'',placeholder:'Nº de parcelas',oninput:function(){m.despParcelas=parseInt(this.value)||2;}});
   var despBancoSel=el('select',{class:'form-input',onchange:function(){m.despBanco=this.value;}},
-    [el('option',{value:''},'— Banco / Conta —')].concat(bancos.map(function(b){return el('option',{value:b.id,selected:m.despBanco===b.id},b.nome);})));
+    [el('option',{value:''},'— Banco / Conta —')].concat(bancos.map(function(b){return el('option',{value:b.id},b.nome);})));
+  despBancoSel.value = m.despBanco||'';
   var despDescInp=el('input',{class:'form-input',value:m.despDesc||'',placeholder:'Descrição da conta (opcional)',oninput:function(){m.despDesc=this.value;}});
   var despCampos=m.gerarDespesa?el('div',{style:{background:'var(--bg3)',border:'1px solid var(--gold)',borderRadius:'8px',padding:'12px',marginTop:'10px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}},[
     el('div',{style:{gridColumn:'1/-1',fontSize:'11px',fontWeight:'700',color:'var(--gold)',marginBottom:'2px'}},'💳 Detalhes da conta a pagar'),

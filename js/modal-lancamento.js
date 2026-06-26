@@ -45,17 +45,37 @@ function renderModal(){
     var fornecedorIdInp=document.getElementById('mf-fornecedor-id');
     d.fornecedor=fornecedorInp?fornecedorInp.value.trim():'';
     d.fornecedorId=fornecedorIdInp?fornecedorIdInp.value:'';
-    if(!d.descricao||!d.valor){
-      function _fldErr(id){
-        var e2=document.getElementById('mf-'+id);if(!e2)return;
+    if(!d.descricao||!d.valor||parseFloat(d.valor)<=0){
+      function _fldErr(id, label){
+        var e2=document.getElementById('mf-'+id);
+        if(!e2)return;
+        // Borda vermelha persistente
+        e2.style.borderColor='var(--red)';
+        e2.style.boxShadow='0 0 0 3px rgba(239,68,68,.35)';
+        // Sacudida
         e2.classList.remove('_fldshake');
-        void e2.offsetWidth; // força reflow para reiniciar animação
+        void e2.offsetWidth;
         e2.classList.add('_fldshake');
-        setTimeout(function(){e2.classList.remove('_fldshake');},2000);
+        // Mensagem de erro abaixo do campo
+        var errId='_mferr_'+id;
+        var prev=document.getElementById(errId);if(prev)prev.remove();
+        var msg=document.createElement('div');
+        msg.id=errId;
+        msg.style.cssText='color:#f87171;font-size:11px;font-weight:600;margin-top:5px;display:flex;align-items:center;gap:4px;';
+        msg.innerHTML='<span style="font-size:14px;">⚠</span> '+label;
+        e2.parentNode.appendChild(msg);
+        // Remove ao digitar
+        function _limpar(){
+          e2.style.borderColor='';e2.style.boxShadow='';
+          var em=document.getElementById(errId);if(em)em.remove();
+          e2.removeEventListener('input',_limpar);e2.removeEventListener('change',_limpar);
+        }
+        e2.addEventListener('input',_limpar);
+        e2.addEventListener('change',_limpar);
       }
-      if(!d.descricao)_fldErr('descricao');
-      if(!d.valor||parseFloat(d.valor)<=0)_fldErr('valor');
-      showToast('Preencha os campos destacados em vermelho','error');
+      if(!d.descricao)_fldErr('descricao','Descrição é obrigatória');
+      if(!d.valor||parseFloat(d.valor)<=0)_fldErr('valor','Informe um valor válido');
+      showToast('Preencha os campos em vermelho','error');
       return;
     }
 

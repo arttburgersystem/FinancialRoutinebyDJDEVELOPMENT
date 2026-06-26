@@ -489,6 +489,92 @@ function renderProdutoModal() {
     return d;
   }
 
+  function buildEmbSection() {
+    if(!p.embalagens) p.embalagens={ativo:false,delivery:{ativo:false,itens:[]},salao:{ativo:false,itens:[]}};
+    var emb=p.embalagens;
+    emb.delivery=emb.delivery||{ativo:false,itens:[]};
+    emb.salao   =emb.salao   ||{ativo:false,itens:[]};
+    emb.delivery.itens=emb.delivery.itens||[];
+    emb.salao.itens   =emb.salao.itens   ||[];
+    var insumos=(state.produtos||[]).filter(function(x){return x.tipo==='insumo'&&x.profile===state.profile;});
+    function refresh(){setState({produtoModal:Object.assign({},p)});}
+
+    function buildChannel(ch,label,icon){
+      var chData=emb[ch];
+      var tog=el('div',{style:{display:'inline-flex',alignItems:'center',width:'32px',height:'18px',borderRadius:'9px',background:chData.ativo?'var(--green)':'var(--border)',padding:'2px',cursor:'pointer',transition:'background .2s',flexShrink:'0'}});
+      var thumb=el('div',{style:{width:'14px',height:'14px',borderRadius:'50%',background:'#fff',boxShadow:'0 1px 3px rgba(0,0,0,.3)',transition:'transform .2s',transform:'translateX('+(chData.ativo?'14px':'0px')+')'}});
+      tog.appendChild(thumb);
+      tog.onclick=function(){chData.ativo=!chData.ativo;refresh();};
+      var hdrRow=el('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid var(--border)'}});
+      hdrRow.appendChild(tog);
+      hdrRow.appendChild(el('span',{style:{fontWeight:'700',fontSize:'12px',color:chData.ativo?'var(--text)':'var(--text3)'}},(icon+' '+label+(chData.ativo?'',' — desativado'))));
+      var box=el('div',{style:{background:'var(--bg3)',borderRadius:'8px',padding:'10px 12px'}});
+      box.appendChild(hdrRow);
+      if(chData.ativo){
+        if(insumos.length===0){
+          box.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)',padding:'4px 0'}},'Nenhum insumo cadastrado. Crie insumos na aba Estoque.'));
+        } else {
+          chData.itens.forEach(function(item,i){
+            var insSel=el('select',{class:'form-input',style:{flex:'1',fontSize:'12px'}},
+              [el('option',{value:''},'— Insumo —')].concat(
+                insumos.map(function(ins){
+                  var o=el('option',{value:ins.id},ins.nome+(ins.unidade?' ('+ins.unidade+')':''));
+                  if(item.estoqueId===ins.id)o.selected=true;
+                  return o;
+                })
+              )
+            );
+            insSel.onchange=function(){
+              var ins=insumos.find(function(x){return x.id===insSel.value;});
+              item.estoqueId=insSel.value;
+              item.nome=ins?ins.nome:'';
+              item.unidade=ins?ins.unidade:'un';
+            };
+            var qtdInp=el('input',{class:'form-input',type:'number',min:'0.001',step:'0.001',
+              value:String(item.qtd||1),placeholder:'Qtd',style:{width:'72px',fontSize:'12px'},
+              oninput:function(){item.qtd=parseFloat(this.value)||1;}});
+            var delBtn=el('button',{style:{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:'18px',padding:'0 4px',lineHeight:'1',flexShrink:'0'}});
+            delBtn.textContent='×';
+            delBtn.onclick=function(e){e.preventDefault();chData.itens.splice(i,1);refresh();};
+            var row=el('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginBottom:'6px'}});
+            row.appendChild(insSel);row.appendChild(qtdInp);row.appendChild(delBtn);
+            box.appendChild(row);
+          });
+          var addBtn=el('button',{class:'btn-ghost',style:{fontSize:'11px',padding:'4px 10px',marginTop:'2px'}});
+          addBtn.textContent='+ Adicionar insumo';
+          addBtn.onclick=function(e){e.preventDefault();chData.itens.push({estoqueId:'',nome:'',qtd:1,unidade:'un'});refresh();};
+          box.appendChild(addBtn);
+        }
+      }
+      return box;
+    }
+
+    var masterTrack=el('div',{style:{display:'inline-flex',alignItems:'center',width:'32px',height:'18px',borderRadius:'9px',background:emb.ativo?'var(--green)':'var(--border)',padding:'2px',cursor:'pointer',transition:'background .2s',flexShrink:'0'}});
+    var masterThumb=el('div',{style:{width:'14px',height:'14px',borderRadius:'50%',background:'#fff',boxShadow:'0 1px 3px rgba(0,0,0,.3)',transition:'transform .2s',transform:'translateX('+(emb.ativo?'14px':'0px')+')'}});
+    masterTrack.appendChild(masterThumb);
+    masterTrack.onclick=function(){emb.ativo=!emb.ativo;refresh();};
+    var masterRow=el('div',{style:{display:'flex',alignItems:'center',gap:'10px',marginBottom:emb.ativo?'12px':'0'}});
+    masterRow.appendChild(masterTrack);
+    masterRow.appendChild(el('span',{style:{fontSize:'13px',fontWeight:'600'}},'Saídas automáticas de embalagem'));
+    masterRow.appendChild(el('span',{style:{fontSize:'11px',color:'var(--text3)'}},'(baixa de insumos ao registrar venda)'));
+
+    var wrap=el('div',{});
+    wrap.appendChild(secHead('📦','Embalagens / Saídas automáticas'));
+    wrap.appendChild(masterRow);
+    if(emb.ativo){
+      var grid=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginTop:'12px'}});
+      var delCol=el('div',{});
+      delCol.appendChild(el('div',{style:{fontWeight:'700',fontSize:'11px',textTransform:'uppercase',letterSpacing:'.5px',color:'var(--text3)',marginBottom:'8px'}},'🛵 Delivery'));
+      delCol.appendChild(buildChannel('delivery','DELIVERY','🛵'));
+      var salCol=el('div',{});
+      salCol.appendChild(el('div',{style:{fontWeight:'700',fontSize:'11px',textTransform:'uppercase',letterSpacing:'.5px',color:'var(--text3)',marginBottom:'8px'}},'🍽️ Salão'));
+      salCol.appendChild(buildChannel('salao','SALÃO','🍽️'));
+      grid.appendChild(delCol);grid.appendChild(salCol);
+      wrap.appendChild(grid);
+    }
+    return wrap;
+  }
+
   function salvar() {
     if (!p.tipo) { errEl.textContent='⚠️ Selecione o tipo: Produto ou Insumo.'; return; }
     if (!(p.nome||'').trim()) { errEl.textContent='Informe o nome.'; return; }
@@ -518,6 +604,7 @@ function renderProdutoModal() {
       aliqPis:p.aliqPis||0, aliqCofins:p.aliqCofins||0,
       unidTrib:p.unidTrib||'',
       ativo:true, criadoEm:p.criadoEm||today(),
+      embalagens: p.embalagens||null,
     };
     var novos = isEdit
       ? state.produtos.map(function(x){return x.id===prod.id?prod:x;})
@@ -574,6 +661,9 @@ function renderProdutoModal() {
             el('div',{style:{gridColumn:'1/-1'}},fld('URL da imagem (opcional)',imgInp)),
           ]),
         ]) : null,
+
+        // EMBALAGENS (só produto)
+        p.tipo==='produto' ? buildEmbSection() : null,
 
         // FISCAL
         secHead('🧾','Informações Fiscais'),

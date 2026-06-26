@@ -14,6 +14,7 @@ function renderCardapio() {
   var setores = (state.setoresImpressao||[]).filter(function(s){return s.profile===perfil;});
   var isComp  = _crdTab === 'complementos';
   var isCats  = _crdTab === 'categorias';
+  var isEmb   = _crdTab === 'embalagens';
 
   var todosProd = (state.produtos||[]).filter(function(p){
     return p.profile===perfil && p.tipo==='produto';
@@ -21,13 +22,13 @@ function renderCardapio() {
   var todosComp = (state.complementos||[]).filter(function(c){
     return c.profile===perfil;
   });
-  var todos = isCats ? [] : isComp ? todosComp : todosProd;
+  var todos = (isCats||isEmb) ? [] : isComp ? todosComp : todosProd;
 
   var visivel = todos.filter(function(p){
     var q = _crdBusca.toLowerCase();
     if (q && !(p.nome||'').toLowerCase().includes(q) && !(p.codigo||'').toLowerCase().includes(q)) return false;
-    if (!isComp && !isCats && _crdCatFlt && p.categoria !== _crdCatFlt) return false;
-    if (!isComp && !isCats && _crdSetFlt && p.setorImpressao !== _crdSetFlt) return false;
+    if (!isComp && !isCats && !isEmb && _crdCatFlt && p.categoria !== _crdCatFlt) return false;
+    if (!isComp && !isCats && !isEmb && _crdSetFlt && p.setorImpressao !== _crdSetFlt) return false;
     if (_crdStsFlt==='ativo'   && p.disponivel===false) return false;
     if (_crdStsFlt==='inativo' && p.disponivel!==false) return false;
     return true;
@@ -293,6 +294,12 @@ function renderCardapio() {
     ncBtn.textContent='+ Nova categoria';
     ncBtn.onclick=function(){_crdCatModal={nome:'',imagem:''};setState({});};
     tabBarRight.appendChild(ncBtn);
+  } else if (isEmb) {
+    tabBarRight = el('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 12px'}});
+    var embInfoEl=el('span',{style:{fontSize:'11px',color:'var(--text3)'}});
+    var embCount=todosProd.filter(function(p){return p.embalagens&&p.embalagens.ativo;}).length;
+    embInfoEl.textContent=embCount+' produto(s) configurado(s)';
+    tabBarRight.appendChild(embInfoEl);
   } else {
     tabBarRight = el('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 12px'}});
     var addBtn=el('button',{class:'btn-primary',style:{fontSize:'12px',padding:'7px 14px',whiteSpace:'nowrap'}});
@@ -309,9 +316,100 @@ function renderCardapio() {
       tabBtn('produtos','Produtos'),
       tabBtn('complementos','Montagens'),
       tabBtn('categorias','🏷️ Categorias'),
+      tabBtn('embalagens','📦 Embalagens'),
     ]),
     tabBarRight,
   ]);
+
+  // ── ABA EMBALAGENS ───────────────────────────────────────────────────────────
+  function renderEmbalagemTab() {
+    var prods = todosProd.filter(function(p){
+      if(_crdBusca) return (p.nome||'').toLowerCase().includes(_crdBusca.toLowerCase());
+      return true;
+    });
+    var insumos=(state.produtos||[]).filter(function(x){return x.tipo==='insumo'&&x.profile===perfil;});
+
+    function renderChannelColumn(ch, label, icon, cor) {
+      var prodsConf=prods.filter(function(p){
+        return p.embalagens&&p.embalagens.ativo&&p.embalagens[ch]&&p.embalagens[ch].ativo;
+      });
+
+      var cards=prodsConf.map(function(p){
+        var itens=(p.embalagens[ch].itens||[]).filter(function(i){return i.nome||i.estoqueId;});
+        var itemEls=itens.map(function(item){
+          var ins=insumos.find(function(x){return x.id===item.estoqueId;});
+          var nome=ins?ins.nome:(item.nome||'—');
+          var unid=ins?ins.unidade:(item.unidade||'un');
+          var row=el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid var(--border)',fontSize:'12px',color:'var(--text2)'}});
+          row.appendChild(el('span',{},nome));
+          var badge=el('span',{style:{fontWeight:'700',color:cor,background:'rgba(0,0,0,.06)',padding:'2px 8px',borderRadius:'10px',fontSize:'11px'}});
+          badge.textContent='× '+item.qtd+' '+unid;
+          row.appendChild(badge);
+          return row;
+        });
+        if(!itemEls.length){
+          itemEls=[el('div',{style:{fontSize:'11px',color:'var(--text3)',padding:'4px 0'}},'Nenhum insumo configurado.')];
+        }
+        var configBtn=el('button',{style:{fontSize:'11px',padding:'4px 10px',background:'none',border:'1px solid var(--border)',borderRadius:'5px',cursor:'pointer',color:'var(--text3)',marginTop:'8px'}});
+        configBtn.textContent='✏️ Editar produto';
+        configBtn.onclick=function(){setState({produtoModal:Object.assign({},p)});};
+
+        var card=el('div',{style:{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'8px',padding:'12px',marginBottom:'10px'}});
+        card.appendChild(el('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'8px',color:'var(--text)'}},p.nome));
+        itemEls.forEach(function(r){card.appendChild(r);});
+        card.appendChild(configBtn);
+        return card;
+      });
+
+      // Produtos sem config para este canal
+      var semConf=prods.filter(function(p){
+        return !(p.embalagens&&p.embalagens.ativo&&p.embalagens[ch]&&p.embalagens[ch].ativo);
+      });
+      var semConfRows=semConf.map(function(p){
+        var row=el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'12px',color:'var(--text3)'}});
+        row.appendChild(el('span',{},p.nome));
+        var cfg=el('button',{style:{fontSize:'11px',padding:'3px 8px',background:'none',border:'1px solid var(--border)',borderRadius:'4px',cursor:'pointer',color:'var(--text3)'}});
+        cfg.textContent='+ Configurar';
+        cfg.onclick=function(){setState({produtoModal:Object.assign({},p)});};
+        row.appendChild(cfg);
+        return row;
+      });
+
+      var col=el('div',{style:{flex:'1',minWidth:'0'}});
+      var hdr=el('div',{style:{display:'flex',alignItems:'center',gap:'10px',padding:'14px 16px',background:cor,borderRadius:'8px 8px 0 0'}});
+      hdr.appendChild(el('span',{style:{fontSize:'20px'}},icon));
+      hdr.appendChild(el('span',{style:{fontWeight:'700',fontSize:'14px',color:'#fff'}},label));
+      hdr.appendChild(el('span',{style:{fontSize:'11px',color:'rgba(255,255,255,.8)',marginLeft:'auto'}},(prodsConf.length)+' configurado(s)'));
+      col.appendChild(hdr);
+
+      var body=el('div',{style:{border:'1px solid var(--border)',borderTop:'none',borderRadius:'0 0 8px 8px',overflow:'hidden'}});
+      if(prodsConf.length>0){
+        var confArea=el('div',{style:{padding:'14px',background:'var(--bg2)'}});
+        cards.forEach(function(c){confArea.appendChild(c);});
+        body.appendChild(confArea);
+      }
+      if(semConf.length>0){
+        var semHdr=el('div',{style:{padding:'8px 10px',fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'.5px',color:'var(--text3)',background:'var(--bg3)',borderTop:prodsConf.length?'1px solid var(--border)':'none'}});
+        semHdr.textContent='Sem embalagem '+(label)+' configurada';
+        body.appendChild(semHdr);
+        semConfRows.forEach(function(r){body.appendChild(r);});
+      }
+      if(!prodsConf.length&&!semConf.length){
+        body.appendChild(el('div',{style:{padding:'40px',textAlign:'center',color:'var(--text3)',fontSize:'13px'}},'Nenhum produto. Use a busca acima ou cadastre produtos.'));
+      }
+      col.appendChild(body);
+      return col;
+    }
+
+    var infoBar=el('div',{style:{padding:'10px 16px',borderBottom:'1px solid var(--border)',background:'var(--bg3)',fontSize:'12px',color:'var(--text3)'}});
+    infoBar.textContent='Configure quais insumos de embalagem são baixados automaticamente do estoque ao registrar uma venda. Edite cada produto para ativar.';
+
+    var cols=el('div',{style:{display:'flex',gap:'16px',padding:'16px'}});
+    cols.appendChild(renderChannelColumn('delivery','DELIVERY','🛵','#ea580c'));
+    cols.appendChild(renderChannelColumn('salao','SALÃO','🍽️','#0284c7'));
+
+    return el('div',{},[infoBar,cols]);
+  }
 
   // ── ABA CATEGORIAS ────────────────────────────────────────────────────────────
   function renderCategoriasTab() {
@@ -479,16 +577,16 @@ function renderCardapio() {
   var stsOpts=[{v:'ativo',l:'✅ Ativo'},{v:'inativo',l:'❌ Inativo'}];
 
   var toolbarChildren=[searchWrap];
-  if(!isComp&&!isCats){
+  if(!isComp&&!isCats&&!isEmb){
     toolbarChildren.push(filterDrop('cat','por categoria',_crdCatFlt,catOpts,function(v){_crdCatFlt=v;},function(){_crdCatFlt='';}));
     toolbarChildren.push(filterDrop('set','por setor de impressão',_crdSetFlt,setOpts,function(v){_crdSetFlt=v;},function(){_crdSetFlt='';}));
   }
-  if(!isCats){
+  if(!isCats&&!isEmb){
     toolbarChildren.push(filterDrop('sts','por status',_crdStsFlt,stsOpts,function(v){_crdStsFlt=v;},function(){_crdStsFlt='';}));
     toolbarChildren.push(acoesBtn());
   }
   toolbarChildren.push(el('div',{style:{flex:'1'}}));
-  if(!isCats){
+  if(!isCats&&!isEmb){
     var menuBtn=el('button',{title:'Ir para Setores de Impressão'});
     menuBtn.style.cssText='padding:7px 11px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);font-size:16px;cursor:pointer;line-height:1;';
     menuBtn.textContent='≡';
@@ -628,12 +726,14 @@ function renderCardapio() {
       el('p',{class:'page-sub'},
         isCats
           ?((state.estCategorias||[]).length+' categorias — organizam Produtos e Montagens')
+          :isEmb
+          ?'Configure quais insumos são baixados no estoque conforme canal de venda (Delivery / Salão)'
           :'Gerencie produtos e montagens — '+todos.length+' item(s) cadastrado(s)'),
     ]),
     el('div',{style:{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'10px',overflow:'visible'}},[
       tabBar,
       toolbar,
-      isCats ? renderCategoriasTab() : renderTabela(),
+      isCats ? renderCategoriasTab() : isEmb ? renderEmbalagemTab() : renderTabela(),
     ]),
   ]);
 

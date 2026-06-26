@@ -717,21 +717,19 @@ function renderMovModal() {
 
   var prodAtual = prods.find(function(p){return p.id===m.produto_id;});
 
-  var prodSel = document.createElement('select');
-  prodSel.className = 'form-input';
-  prodSel.onchange = function(){
+  var _insOpts = prods.filter(function(p){return p.tipo==='insumo';}).map(function(p){
+    return el('option',{value:p.id,selected:m.produto_id===p.id},'⚙️ '+p.nome+' ('+formatQtd(p.estoqueAtual,p.unidade)+')');
+  });
+  var _prdOpts = prods.filter(function(p){return p.tipo!=='insumo';}).map(function(p){
+    return el('option',{value:p.id,selected:m.produto_id===p.id},'🍔 '+p.nome+' ('+formatQtd(p.estoqueAtual,p.unidade)+')');
+  });
+  var prodSel = el('select',{class:'form-input',onchange:function(){
     var selVal = this.value;
     var prd = prods.find(function(p){return p.id===selVal;});
     var novoCusto = (prd && tipo!=='saida') ? (prd.custoMedio||0) : m.custoUnitario;
     setState({movModal:Object.assign({},m,{produto_id:selVal,custoUnitario:novoCusto,qtdEmb:'',unidPorEmb:''})});
-  };
-  (function(){
-    var defOpt=document.createElement('option');defOpt.value='';defOpt.textContent='— Selecione o produto / insumo —';prodSel.appendChild(defOpt);
-    var ins=prods.filter(function(p){return p.tipo==='insumo';});
-    var prs=prods.filter(function(p){return p.tipo!=='insumo';});
-    if(ins.length){var gi=document.createElement('optgroup');gi.label='⚙️ Insumos (matéria-prima)';ins.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=p.nome+' ('+formatQtd(p.estoqueAtual,p.unidade)+')';if(m.produto_id===p.id)o.selected=true;gi.appendChild(o);});prodSel.appendChild(gi);}
-    if(prs.length){var gp=document.createElement('optgroup');gp.label='🍔 Produtos';prs.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=p.nome+' ('+formatQtd(p.estoqueAtual,p.unidade)+')';if(m.produto_id===p.id)o.selected=true;gp.appendChild(o);});prodSel.appendChild(gp);}
-  })();
+  }},
+    [el('option',{value:''},'— Selecione o produto / insumo —')].concat(_insOpts).concat(_prdOpts));
 
   var qtdInp = el('input',{class:'form-input',type:'number',min:'0',step:'0.001',value:m.quantidade||'',
     placeholder:tipo==='ajuste'?'Novo estoque total':'Quantidade',oninput:function(){m.quantidade=parseFloat(this.value)||0;}});

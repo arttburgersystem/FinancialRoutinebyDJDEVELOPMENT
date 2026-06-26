@@ -1455,6 +1455,293 @@ function _lotesVencendoEmBreve() {
   return result.sort(function(a,b){return a.diff-b.diff;});
 }
 
+// ── MODAL: ENTRADA POR NOTA FISCAL ───────────────────────────────────────────
+
+function renderNFModal() {
+  var m = state.nfModal;
+  if (!m) return null;
+  var prods = estProdutos();
+
+  function totalItem(it) { return (parseFloat(it.quantidade)||0) * (parseFloat(it.custoUnit)||0); }
+  function totalNF()     { return (m.itens||[]).reduce(function(a,it){return a+totalItem(it);},0); }
+
+  function addItem() {
+    m.itens.push({_id:uid(), produto_id:'', quantidade:'', qtdEmb:'', unidPorEmb:'', custoUnit:''});
+    setState({nfModal:m});
+  }
+  function removeItem(idx) {
+    m.itens.splice(idx,1);
+    setState({nfModal:m});
+  }
+  function selectProd(idx, pid) {
+    var prd = prods.find(function(p){return p.id===pid;});
+    m.itens[idx].produto_id = pid;
+    m.itens[idx].custoUnit  = prd ? (prd.custoMedio||(prd.precoEmbalagem||0)) : '';
+    if (prd && prd.qtdPorEmbalagem>0) m.itens[idx].unidPorEmb = prd.qtdPorEmbalagem;
+    setState({nfModal:m});
+  }
+
+  // Render each item row
+  function renderItem(it, idx) {
+    var prd = prods.find(function(p){return p.id===it.produto_id;});
+
+    // produto selector
+    var prodSel = el('select',{class:'form-input',style:{fontSize:'12px'},onchange:function(){selectProd(idx,this.value);}},
+      [el('option',{value:''},'— Insumo —')]
+      .concat(prods.map(function(p){return el('option',{value:p.id},p.nome+(p.unidade?' ('+p.unidade+')':'')); }))
+    );
+    prodSel.value = it.produto_id||'';
+
+    var unid = prd ? (prd.unidade||'un') : 'un';
+
+    // Qtd embalagem
+    var qtdEmbInp = el('input',{type:'number',class:'form-input',style:{fontSize:'12px',width:'72px'},
+      min:'0',step:'1',value:it.qtdEmb||'',placeholder:'Nº emb',
+      oninput:function(){
+        it.qtdEmb = parseFloat(this.value)||0;
+        var u = parseFloat(it.unidPorEmb)||0;
+        if(it.qtdEmb>0 && u>0){it.quantidade=it.qtdEmb*u; qtdInp.value=it.quantidade;}
+        rowTotalEl.textContent = fmtMoney(totalItem(it));
+        grandTotalEl.textContent = fmtMoney(totalNF());
+      }});
+
+    var unidPorEmbInp = el('input',{type:'number',class:'form-input',style:{fontSize:'12px',width:'72px'},
+      min:'0',step:'0.001',value:it.unidPorEmb||'',placeholder:'Un/emb',
+      oninput:function(){
+        it.unidPorEmb = parseFloat(this.value)||0;
+        if((parseFloat(it.qtdEmb)||0)>0 && it.unidPorEmb>0){it.quantidade=it.qtdEmb*it.unidPorEmb; qtdInp.value=it.quantidade;}
+        rowTotalEl.textContent = fmtMoney(totalItem(it));
+        grandTotalEl.textContent = fmtMoney(totalNF());
+      }});
+
+    var qtdInp = el('input',{type:'number',class:'form-input',style:{fontSize:'12px',width:'80px'},
+      min:'0',step:'0.001',value:it.quantidade||'',placeholder:'Qtd '+unid,
+      oninput:function(){it.quantidade=parseFloat(this.value)||0; rowTotalEl.textContent=fmtMoney(totalItem(it)); grandTotalEl.textContent=fmtMoney(totalNF());}});
+
+    var custoInp = el('input',{type:'number',class:'form-input',style:{fontSize:'12px',width:'90px'},
+      min:'0',step:'0.0001',value:it.custoUnit||'',placeholder:'R$/'+unid,
+      oninput:function(){it.custoUnit=parseFloat(this.value)||0; rowTotalEl.textContent=fmtMoney(totalItem(it)); grandTotalEl.textContent=fmtMoney(totalNF());}});
+
+    var rowTotalEl = el('span',{style:{fontWeight:'700',color:'var(--blue)',minWidth:'90px',textAlign:'right',fontSize:'13px'}},fmtMoney(totalItem(it)));
+
+    var removeBtn = el('button',{type:'button',style:{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',padding:'4px 8px',fontSize:'16px'},
+      onclick:function(){removeItem(idx);}}, '🗑️');
+
+    return el('div',{style:{
+      display:'grid',
+      gridTemplateColumns:'minmax(150px,1fr) 70px 70px 80px 90px 90px 32px',
+      gap:'6px',alignItems:'center',
+      padding:'8px 0',
+      borderBottom:'1px solid var(--border)',
+    }},[
+      prodSel,
+      qtdEmbInp,
+      unidPorEmbInp,
+      qtdInp,
+      custoInp,
+      rowTotalEl,
+      removeBtn,
+    ]);
+  }
+
+  // Grand total element (shared ref for live update)
+  var grandTotalEl = el('span',{style:{fontWeight:'800',color:'var(--gold)',fontSize:'18px'}},fmtMoney(totalNF()));
+
+  // Conta a pagar section
+  var despVencInp = el('input',{type:'date',class:'form-input',value:m.despVenc||today(),oninput:function(){m.despVenc=this.value;}});
+  var despFormSel = el('select',{class:'form-input',onchange:function(){setState({nfModal:Object.assign({},m,{despFormPgto:this.value})});}},
+    ['Boleto','PIX','Transferência','Cartão','Dinheiro','Parcelado'].map(function(f){return el('option',{value:f},f);}));
+  despFormSel.value = m.despFormPgto||'Boleto';
+
+  var despParcInp = el('input',{type:'number',class:'form-input',min:'2',max:'24',step:'1',
+    value:m.despParcelas||2,oninput:function(){m.despParcelas=parseInt(this.value)||2;}});
+
+  var fornecedores = (state.fornecedores||[]).filter(function(f){return f.profile===state.profile;});
+
+  var despCampos = m.gerarDespesa ? el('div',{style:{
+    marginTop:'12px',padding:'14px',background:'var(--bg3)',
+    border:'1px solid var(--gold)',borderRadius:'8px',
+    display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',
+  }},[
+    el('div',{},[el('label',{class:'form-label'},'Vencimento'),despVencInp]),
+    el('div',{},[el('label',{class:'form-label'},'Forma de pagamento'),despFormSel]),
+    m.despFormPgto==='Parcelado' ? el('div',{},[el('label',{class:'form-label'},'Nº de parcelas'),despParcInp]) : null,
+    el('div',{style:{gridColumn:'1/-1'}},[
+      el('label',{class:'form-label'},'Banco / Conta'),
+      el('input',{type:'text',class:'form-input',value:m.despBanco||'',placeholder:'Ex: Bradesco conta PJ',
+        oninput:function(){m.despBanco=this.value;}}),
+    ]),
+  ].filter(Boolean)) : null;
+
+  var cbGerarDesp = el('input',{type:'checkbox',id:'_nfgerardesp',style:{marginRight:'6px'}});
+  cbGerarDesp.checked = !!m.gerarDespesa;
+  cbGerarDesp.onchange = function(){ setState({nfModal:Object.assign({},m,{gerarDespesa:this.checked})}); };
+
+  function salvarNF() {
+    if (!m.fornecedor) { alert('Informe o fornecedor.'); return; }
+    var itens = (m.itens||[]).filter(function(it){return it.produto_id && (parseFloat(it.quantidade)||0)>0;});
+    if (!itens.length) { alert('Adicione pelo menos um item com produto e quantidade.'); return; }
+
+    var novosProd  = (state.produtos||[]).slice();
+    var novosMovs  = (state.movEstoque||[]).slice();
+    var novasContas = (state.contas||[]).slice();
+    var nfTotal    = 0;
+
+    itens.forEach(function(it){
+      var qtd    = parseFloat(it.quantidade)||0;
+      var custo  = parseFloat(it.custoUnit)||0;
+      nfTotal   += qtd * custo;
+      var prodIdx = novosProd.findIndex(function(p){return p.id===it.produto_id;});
+      if (prodIdx<0) return;
+      var prod   = novosProd[prodIdx];
+      var novoCusto = calcCustoMedioNovo(prod.estoqueAtual||0, prod.custoMedio||0, qtd, custo);
+      novosProd[prodIdx] = Object.assign({},prod,{estoqueAtual:(prod.estoqueAtual||0)+qtd, custoMedio:novoCusto});
+      novosMovs.push({
+        id:uid(), profile:state.profile,
+        produto_id:it.produto_id, produtoNome:prod.nome,
+        tipo:'entrada', motivo:'Nota Fiscal',
+        data:m.dataEntrada||today(),
+        quantidade:qtd, custoUnitario:custo,
+        nfNumero:m.numero||'', nfFornecedor:m.fornecedor,
+        obs:'NF '+(m.numero||'')+'  '+m.fornecedor,
+      });
+    });
+
+    if (m.gerarDespesa && nfTotal>0) {
+      var fpg   = m.despFormPgto||'Boleto';
+      var nParc = fpg==='Parcelado' ? (parseInt(m.despParcelas)||2) : 1;
+      var vlParc = nfTotal/nParc;
+      for (var pi=0;pi<nParc;pi++) {
+        var vd = new Date((m.despVenc||today())+'T12:00:00');
+        vd.setMonth(vd.getMonth()+pi);
+        var vdStr = vd.getFullYear()+'-'+String(vd.getMonth()+1).padStart(2,'0')+'-'+String(vd.getDate()).padStart(2,'0');
+        novasContas.push({
+          id:uid(), profile:state.profile,
+          tipo:'despesa', categoria:'Estoque / Insumos',
+          descricao:'NF '+(m.numero?m.numero+' — ':'')+m.fornecedor+(nParc>1?' ('+(pi+1)+'/'+nParc+')':''),
+          valor:vlParc, vencimento:vdStr,
+          formaPgto:fpg, banco:m.despBanco||'',
+          status:'pendente', pago:false, data:today(),
+        });
+      }
+    }
+
+    var nfRecord = {
+      id:uid(), profile:state.profile,
+      numero:m.numero||'', fornecedor:m.fornecedor, cnpj:m.cnpj||'',
+      dataEmissao:m.dataEmissao||today(), dataEntrada:m.dataEntrada||today(),
+      itens:itens, total:nfTotal, data:today(),
+    };
+    setState({produtos:novosProd, movEstoque:novosMovs, contas:novasContas,
+      notasFiscais:(state.notasFiscais||[]).concat([nfRecord]), nfModal:null});
+  }
+
+  var modalEl = el('div',{class:'modal-overlay',onclick:function(e){if(e.target===this)setState({nfModal:null});}},[
+    el('div',{class:'modal-box',style:{maxWidth:'820px',width:'96vw',maxHeight:'92vh',overflow:'auto'}},[
+
+      // Cabeçalho
+      el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px'}},[
+        el('div',{},[
+          el('h3',{style:{margin:'0',fontSize:'18px',color:'var(--text)'}},'📄 Entrada por Nota Fiscal'),
+          el('div',{style:{fontSize:'12px',color:'var(--text3)',marginTop:'3px'}},'Todos os itens entram no estoque e atualizam o custo médio ponderado'),
+        ]),
+        el('button',{class:'btn-ghost',style:{padding:'4px 10px'},onclick:function(){setState({nfModal:null});}},'✕'),
+      ]),
+
+      // Dados da NF
+      el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'10px',marginBottom:'18px',
+        background:'var(--bg3)',padding:'14px',borderRadius:'8px',border:'1px solid var(--border)'}},[
+        el('div',{},[
+          el('label',{class:'form-label'},'Fornecedor *'),
+          el('input',{type:'text',class:'form-input',value:m.fornecedor||'',placeholder:'Nome do fornecedor',
+            list:'_nf_forn_list',
+            oninput:function(){m.fornecedor=this.value;}}),
+          el('datalist',{id:'_nf_forn_list'},
+            fornecedores.map(function(f){return el('option',{value:f.nome||f.razaoSocial||''});})),
+        ]),
+        el('div',{},[
+          el('label',{class:'form-label'},'Nº da NF'),
+          el('input',{type:'text',class:'form-input',value:m.numero||'',placeholder:'Ex: 000123',
+            oninput:function(){m.numero=this.value;}}),
+        ]),
+        el('div',{},[
+          el('label',{class:'form-label'},'CNPJ do fornecedor'),
+          el('input',{type:'text',class:'form-input',value:m.cnpj||'',placeholder:'00.000.000/0001-00',
+            oninput:function(){m.cnpj=this.value;}}),
+        ]),
+        el('div',{},[
+          el('label',{class:'form-label'},'Data de emissão'),
+          el('input',{type:'date',class:'form-input',value:m.dataEmissao||today(),
+            oninput:function(){m.dataEmissao=this.value;}}),
+        ]),
+        el('div',{},[
+          el('label',{class:'form-label'},'Data de entrada'),
+          el('input',{type:'date',class:'form-input',value:m.dataEntrada||today(),
+            oninput:function(){m.dataEntrada=this.value;}}),
+        ]),
+        el('div',{},[
+          el('label',{class:'form-label'},'Chave de acesso (NF-e)'),
+          el('input',{type:'text',class:'form-input',value:m.chaveAcesso||'',placeholder:'44 dígitos (opcional)',
+            oninput:function(){m.chaveAcesso=this.value;}}),
+        ]),
+      ]),
+
+      // Header da tabela de itens
+      el('div',{style:{display:'grid',
+        gridTemplateColumns:'minmax(150px,1fr) 70px 70px 80px 90px 90px 32px',
+        gap:'6px',padding:'6px 0',borderBottom:'2px solid var(--border)',
+        fontSize:'11px',fontWeight:'700',color:'var(--gold)',letterSpacing:'.5px',marginBottom:'4px'}},[
+        el('span',{},'PRODUTO / INSUMO'),
+        el('span',{},'Nº EMB'),
+        el('span',{},'UN/EMB'),
+        el('span',{},'QUANTIDADE'),
+        el('span',{},'CUSTO UNIT.'),
+        el('span',{style:{textAlign:'right'}},'TOTAL'),
+        el('span',{},''),
+      ]),
+
+      // Itens
+      el('div',{id:'_nf_itens'},
+        (m.itens||[]).map(function(it,idx){ return renderItem(it,idx); })
+      ),
+
+      // Botão adicionar item
+      el('div',{style:{marginTop:'10px'}},[
+        el('button',{type:'button',class:'btn-ghost',style:{fontSize:'13px',padding:'7px 14px'},
+          onclick:addItem},'+ Adicionar item'),
+      ]),
+
+      // Total da NF
+      el('div',{style:{
+        display:'flex',justifyContent:'flex-end',alignItems:'center',gap:'12px',
+        margin:'16px 0',padding:'14px 16px',
+        background:'var(--bg3)',borderRadius:'8px',border:'1px solid var(--border)',
+      }},[
+        el('span',{style:{fontSize:'14px',color:'var(--text3)'}},'Total da NF:'),
+        grandTotalEl,
+      ]),
+
+      // Gerar conta a pagar
+      el('div',{style:{marginBottom:'14px'}},[
+        el('label',{style:{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'13px',color:'var(--text)'}},[
+          cbGerarDesp,
+          el('span',{},'Gerar conta a pagar vinculada a esta NF'),
+        ]),
+        despCampos,
+      ]),
+
+      // Ações
+      el('div',{style:{display:'flex',gap:'10px',justifyContent:'flex-end',paddingTop:'14px',borderTop:'1px solid var(--border)'}},[
+        el('button',{class:'btn-ghost',onclick:function(){setState({nfModal:null});}}, 'Cancelar'),
+        el('button',{class:'btn-primary',style:{padding:'10px 28px'},onclick:salvarNF},'✅ Registrar NF no Estoque'),
+      ]),
+
+    ]),
+  ]);
+
+  return modalEl;
+}
+
 // ── RENDER PRINCIPAL ──────────────────────────────────────────────────────────
 
 function renderEstoque() {
@@ -1490,14 +1777,25 @@ function renderEstoque() {
     })
   );
 
+  function _abrirNF() {
+    setState({nfModal:{
+      numero:'', fornecedor:'', cnpj:'', chaveAcesso:'',
+      dataEmissao:today(), dataEntrada:today(),
+      itens:[{_id:uid(), produto_id:'', quantidade:'', qtdEmb:'', unidPorEmb:'', custoUnit:''}],
+      gerarDespesa:false, despVenc:today(), despFormPgto:'Boleto', despParcelas:2, despBanco:'',
+    }});
+  }
+
   var acoes = [];
   if (tab==='produtos') {
     acoes.push(btn('btn-ghost','🔧 Ajuste',function(){setState({movModal:{tipo:'ajuste',data:today()}});}));
-    acoes.push(btn('btn-secondary','📥 Entrada',function(){setState({movModal:{tipo:'entrada',data:today()}});}));
+    acoes.push(btn('btn-ghost','📥 Entrada avulsa',function(){setState({movModal:{tipo:'entrada',data:today()}});}));
+    acoes.push(btn('btn-secondary','📄 Nota Fiscal',_abrirNF));
     acoes.push(btn('btn-primary','+ Cadastrar Insumo',function(){setState({produtoModal:{tipo:'insumo'}});}));
   }
   if (tab==='movs') {
-    acoes.push(btn('btn-secondary','📥 Entrada',function(){setState({movModal:{tipo:'entrada',data:today()}});}));
+    acoes.push(btn('btn-ghost','📥 Entrada avulsa',function(){setState({movModal:{tipo:'entrada',data:today()}});}));
+    acoes.push(btn('btn-secondary','📄 Nota Fiscal',_abrirNF));
     acoes.push(btn('btn-ghost','📤 Saída',function(){setState({movModal:{tipo:'saida',data:today()}});}));
   }
 
@@ -1538,6 +1836,7 @@ function renderEstoque() {
     content,
     state.produtoModal!==null ? renderProdutoModal() : null,
     state.movModal!==null     ? renderMovModal()     : null,
+    state.nfModal!==null      ? renderNFModal()      : null,
     state.estCatManager  ? renderEstCatManager()  : null,
     state.estUnidManager ? renderEstUnidManager() : null,
   ].filter(Boolean));

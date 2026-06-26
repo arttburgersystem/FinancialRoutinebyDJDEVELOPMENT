@@ -409,8 +409,20 @@ function renderProdutoModal() {
   ]);
 
   // ── CAMPOS BÁSICOS ─────────────────────────────────────────────────────────
-  var nomeInp  = el('input',{class:'form-input',value:p.nome||'',placeholder:'Ex: X-Burguer, Bacon, Pão brioche...',oninput:function(){p.nome=this.value;}});
-  var custoInp = el('input',{class:'form-input',type:'number',min:'0',step:'0.01',value:p.custoMedio||'',placeholder:'0,00',oninput:function(){p.custoMedio=parseFloat(this.value)||0;}});
+  var nomeInp  = el('input',{class:'form-input',value:p.nome||'',placeholder:'Ex: Carne, Bacon, Pão brioche...',oninput:function(){p.nome=this.value;}});
+  var custoInp = el('input',{class:'form-input',type:'number',min:'0',step:'0.0001',value:p.custoMedio||'',placeholder:'0,0000',oninput:function(){p.custoMedio=parseFloat(this.value)||0;}});
+
+  function _recalcCustoEmb(){
+    var qtd=p.qtdPorEmbalagem||0; var preco=p.precoEmbalagem||0;
+    if(qtd>0&&preco>0){p.custoMedio=Math.round(preco/qtd*10000)/10000;custoInp.value=String(p.custoMedio);}
+  }
+  var qtdPorEmbInp=el('input',{class:'form-input',type:'number',min:'1',step:'0.001',
+    value:p.qtdPorEmbalagem||'',placeholder:'Ex: 36',
+    oninput:function(){p.qtdPorEmbalagem=parseFloat(this.value)||0;_recalcCustoEmb();}});
+  var precoEmbInp=el('input',{class:'form-input',type:'number',min:'0',step:'0.01',
+    value:p.precoEmbalagem||'',placeholder:'R$ 0,00',
+    oninput:function(){p.precoEmbalagem=parseFloat(this.value)||0;_recalcCustoEmb();}});
+
   var vendaInp = el('input',{class:'form-input',type:'number',min:'0',step:'0.01',value:p.precoVenda||'',placeholder:'0,00',oninput:function(){p.precoVenda=parseFloat(this.value)||0;}});
   var estAInp  = el('input',{class:'form-input',type:'number',min:'0',step:'0.001',value:p.estoqueAtual||'',placeholder:'0',oninput:function(){p.estoqueAtual=parseFloat(this.value)||0;}});
   var estMInp  = el('input',{class:'form-input',type:'number',min:'0',step:'0.001',value:p.estoqueMinimo||'',placeholder:'0',oninput:function(){p.estoqueMinimo=parseFloat(this.value)||0;}});
@@ -586,6 +598,7 @@ function renderProdutoModal() {
       nome:(p.nome||'').trim(),
       categoria:catVal, unidade:unidVal,
       custoMedio:p.custoMedio||0, precoVenda:p.precoVenda||0,
+      qtdPorEmbalagem:p.qtdPorEmbalagem||0, precoEmbalagem:p.precoEmbalagem||0,
       estoqueAtual:p.estoqueAtual||0, estoqueMinimo:p.estoqueMinimo||0,
       sku: (p.sku||'').trim(),
       estoqueMaximo: p.estoqueMaximo||0,
@@ -642,8 +655,30 @@ function renderProdutoModal() {
           el('div',{style:{gridColumn:'1/-1'}},fld('Nome *',nomeInp)),
           el('div',{style:{gridColumn:'1/-1'}},catRow),
           el('div',{style:{gridColumn:'1/-1'}},unidRow),
+
+          // Seção embalagem — só para insumo
+          p.tipo==='insumo' ? el('div',{style:{gridColumn:'1/-1',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'8px',padding:'12px'}},[
+            el('div',{style:{fontSize:'11px',fontWeight:'700',color:'var(--gold)',marginBottom:'10px'}},'📦 Embalagem / Cálculo de custo'),
+            el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}},[
+              el('div',{class:'form-group',style:{margin:'0'}},[
+                el('label',{class:'form-label'},'Unid. por embalagem'),
+                qtdPorEmbInp,
+                el('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'3px'}},'Ex: 36 unidades por caixa'),
+              ]),
+              el('div',{class:'form-group',style:{margin:'0'}},[
+                el('label',{class:'form-label'},'Preço da embalagem (R$)'),
+                precoEmbInp,
+                el('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'3px'}},'Valor pago pela caixa/fardo/etc.'),
+              ]),
+            ]),
+            (p.qtdPorEmbalagem>0&&p.precoEmbalagem>0) ? el('div',{style:{marginTop:'8px',padding:'8px',background:'var(--bg2)',borderRadius:'6px',fontSize:'12px',color:'var(--green)',fontWeight:'700'}},[
+              el('span',{},'= R$ '+(p.precoEmbalagem/p.qtdPorEmbalagem).toFixed(4)+' / '+(unidSel.value||'un')+' (custo unitário)'),
+              el('span',{style:{color:'var(--text3)',fontWeight:'400',marginLeft:'12px'}},'| Embalagem: '+fmtMoney(p.precoEmbalagem)),
+            ]) : el('div',{style:{marginTop:'6px',fontSize:'11px',color:'var(--text3)'}},'Preencha os dois campos acima para calcular o custo unitário automaticamente.'),
+          ]) : null,
+
           fld('Custo médio (R$)',custoInp),
-          fld('Preço de venda (R$)',vendaInp),
+          p.tipo==='insumo' ? null : fld('Preço de venda (R$)',vendaInp),
           fld('Estoque atual',estAInp),
           fld('Estoque mínimo (alerta)',estMInp),
           fld('Estoque máximo',estMaxInp),
@@ -960,12 +995,12 @@ function renderEstProdutos() {
         p.estoqueMinimo>0 ? el('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'2px'}},'Mínimo: '+formatQtd(p.estoqueMinimo,p.unidade)) : null,
         p.sku ? el('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'2px'}},'SKU: '+p.sku) : null,
       ].filter(Boolean)),
-      el('div',{style:{display:'flex',gap:'12px',fontSize:'12px',color:'var(--text3)',marginBottom:'10px',flexWrap:'wrap'}},[
-        el('span',{},'Custo médio: '),el('strong',{style:{color:'var(--text)'}},fmtMoney(p.custoMedio||0)),
-        p.precoVenda>0 ? el('span',{},'  Venda: ') : null,
-        p.precoVenda>0 ? el('strong',{style:{color:'var(--green)'}},fmtMoney(p.precoVenda)) : null,
+      el('div',{style:{display:'flex',gap:'12px',fontSize:'12px',color:'var(--text3)',marginBottom:'6px',flexWrap:'wrap'}},[
+        el('span',{},'Custo unit.: '),el('strong',{style:{color:'var(--text)'}},fmtMoney(p.custoMedio||0)),
         el('span',{},'  Total: '),el('strong',{style:{color:'var(--gold)'}},fmtMoney(vlTotal)),
       ].filter(Boolean)),
+      (p.qtdPorEmbalagem>0&&p.precoEmbalagem>0) ? el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'6px'}},
+        '📦 '+formatQtd(p.qtdPorEmbalagem,p.unidade)+'/emb · '+fmtMoney(p.precoEmbalagem)+'/emb') : null,
       el('div',{style:{display:'flex',gap:'6px'}},[
         el('button',{class:'btn-secondary',style:{flex:'1',fontSize:'12px',padding:'6px'},onclick:function(){
           setState({movModal:{tipo:'entrada',produto_id:p.id,custoUnitario:p.custoMedio||0,data:today()}});

@@ -12,7 +12,7 @@ function renderPerfilModal(){
 
   function save(){
     var label=(g('label')||'').trim();
-    if(!label){showToast('Informe o nome do perfil','error');return;}
+    if(!label){_fldErr('pf-label','Nome do perfil é obrigatório');showToast('Preencha os campos em vermelho','error');return;}
     if(!isEdit){
       var dup=PROFILES.find(function(p){return p.label.toLowerCase()===label.toLowerCase();});
       if(dup){showToast('Já existe um perfil com este nome','error');return;}

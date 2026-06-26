@@ -13,6 +13,7 @@ function renderTransfModal(){
     var data=g('data')||today();
 
     if(!deId||!paraId||deId===paraId||valor<=0){
+      if(valor<=0)_fldErr('tf-valor','Informe o valor da transferência');
       showToast('Preencha os campos corretamente','error');return;
     }
 

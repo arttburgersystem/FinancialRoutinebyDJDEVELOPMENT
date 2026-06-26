@@ -27,7 +27,11 @@ function renderReceitaModal(){
       notas:     g('notas'),
       profile:   state.profile,
     };
-    if(!d.descricao||!d.valor){showToast('Preencha descrição e valor','error');return;}
+    if(!d.descricao||!d.valor){
+      if(!d.descricao)_fldErr('rc-descricao','Descrição é obrigatória');
+      if(!d.valor)_fldErr('rc-valor','Informe um valor válido');
+      showToast('Preencha os campos em vermelho','error');return;
+    }
 
     // Calcula delta bancário em uma só passagem (evita double-render)
     var bPatch=state.bancos;

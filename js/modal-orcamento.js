@@ -23,7 +23,10 @@ function renderOrcamentoModal(){
       categoria:g('categoria')||cats[0]||'',
       valor:parseFloat(g('valor'))||0,
     };
-    if(!d.categoria||!d.valor){showToast('Preencha todos os campos','error');return;}
+    if(!d.categoria||!d.valor){
+      if(!d.valor)_fldErr('om-valor','Informe o valor do orçamento');
+      showToast('Preencha os campos em vermelho','error');return;
+    }
     // Verificar duplicata (mesmo tipo e categoria, exceto ao editar)
     if(!isEdit){
       var dup=(state.orcamentos||[]).find(function(o){return o.profile===pf&&o.tipo===d.tipo&&o.categoria===d.categoria;});

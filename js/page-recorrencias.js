@@ -97,8 +97,8 @@ function renderRecorrencias(){
     var errEl=el('div',{style:{color:'var(--danger)',fontSize:'12px',minHeight:'16px'}});
 
     function salvar(){
-      if(!(r.descricao||'').trim()){errEl.textContent='Informe a descrição.';return;}
-      if(!r.valor||r.valor<=0){errEl.textContent='Informe um valor válido.';return;}
+      if(!(r.descricao||'').trim()){_fldErr(descInp,'Descrição é obrigatória');showToast('Preencha os campos em vermelho','error');return;}
+      if(!r.valor||r.valor<=0){_fldErr(valorInp,'Informe um valor válido');showToast('Preencha os campos em vermelho','error');return;}
       logAudit((isEdit?'editou':'criou')+' recorrência',r.descricao+' '+fmtMoney(r.valor));
       var novaRec=Object.assign({},r,{
         id:r.id||uid(),

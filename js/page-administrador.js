@@ -31,7 +31,7 @@ function renderAdminModal() {
 
   function salvar() {
     var nome = g('nome').trim();
-    if (!nome) { showToast('Informe o nome completo','error'); return; }
+    if (!nome) { _fldErr('adm-nome','Nome completo é obrigatório'); showToast('Preencha os campos em vermelho','error'); return; }
     var pf = state.profile;
     var novo = {
       id:           modal.id || uid(),

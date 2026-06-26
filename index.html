@@ -840,7 +840,36 @@ function addBanco(b){var bs=state.bancos.concat([b]);lsSet('bancos',bs);setState
 function deleteBanco(id){var bs=state.bancos.filter(function(x){return x.id!==id;});lsSet('bancos',bs);setState({bancos:bs});scheduleSave();showToast('Banco removido','error');}
 function updateBanco(b){var bs=state.bancos.map(function(x){return x.id===b.id?b:x;});lsSet('bancos',bs);setState({bancos:bs,bancoModal:null});scheduleSave();showToast('Saldo atualizado!');}
 
+// ── VALIDAÇÃO GLOBAL DE CAMPOS ────────────────────────────────────────────────
+function _fldErr(elOrId, label){
+  var e2 = typeof elOrId==='string'
+    ? (document.getElementById(elOrId) || document.getElementById('mf-'+elOrId))
+    : elOrId;
+  if(!e2) return;
+  e2.style.borderColor='var(--red)';
+  e2.style.boxShadow='0 0 0 3px rgba(239,68,68,.35)';
+  e2.classList.remove('_fldshake');
+  void e2.offsetWidth;
+  e2.classList.add('_fldshake');
+  var errId='_ferr_'+(e2.id||('x'+Math.random().toString(36).slice(2)));
+  e2.dataset.errId=errId;
+  var prev=document.getElementById(errId);if(prev)prev.remove();
+  var msg=document.createElement('div');
+  msg.id=errId;
+  msg.style.cssText='color:#f87171;font-size:11px;font-weight:600;margin-top:5px;display:flex;align-items:center;gap:4px;';
+  msg.innerHTML='<span style="font-size:13px;">⚠</span> '+(label||'Campo obrigatório');
+  if(e2.parentNode) e2.parentNode.appendChild(msg);
+  function _limpar(){
+    e2.style.borderColor='';e2.style.boxShadow='';
+    var em=document.getElementById(errId);if(em)em.remove();
+    e2.removeEventListener('input',_limpar);e2.removeEventListener('change',_limpar);
+  }
+  e2.addEventListener('input',_limpar);
+  e2.addEventListener('change',_limpar);
+}
+
 // ── HELPERS DOM ──────────────────────────────────────────────────────────────
+var _TEXT_TYPES={text:1,search:1,email:1,url:1,'':1};
 function el(tag,attrs,children){
   var e=document.createElement(tag);
   if(attrs){Object.keys(attrs).forEach(function(k){
@@ -850,6 +879,10 @@ function el(tag,attrs,children){
     else if(k==='checked'){e.checked=!!attrs[k];}
     else{try{e.setAttribute(k,attrs[k]);}catch(ex){}}
   });}
+  // Spell check PT-BR em campos de texto
+  if(tag==='textarea'||(tag==='input'&&_TEXT_TYPES[((attrs&&attrs.type)||'').toLowerCase()])){
+    e.spellcheck=true; e.lang='pt-BR';
+  }
   if(children){
     if(!Array.isArray(children))children=[children];
     children.forEach(function(c){
@@ -2830,6 +2863,10 @@ function oferecerBiometria() {
   btnNao.style.cssText = 'width:220px;font-size:13px;height:40px;color:var(--text3);';
   btnNao.textContent = 'Agora não';
   btnNao.onclick = function() { ov.style.display = 'none'; initApp(); };
+
+  // Enter = "Agora não" (dispensa sem mouse)
+  function _bioEnter(e){ if(e.key==='Enter'){btnNao.onclick();document.removeEventListener('keydown',_bioEnter);} }
+  document.addEventListener('keydown',_bioEnter);
 
   box.appendChild(logo); box.appendChild(dev2); box.appendChild(ico);
   box.appendChild(tit); box.appendChild(sub2);

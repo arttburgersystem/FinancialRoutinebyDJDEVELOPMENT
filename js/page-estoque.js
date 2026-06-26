@@ -507,7 +507,7 @@ function renderProdutoModal() {
       tog.onclick=function(){chData.ativo=!chData.ativo;refresh();};
       var hdrRow=el('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid var(--border)'}});
       hdrRow.appendChild(tog);
-      hdrRow.appendChild(el('span',{style:{fontWeight:'700',fontSize:'12px',color:chData.ativo?'var(--text)':'var(--text3)'}},(icon+' '+label+(chData.ativo?'',' — desativado'))));
+      hdrRow.appendChild(el('span',{style:{fontWeight:'700',fontSize:'12px',color:chData.ativo?'var(--text)':'var(--text3)'}},(icon+' '+label+(chData.ativo?'':' — desativado'))));
       var box=el('div',{style:{background:'var(--bg3)',borderRadius:'8px',padding:'10px 12px'}});
       box.appendChild(hdrRow);
       if(chData.ativo){

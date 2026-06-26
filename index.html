@@ -2832,6 +2832,8 @@ function bioAutenticar(onOk, onErr) {
 
 function oferecerBiometria() {
   var ov = document.getElementById('pin-overlay');
+  // Remove o listener de teclado do PIN para evitar que Enter reative o submit do PIN
+  if(ov._keyHandler){document.removeEventListener('keydown',ov._keyHandler);ov._keyHandler=null;}
   ov.style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   ov.innerHTML = '';

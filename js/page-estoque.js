@@ -413,8 +413,13 @@ function renderProdutoModal() {
   var custoInp = el('input',{class:'form-input',type:'number',min:'0',step:'0.0001',value:p.custoMedio||'',placeholder:'0,0000',oninput:function(){p.custoMedio=parseFloat(this.value)||0;}});
 
   function _recalcCustoEmb(){
-    var qtd=p.qtdPorEmbalagem||0; var preco=p.precoEmbalagem||0;
-    if(qtd>0&&preco>0){p.custoMedio=Math.round(preco/qtd*10000)/10000;custoInp.value=String(p.custoMedio);}
+    var preco=p.precoEmbalagem||0;
+    if(preco>0){
+      // custoMedio = preço por embalagem (a unidade de rastreio é a embalagem)
+      // qtdPorEmbalagem é apenas para referência do custo por unidade interna
+      p.custoMedio=preco;
+      custoInp.value=String(preco);
+    }
   }
   var qtdPorEmbInp=el('input',{class:'form-input',type:'number',min:'1',step:'0.001',
     value:p.qtdPorEmbalagem||'',placeholder:'Ex: 36',
@@ -671,10 +676,10 @@ function renderProdutoModal() {
                 el('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'3px'}},'Valor pago pela caixa/fardo/etc.'),
               ]),
             ]),
-            (p.qtdPorEmbalagem>0&&p.precoEmbalagem>0) ? el('div',{style:{marginTop:'8px',padding:'8px',background:'var(--bg2)',borderRadius:'6px',fontSize:'12px',color:'var(--green)',fontWeight:'700'}},[
-              el('span',{},'= R$ '+(p.precoEmbalagem/p.qtdPorEmbalagem).toFixed(4)+' / '+(unidSel.value||'un')+' (custo unitário)'),
-              el('span',{style:{color:'var(--text3)',fontWeight:'400',marginLeft:'12px'}},'| Embalagem: '+fmtMoney(p.precoEmbalagem)),
-            ]) : el('div',{style:{marginTop:'6px',fontSize:'11px',color:'var(--text3)'}},'Preencha os dois campos acima para calcular o custo unitário automaticamente.'),
+            (p.precoEmbalagem>0) ? el('div',{style:{marginTop:'8px',padding:'8px',background:'var(--bg2)',borderRadius:'6px',fontSize:'12px',color:'var(--green)',fontWeight:'700',display:'flex',gap:'16px',flexWrap:'wrap'}},[
+              el('span',{},'✅ Custo por '+( unidSel.value||'cx')+': '+fmtMoney(p.precoEmbalagem)),
+              (p.qtdPorEmbalagem>0) ? el('span',{style:{color:'var(--text3)',fontWeight:'400'}},'→ R$ '+(p.precoEmbalagem/p.qtdPorEmbalagem).toFixed(4)+'/un interno (informativo)') : null,
+            ].filter(Boolean)) : el('div',{style:{marginTop:'6px',fontSize:'11px',color:'var(--text3)'}},'Preencha o preço da embalagem para calcular o custo automaticamente.'),
           ]) : null,
 
           fld('Custo médio (R$)',custoInp),
@@ -759,10 +764,16 @@ function renderMovModal() {
   var _prdOpts = prods.filter(function(p){return p.tipo!=='insumo';}).map(function(p){
     return el('option',{value:p.id},'🍔 '+p.nome+' ('+formatQtd(p.estoqueAtual,p.unidade)+')');
   });
+  function _custoParaProd(prd) {
+    if(!prd || prd.tipo==='saida') return 0;
+    if(prd.custoMedio>0) return prd.custoMedio;
+    if(prd.precoEmbalagem>0) return prd.precoEmbalagem;
+    return 0;
+  }
   var prodSel = el('select',{class:'form-input',onchange:function(){
     var selVal = this.value;
     var prd = prods.find(function(p){return p.id===selVal;});
-    var novoCusto = (prd && tipo!=='saida') ? (prd.custoMedio||0) : m.custoUnitario;
+    var novoCusto = (prd && tipo!=='saida') ? _custoParaProd(prd) : m.custoUnitario;
     setState({movModal:Object.assign({},m,{produto_id:selVal,custoUnitario:novoCusto,qtdEmb:'',unidPorEmb:''})});
   }},
     [el('option',{value:''},'— Selecione o produto / insumo —')].concat(_insOpts).concat(_prdOpts));
@@ -788,7 +799,8 @@ function renderMovModal() {
 
   var prodInfoEl = prodAtual ? el('div',{style:{background:'var(--bg3)',borderRadius:'8px',padding:'8px 12px',fontSize:'12px',color:'var(--text3)',display:'flex',gap:'16px',flexWrap:'wrap',marginBottom:'4px'}},[
     el('span',{},'📦 Estoque: '+formatQtd(prodAtual.estoqueAtual,prodAtual.unidade)),
-    el('span',{},'💰 Custo médio: '+fmtMoney(prodAtual.custoMedio||0)),
+    el('span',{style:{color:prodAtual.custoMedio>0?'var(--text3)':'var(--danger)'}},'💰 Custo unit.: '+fmtMoney(prodAtual.custoMedio||0)),
+    (prodAtual.qtdPorEmbalagem>0&&prodAtual.precoEmbalagem>0) ? el('span',{style:{color:'var(--gold)'}},'📦 '+fmtMoney(prodAtual.precoEmbalagem)+'/emb × '+prodAtual.qtdPorEmbalagem+' un = '+fmtMoney(prodAtual.precoEmbalagem/prodAtual.qtdPorEmbalagem)+'/'+prodAtual.unidade) : null,
     prodAtual.estoqueMinimo>0 ? el('span',{style:{color:prodAtual.estoqueAtual<=prodAtual.estoqueMinimo?'var(--danger)':'var(--text3)'}},'⚠️ Mín: '+formatQtd(prodAtual.estoqueMinimo,prodAtual.unidade)) : null,
     prodAtual.estoqueMaximo>0 ? el('span',{style:{color:prodAtual.estoqueAtual>=prodAtual.estoqueMaximo?'var(--danger)':'var(--text3)'}},'⬆️ Máx: '+formatQtd(prodAtual.estoqueMaximo,prodAtual.unidade)) : null,
   ].filter(Boolean)) : null;
@@ -835,11 +847,12 @@ function renderMovModal() {
     if (!prod) return;
 
     var qtd    = m.quantidade;
-    var custo  = m.custoUnitario || prod.custoMedio || 0;
+    var custo  = m.custoUnitario || (prod.qtdPorEmbalagem>0&&prod.precoEmbalagem>0 ? prod.precoEmbalagem/prod.qtdPorEmbalagem : 0) || prod.custoMedio || 0;
     var estAnt = prod.estoqueAtual || 0;
     var novoProd;
 
     if (tipo === 'entrada') {
+      if (!custo && !confirm('⚠️ Custo unitário está R$ 0,00. O valor em estoque ficará zerado.\nContinuar mesmo assim?')) return;
       var novoCusto = calcCustoMedioNovo(estAnt, prod.custoMedio||0, qtd, custo);
       novoProd = Object.assign({},prod,{estoqueAtual:estAnt+qtd, custoMedio:novoCusto});
     } else if (tipo === 'saida') {
@@ -956,7 +969,7 @@ function renderEstProdutos() {
   var cats      = [].concat(prods.map(function(p){return p.categoria;})).filter(function(v,i,a){return a.indexOf(v)===i;}).length;
 
   var kpis = el('div',{class:'kpi-grid',style:{gridTemplateColumns:'repeat(auto-fill,minmax(155px,1fr))'}},[
-    el('div',{class:'kpi-card gold' },[el('div',{class:'kpi-label'},'Produtos ativos'),   el('div',{class:'kpi-value gold'},  String(prods.length)),      el('div',{class:'kpi-sub'},cats+' categorias')]),
+    el('div',{class:'kpi-card gold' },[el('div',{class:'kpi-label'},'Insumos ativos'),   el('div',{class:'kpi-value gold'},  String(prods.length)),      el('div',{class:'kpi-sub'},cats+' categorias')]),
     el('div',{class:'kpi-card green'},[el('div',{class:'kpi-label'},'Valor em estoque'),  el('div',{class:'kpi-value green'}, fmtMoney(valorTotal)),       el('div',{class:'kpi-sub'},'custo médio ponderado')]),
     el('div',{class:'kpi-card red'  },[el('div',{class:'kpi-label'},'Abaixo do mínimo'), el('div',{class:'kpi-value red'},   String(criticos)),            el('div',{class:'kpi-sub'},zerados+' zerados')]),
   ]);
@@ -1003,7 +1016,8 @@ function renderEstProdutos() {
         '📦 '+formatQtd(p.qtdPorEmbalagem,p.unidade)+'/emb · '+fmtMoney(p.precoEmbalagem)+'/emb') : null,
       el('div',{style:{display:'flex',gap:'6px'}},[
         el('button',{class:'btn-secondary',style:{flex:'1',fontSize:'12px',padding:'6px'},onclick:function(){
-          setState({movModal:{tipo:'entrada',produto_id:p.id,custoUnitario:p.custoMedio||0,data:today()}});
+          var cu=p.custoMedio||(p.qtdPorEmbalagem>0&&p.precoEmbalagem>0?Math.round(p.precoEmbalagem/p.qtdPorEmbalagem*10000)/10000:0);
+          setState({movModal:{tipo:'entrada',produto_id:p.id,custoUnitario:cu,data:today()}});
         }},'📥 Entrada'),
         el('button',{class:'btn-ghost',style:{flex:'1',fontSize:'12px',padding:'6px',color:'var(--danger)'},onclick:function(){
           setState({movModal:{tipo:'saida',produto_id:p.id,data:today()}});

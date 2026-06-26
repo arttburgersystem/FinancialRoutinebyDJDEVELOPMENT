@@ -483,6 +483,7 @@ var state={
   toast: null,
   filtro: {pagar:'todos',receber:'todos'},
   busca: {pagar:'',receber:''},
+  pagarMes: today().slice(0,7),
   mesSel: nowBR().getMonth(),
   impressorasCadastradas: lsGet('impressorasCadastradas',[]),
   impModal: null,
@@ -1358,19 +1359,91 @@ function renderPagar(){
   var items=state.contas.filter(function(c){return c.tipo==='pagar'&&c.profile===state.profile;});
   var busca=state.busca.pagar||'';
   var filtro=state.filtro.pagar||'todos';
+  var pagarMes=state.pagarMes||today().slice(0,7);
+
+  // Navegar meses
+  function _navMes(delta){
+    var p=pagarMes.split('-'); var y=parseInt(p[0]); var mo=parseInt(p[1])-1+delta;
+    y+=Math.floor(mo/12); mo=((mo%12)+12)%12;
+    setState({pagarMes:y+'-'+String(mo+1).padStart(2,'0')});
+  }
+  var _MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var _pParts=pagarMes.split('-');
+  var _labelMes=_MESES[parseInt(_pParts[1])-1]+' '+_pParts[0];
+  var _isMesAtual=pagarMes===today().slice(0,7);
+
+  // Totalizador do mês filtrado
+  var _totalMes=0, _totalPago=0, _totalPendente=0, _totalVencido=0;
+
   var filtrados=items.filter(function(c){
-    var mb=c.descricao.toLowerCase().includes(busca.toLowerCase())||c.categoria.toLowerCase().includes(busca.toLowerCase());
-    if(filtro==='pendente')return mb&&c.status==='pendente';
-    if(filtro==='pago')return mb&&c.status==='pago';
-    if(filtro==='vencido')return mb&&(c.status==='vencido'||diasRestantes(c.vencimento)<0);
-    return mb;
+    var mb=!busca||(c.descricao||'').toLowerCase().includes(busca.toLowerCase())||(c.categoria||'').toLowerCase().includes(busca.toLowerCase());
+    if(!mb)return false;
+    // Filtro de mês (aplicado em todos exceto "todos")
+    if(filtro!=='todos'){
+      if(!c.vencimento||c.vencimento.slice(0,7)!==pagarMes)return false;
+    }
+    if(filtro==='pendente')return c.status==='pendente';
+    if(filtro==='pago')return c.status==='pago';
+    if(filtro==='vencido')return c.status==='vencido'||(c.status!=='pago'&&diasRestantes(c.vencimento)<0);
+    return true;
   }).sort(function(a,b){return new Date(a.vencimento)-new Date(b.vencimento);});
 
+  // KPIs do mês (sempre do mês selecionado, independente do filtro de status)
+  items.forEach(function(c){
+    if(!c.vencimento||c.vencimento.slice(0,7)!==pagarMes)return;
+    _totalMes+=(c.valor||0);
+    if(c.status==='pago')_totalPago+=(c.valorPago||c.valor||0);
+    else if(c.status==='vencido'||(c.status!=='pago'&&diasRestantes(c.vencimento)<0))_totalVencido+=(c.valor||0);
+    else _totalPendente+=(c.valor||0);
+  });
+
   var sb=div('search-wrap',[el('span',{},'🔍'),el('input',{placeholder:'Buscar...',value:busca,oninput:function(e){var b=Object.assign({},state.busca);b.pagar=e.target.value;setState({busca:b});}})]);
-  var chips=['todos','pendente','pago','vencido'].map(function(f){return el('button',{class:'chip'+(filtro===f?' active':''),onclick:function(){var fi=Object.assign({},state.filtro);fi.pagar=f;setState({filtro:fi});}},f.charAt(0).toUpperCase()+f.slice(1));});
+  var chips=['todos','pendente','pago','vencido'].map(function(f){
+    return el('button',{class:'chip'+(filtro===f?' active':''),onclick:function(){
+      var fi=Object.assign({},state.filtro);fi.pagar=f;
+      // Ao ativar filtro não-todos, vai para o mês atual
+      setState({filtro:fi, pagarMes:today().slice(0,7)});
+    }},f==='todos'?'Todos':f.charAt(0).toUpperCase()+f.slice(1));
+  });
+
+  // Navegação de mês (mostrada sempre, destaque diferente quando filtro=todos)
+  var mesNav=el('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},[
+    el('button',{style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',cursor:'pointer',padding:'5px 10px',fontSize:'14px',lineHeight:'1'},onclick:function(){_navMes(-1);}},'‹'),
+    el('div',{style:{
+      padding:'5px 14px',borderRadius:'6px',fontSize:'13px',fontWeight:'600',
+      background:filtro==='todos'?'var(--bg3)':'var(--bg2)',
+      border:'1px solid '+(filtro==='todos'?'var(--border)':'var(--gold)44'),
+      color:filtro==='todos'?'var(--text2)':'var(--gold)',
+      minWidth:'140px',textAlign:'center',cursor:'pointer',
+    },onclick:function(){setState({pagarMes:today().slice(0,7)});},title:'Ir para mês atual'},[
+      _labelMes,
+      _isMesAtual?el('span',{style:{fontSize:'10px',color:'var(--text3)',marginLeft:'6px'}},'(atual)'):null,
+    ].filter(Boolean)),
+    el('button',{style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',cursor:'pointer',padding:'5px 10px',fontSize:'14px',lineHeight:'1'},onclick:function(){_navMes(1);}},'›'),
+  ]);
+
+  // KPIs resumo do mês
+  var kpiBar=filtro!=='todos'?el('div',{style:{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'14px'}},[
+    el('div',{style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'8px',padding:'10px 16px',flex:'1',minWidth:'130px'}},[
+      el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'3px'}},'Total do mês'),
+      el('div',{style:{fontSize:'16px',fontWeight:'700',color:'var(--text1)'}},fmtMoney(_totalMes)),
+    ]),
+    el('div',{style:{background:'var(--bg3)',border:'1px solid rgba(239,68,68,.3)',borderRadius:'8px',padding:'10px 16px',flex:'1',minWidth:'130px'}},[
+      el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'3px'}},'Pendente'),
+      el('div',{style:{fontSize:'16px',fontWeight:'700',color:'var(--red)'}},fmtMoney(_totalPendente)),
+    ]),
+    el('div',{style:{background:'var(--bg3)',border:'1px solid rgba(239,68,68,.5)',borderRadius:'8px',padding:'10px 16px',flex:'1',minWidth:'130px'}},[
+      el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'3px'}},'Vencido'),
+      el('div',{style:{fontSize:'16px',fontWeight:'700',color:'#f87171'}},fmtMoney(_totalVencido)),
+    ]),
+    el('div',{style:{background:'var(--bg3)',border:'1px solid rgba(34,197,94,.3)',borderRadius:'8px',padding:'10px 16px',flex:'1',minWidth:'130px'}},[
+      el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'3px'}},'Pago'),
+      el('div',{style:{fontSize:'16px',fontWeight:'700',color:'var(--green)'}},fmtMoney(_totalPago)),
+    ]),
+  ]):null;
 
   var rows=filtrados.length===0
-    ?[el('tr',{},[el('td',{colspan:'7',style:{textAlign:'center',padding:'30px',color:'var(--text3)'}},'Nenhuma conta encontrada')])]
+    ?[el('tr',{},[el('td',{colspan:'7',style:{textAlign:'center',padding:'30px',color:'var(--text3)'}},'Nenhuma conta em '+_labelMes)])]
     :filtrados.map(function(c){
       var st=statusBadge(c),d=diasRestantes(c.vencimento);
       var temJuros=c.status==='pago'&&c.valorPago!=null&&c.jurosAtraso!=null&&c.jurosAtraso!==0;
@@ -1392,12 +1465,9 @@ function renderPagar(){
         el('td',{},[
           c.status!=='pago'?el('button',{class:'btn-icon edit',title:'Marcar como pago',onclick:function(){
             var dias=diasRestantes(c.vencimento);
-            if(dias!==null&&dias<0){
-              setState({pagarAtrasadoModal:c});
-            } else {
-              updateConta(Object.assign({},c,{status:'pago',dataPagamento:today()}));
-            }
-          }}, '✓'):null,
+            if(dias!==null&&dias<0){setState({pagarAtrasadoModal:c});}
+            else{updateConta(Object.assign({},c,{status:'pago',dataPagamento:today()}));}
+          }},'✓'):null,
           el('button',{class:'btn-icon edit',onclick:function(){setState({modal:{tipo:'pagar',editItem:c}});}}, '✏️'),
           el('button',{class:'btn-icon',onclick:function(){deleteConta(c.id);}}, '🗑️'),
         ].filter(Boolean)),
@@ -1406,8 +1476,15 @@ function renderPagar(){
 
   return div('',[
     div('page-header',[el('h1',{},'Despesas'),el('p',{},'Gerencie seus compromissos e vencimentos')]),
-    div('action-row',[el('div',{style:{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}},[sb,div('filter-row',chips)]),el('button',{class:'btn-primary',onclick:function(){setState({modal:{tipo:'pagar',editItem:null}});}}, '+ Nova conta')]),
-    div('card',[div('table-wrap',[el('table',{},[el('thead',{},[el('tr',{},[el('th',{},'Descrição'),el('th',{},'Categoria'),el('th',{},'Valor'),el('th',{},'Vencimento'),el('th',{},'Status'),el('th',{},'Recorrente'),el('th',{},'')])])  ,el('tbody',{},rows)])])]),
+    div('action-row',[
+      el('div',{style:{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}},[sb,div('filter-row',chips),mesNav]),
+      el('button',{class:'btn-primary',onclick:function(){setState({modal:{tipo:'pagar',editItem:null}});}}, '+ Nova conta'),
+    ]),
+    kpiBar,
+    div('card',[div('table-wrap',[el('table',{},[
+      el('thead',{},[el('tr',{},[el('th',{},'Descrição'),el('th',{},'Categoria'),el('th',{},'Valor'),el('th',{},'Vencimento'),el('th',{},'Status'),el('th',{},'Recorrente'),el('th',{},'')])])  ,
+      el('tbody',{},rows),
+    ])])]),
   ]);
 }
 

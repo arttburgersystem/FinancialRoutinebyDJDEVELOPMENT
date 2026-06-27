@@ -444,11 +444,19 @@ function renderFornecedores(){
   });
 
   var searchInp = el('input',{
-    type:'text', placeholder:'🔍  Buscar por nome, CNPJ, cidade, e-mail, telefone...',
+    type:'text', id:'_forn_search',
+    placeholder:'🔍  Buscar por nome, CNPJ, cidade, e-mail, telefone...',
     class:'form-input',
     value: state.fornBusca||'',
     style:{maxWidth:'420px',fontSize:'13px'},
-    oninput: function(){ setState({fornBusca: this.value}); },
+    oninput: function(){
+      var val = this.value;
+      var pos = this.selectionStart;
+      state.fornBusca = val;
+      render();
+      var inp = document.getElementById('_forn_search');
+      if(inp){ inp.focus(); try{ inp.setSelectionRange(pos,pos); }catch(e){} }
+    },
   });
 
   return div('',[

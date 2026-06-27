@@ -522,7 +522,7 @@ function uid(){try{var a=new Uint8Array(8);crypto.getRandomValues(a);return Arra
 
 function setState(patch){Object.assign(state,patch);render();}
 function showToast(msg,type,dur){
-  type=type||'success';dur=dur||2000;
+  type=type||'success';dur=dur||5000;
   var prev=document.getElementById('_djf-toast');if(prev)prev.remove();
   var t=document.createElement('div');
   t.id='_djf-toast';t.className='toast '+type;

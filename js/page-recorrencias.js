@@ -42,12 +42,14 @@ function renderRecorrencias(){
     var geradas=state.contas.filter(function(x){return x.gerado_de===c.id;});
     var pendentes=geradas.filter(function(x){return x.status==='pendente';}).length;
     var pagas=geradas.filter(function(x){return x.status==='pago'||x.status==='recebido';}).length;
-    var corTipo=c.tipo==='pagar'?'var(--red)':'var(--green)';
-    var iconeTipo=c.tipo==='pagar'?'💸':'💵';
+    var isPagar=c.tipo==='pagar';
+    var corTipo=isPagar?'var(--red)':'var(--green)';
+    var bgTipo=isPagar?'rgba(239,68,68,0.12)':'rgba(34,197,94,0.12)';
+    var iconeTipo=isPagar?'💸':'💵';
     return el('div',{class:'card',style:{padding:'14px',display:'flex',flexDirection:'column',gap:'10px'}},[
       el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},[
         el('div',{style:{display:'flex',alignItems:'center',gap:'10px'}},[
-          el('div',{style:{width:'40px',height:'40px',borderRadius:'10px',background:corTipo.replace(')',',0.12)').replace('var(--','rgba(var(--'),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',flexShrink:'0'}},iconeTipo),
+          el('div',{style:{width:'40px',height:'40px',borderRadius:'10px',background:bgTipo,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',flexShrink:'0'}},iconeTipo),
           el('div',{},[
             el('div',{style:{fontWeight:'700',fontSize:'14px',color:'var(--text)'}},c.descricao),
             el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}},c.categoria+' · '+tipoLabel(c.recorrencia_tipo)),
@@ -85,27 +87,44 @@ function renderRecorrencias(){
 
     function field(label,el2){return el('div',{class:'form-group'},[el('label',{class:'form-label'},label),el2]);}
 
-    var descInp=el('input',{class:'form-input',value:r.descricao||'',placeholder:'Ex: Aluguel, Netflix...',oninput:function(){r.descricao=this.value;}});
-    var valorInp=el('input',{class:'form-input',value:r.valor||'',type:'number',min:'0',step:'0.01',placeholder:'0,00',oninput:function(){r.valor=parseFloat(this.value)||0;}});
-    var catInp=el('input',{class:'form-input',value:r.categoria||'',placeholder:'Ex: Moradia, Assinatura...',oninput:function(){r.categoria=this.value;}});
-    var tipoSel=el('select',{class:'form-input',onchange:function(){r.tipo=this.value;}},
-      [{v:'pagar',l:'💸 Despesa (a pagar)'},{v:'receber',l:'💵 Receita (a receber)'}]
-      .map(function(x){return el('option',{value:x.v,selected:r.tipo===x.v},x.l);}));
-    var recTipoSel=el('select',{class:'form-input',onchange:function(){r.recorrencia_tipo=this.value;}},
-      RECORR_TIPOS.map(function(x){return el('option',{value:x.id,selected:(r.recorrencia_tipo||'mensal')===x.id},x.label);}));
-    var diaInp=el('input',{class:'form-input',type:'date',value:r.vencimento||today(),oninput:function(){r.vencimento=this.value;}});
-    var errEl=el('div',{style:{color:'var(--danger)',fontSize:'12px',minHeight:'16px'}});
+    var descInp=el('input',{class:'form-input',type:'text',placeholder:'Ex: Aluguel, Netflix...'});
+    descInp.value=r.descricao||'';
+    var valorInp=el('input',{class:'form-input',type:'number',min:'0',step:'0.01',placeholder:'0,00'});
+    valorInp.value=r.valor||'';
+    var catInp=el('input',{class:'form-input',type:'text',placeholder:'Ex: Moradia, Assinatura...'});
+    catInp.value=r.categoria||'';
+    var tipoSel=el('select',{class:'form-input'},[
+      el('option',{value:'pagar'},'💸 Despesa (a pagar)'),
+      el('option',{value:'receber'},'💵 Receita (a receber)'),
+    ]);
+    tipoSel.value=r.tipo||'pagar';
+    var recTipoSel=el('select',{class:'form-input'},
+      RECORR_TIPOS.map(function(x){return el('option',{value:x.id},x.label);}));
+    recTipoSel.value=r.recorrencia_tipo||'mensal';
+    var diaInp=el('input',{class:'form-input',type:'date'});
+    diaInp.value=r.vencimento||today();
 
     function salvar(){
-      if(!(r.descricao||'').trim()){_fldErr(descInp,'Descrição é obrigatória');showToast('Preencha os campos em vermelho','error');return;}
-      if(!r.valor||r.valor<=0){_fldErr(valorInp,'Informe um valor válido');showToast('Preencha os campos em vermelho','error');return;}
-      logAudit((isEdit?'editou':'criou')+' recorrência',r.descricao+' '+fmtMoney(r.valor));
+      var descricao=descInp.value.trim();
+      var valor=parseFloat(valorInp.value)||0;
+      var tipo=tipoSel.value||'pagar';
+      var recTipo=recTipoSel.value||'mensal';
+      var categoria=catInp.value.trim();
+      var vencimento=diaInp.value||today();
+      if(!descricao){_fldErr(descInp,'Descrição é obrigatória');showToast('Preencha os campos em vermelho','error');return;}
+      if(!valor||valor<=0){_fldErr(valorInp,'Informe um valor válido');showToast('Preencha os campos em vermelho','error');return;}
+      logAudit((isEdit?'editou':'criou')+' recorrência',descricao+' '+fmtMoney(valor));
       var novaRec=Object.assign({},r,{
         id:r.id||uid(),
+        descricao:descricao,
+        valor:valor,
+        categoria:categoria,
+        tipo:tipo,
+        vencimento:vencimento,
         recorrente:true,
         profile:pf,
-        status:r.tipo==='pagar'?'pendente':'previsto',
-        recorrencia_tipo:r.recorrencia_tipo||'mensal',
+        status:tipo==='pagar'?'pendente':'previsto',
+        recorrencia_tipo:recTipo,
         recorrencia_intervalo:1,
       });
       var nc=isEdit?state.contas.map(function(x){return x.id===r.id?novaRec:x;}):state.contas.concat([novaRec]);

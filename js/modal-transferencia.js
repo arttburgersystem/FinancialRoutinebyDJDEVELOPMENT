@@ -18,6 +18,7 @@ function renderTransfModal(){
     }
 
     var bsDe=state.bancos.find(function(b){return b.id===deId;});
+    if(!bsDe){showToast('Banco de origem não encontrado','error');return;}
     if(bsDe.saldo<valor){
       showToast('Saldo insuficiente em '+bsDe.nome,'error');return;
     }

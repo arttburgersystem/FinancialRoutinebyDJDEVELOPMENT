@@ -810,6 +810,9 @@ function addPeriodo(d,tipo,n){
   var dt=new Date(d+'T12:00:00');n=n||1;
   if(tipo==='diario')dt.setDate(dt.getDate()+n);
   else if(tipo==='semanal')dt.setDate(dt.getDate()+7*n);
+  else if(tipo==='quinzenal')dt.setDate(dt.getDate()+15*n);
+  else if(tipo==='bimestral')dt.setMonth(dt.getMonth()+2*n);
+  else if(tipo==='trimestral')dt.setMonth(dt.getMonth()+3*n);
   else if(tipo==='anual')dt.setFullYear(dt.getFullYear()+n);
   else dt.setMonth(dt.getMonth()+n);
   return dt.toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});

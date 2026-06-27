@@ -384,7 +384,19 @@ function renderFornecedores(){
   // ── LISTA ──────────────────────────────────────────────────────────────────
   var TIPO_LABEL={fornecedor:'Fornecedor',cliente:'Cliente',ambos:'Ambos',outro:'Outro'};
   var TIPO_COLOR={fornecedor:'var(--blue)',cliente:'var(--green)',ambos:'var(--gold)',outro:'var(--text3)'};
-  var sorted=fornecedores.slice().sort(function(a,b){return a.nome.localeCompare(b.nome);});
+
+  var busca = (state.fornBusca||'').toLowerCase().trim();
+  var sorted = fornecedores.slice().sort(function(a,b){return a.nome.localeCompare(b.nome);}).filter(function(f){
+    if(!busca) return true;
+    return (f.nome||'').toLowerCase().includes(busca)
+      || (f.nomeFantasia||'').toLowerCase().includes(busca)
+      || (f.documento||'').toLowerCase().includes(busca)
+      || (f.email||'').toLowerCase().includes(busca)
+      || (f.telefone||'').toLowerCase().includes(busca)
+      || (f.celular||'').toLowerCase().includes(busca)
+      || (f.cidade||'').toLowerCase().includes(busca)
+      || (f.contato||'').toLowerCase().includes(busca);
+  });
 
   var rows=sorted.map(function(f){
     var endStr=[f.cidade,f.estado].filter(Boolean).join('/');
@@ -431,14 +443,25 @@ function renderFornecedores(){
     ]);
   });
 
+  var searchInp = el('input',{
+    type:'text', placeholder:'🔍  Buscar por nome, CNPJ, cidade, e-mail, telefone...',
+    class:'form-input',
+    value: state.fornBusca||'',
+    style:{maxWidth:'420px',fontSize:'13px'},
+    oninput: function(){ setState({fornBusca: this.value}); },
+  });
+
   return div('',[
     div('page-header',[
-      el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},[
+      el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'10px'}},[
         el('div',{},[
           el('h1',{},'🏪 Fornecedores & Destinatários'),
           el('p',{},'Cadastre com dados completos para uso nos lançamentos'),
         ]),
-        btn('btn-primary','➕ Novo fornecedor',function(){setState({fornecedorModal:{}});}),
+        el('div',{style:{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}},[
+          searchInp,
+          btn('btn-primary','➕ Novo fornecedor',function(){setState({fornecedorModal:{}});}),
+        ]),
       ]),
     ]),
     div('card',[
@@ -451,8 +474,11 @@ function renderFornecedores(){
             btn('btn-primary','➕ Cadastrar primeiro fornecedor',function(){setState({fornecedorModal:{}});}),
           ])
         :el('div',{style:{overflowX:'auto'}},[
-            el('div',{style:{marginBottom:'10px',fontSize:'12px',color:'var(--text3)'}},
-              fornecedores.length+' cadastro'+(fornecedores.length!==1?'s':'')+' neste perfil'),
+            el('div',{style:{marginBottom:'10px',fontSize:'12px',color:'var(--text3)',display:'flex',gap:'12px',alignItems:'center'}},[
+              el('span',{},sorted.length+' de '+fornecedores.length+' cadastro'+(fornecedores.length!==1?'s':'')+' neste perfil'),
+              (busca && sorted.length===0) ? el('span',{style:{color:'var(--danger)',fontWeight:'600'}},'Nenhum resultado para "'+state.fornBusca+'"') : null,
+              busca ? el('button',{class:'btn-ghost',style:{fontSize:'11px',padding:'2px 8px'},onclick:function(){setState({fornBusca:''});}}, '✕ Limpar busca') : null,
+            ].filter(Boolean)),
             el('table',{style:{width:'100%',borderCollapse:'collapse'}},[
               el('thead',{},[el('tr',{style:{borderBottom:'2px solid var(--border)'}},[
                 'Nome / Cidade','Tipo','Documentos','Contato','Comercial','',

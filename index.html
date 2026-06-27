@@ -1107,12 +1107,12 @@ function renderSidebar(){
     {id:'recorrencias',label:'Recorrências',icon:'🔄',section:'planejamento'},
     {id:'exportar',label:'Relatórios',icon:'📊',section:'integração'},
     {id:'notas',label:'Bloco de Notas',icon:'📝',section:'planejamento'},
-    {id:'estoque',label:'Estoque & CMV',icon:'📦',section:'sistema'},
-    {id:'cardapio',label:'Cardápio',icon:'🍽️',section:'sistema'},
-    {id:'impressoes',label:'Setores de Impressão',icon:'🖨️',section:'sistema'},
-    {id:'pdv',label:'PDV — Frente de Caixa',icon:'🏪',section:'sistema'},
-    {id:'kds',label:'KDS',icon:'📺',section:'sistema'},
-    {id:'mapa',label:'Mapa',icon:'🗺️',section:'sistema'},
+    {id:'estoque',label:'Estoque & CMV',icon:'📦',section:'sistema',hidden:true},
+    {id:'cardapio',label:'Cardápio',icon:'🍽️',section:'sistema',hidden:true},
+    {id:'impressoes',label:'Setores de Impressão',icon:'🖨️',section:'sistema',hidden:true},
+    {id:'pdv',label:'PDV — Frente de Caixa',icon:'🏪',section:'sistema',hidden:true},
+    {id:'kds',label:'KDS',icon:'📺',section:'sistema',hidden:true},
+    {id:'mapa',label:'Mapa',icon:'🗺️',section:'sistema',hidden:true},
     {id:'empresa',label:'Dados da Empresa',icon:'🏢',section:'sistema'},
     {id:'usuarios',label:'Usuários & Permissões',icon:'🔐',section:'sistema'},
     {id:'auditoria',label:'Auditoria',icon:'📋',section:'sistema'},
@@ -1164,7 +1164,7 @@ function renderSidebar(){
   var secCollapsed=state.navSectionsCollapsed||{};
 
   var navEl=div('nav',sections.map(function(sec){
-    var items=nav.filter(function(n){return n.section===sec&&(!n.onlyProfile||n.onlyProfile===state.profile);});
+    var items=nav.filter(function(n){return n.section===sec&&!n.hidden&&(!n.onlyProfile||n.onlyProfile===state.profile);});
     if(!items.length)return null;
     var isCollapsed=!!secCollapsed[sec];
 
@@ -1274,8 +1274,7 @@ function renderTopbar(){
   var calcBtn=el('button',{class:'topbar-app-btn'+(state.calcOpen?' active':''),title:'Calculadora (Touch Bar)',onclick:function(){setState({calcOpen:!state.calcOpen,calOpen:false,notaOpen:false});}}, '🧮');
   var calBtn=el('button',{class:'topbar-app-btn'+(state.calOpen?' active':''),title:'Calendário (Touch Bar)',onclick:function(){setState({calOpen:!state.calOpen,calcOpen:false,notaOpen:false});}}, '📅');
   var notaBtn=el('button',{class:'topbar-app-btn'+(state.notaOpen?' active':''),title:'Bloco de Notas (Touch Bar)',onclick:function(){setState({notaOpen:!state.notaOpen,calcOpen:false,calOpen:false});}}, '📝');
-  var mapaBtn=el('button',{class:'topbar-app-btn',title:'Mapa',onclick:function(){setState({page:'mapa',calcOpen:false,calOpen:false,notaOpen:false});}}, '🗺️');
-  var appsEl=el('div',{class:'topbar-apps'},[calcBtn,calBtn,notaBtn,mapaBtn]);
+  var appsEl=el('div',{class:'topbar-apps'},[calcBtn,calBtn,notaBtn]);
 
   // Widget clima/localização
   var weatherEl=el('div',{id:'djf-weather',style:{display:'inline-flex',alignItems:'center',gap:'3px'}});
@@ -2476,6 +2475,9 @@ function render(){
     }
     return;
   }
+
+  var _hiddenPages=['estoque','cardapio','impressoes','pdv','kds','mapa'];
+  if(_hiddenPages.indexOf(state.page)!==-1){setState({page:'dashboard'});return;}
 
   var pages={dashboard:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,administrador:renderAdministrador,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas,usuarios:renderUsuarios,recorrencias:renderRecorrencias,auditoria:renderAuditoria,ajuda:renderAjuda,estoque:renderEstoque,empresa:renderEmpresa,cardapio:renderCardapio,impressoes:renderImpressoes,kds:renderKDS,notas:renderNotas,mapa:renderMapa,pdv:renderPDV};
   var pageContent=(pages[state.page]||renderDashboard)();

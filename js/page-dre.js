@@ -11,10 +11,10 @@ function renderDRE(){
   function getMes(d){return d?parseInt(d.slice(5,7))-1:-1;}
 
   // Dados do mês selecionado
-  var receitasMes=state.receitas.filter(function(r){return r.profile===pf&&r.data&&r.data.startsWith(mesMes);});
+  var receitasMes=(state.receitas||[]).filter(function(r){return r.profile===pf&&r.data&&r.data.startsWith(mesMes);});
   // Para pessoal, incluir também contas recebidas
-  var contasRecebidas=state.contas.filter(function(c){return c.profile===pf&&c.tipo==='receber'&&c.status==='recebido'&&c.vencimento&&c.vencimento.startsWith(mesMes);});
-  var despesasPagas=state.contas.filter(function(c){return c.profile===pf&&c.tipo==='pagar'&&c.status==='pago'&&c.vencimento&&c.vencimento.startsWith(mesMes);});
+  var contasRecebidas=(state.contas||[]).filter(function(c){return c.profile===pf&&c.tipo==='receber'&&c.status==='recebido'&&c.vencimento&&c.vencimento.startsWith(mesMes);});
+  var despesasPagas=(state.contas||[]).filter(function(c){return c.profile===pf&&c.tipo==='pagar'&&c.status==='pago'&&c.vencimento&&c.vencimento.startsWith(mesMes);});
 
   var totalReceitas=receitasMes.reduce(function(a,r){return a+r.valor;},0);
   var totalContasRec=contasRecebidas.reduce(function(a,c){return a+c.valor;},0);
@@ -35,9 +35,9 @@ function renderDRE(){
   // Dados anuais para o gráfico
   var dadosAno=MESES.map(function(m,i){
     var mm=ano+'-'+String(i+1).padStart(2,'0');
-    var rec=state.receitas.filter(function(r){return r.profile===pf&&r.data&&r.data.startsWith(mm);}).reduce(function(a,r){return a+r.valor;},0);
-    var recC=isPessoal?state.contas.filter(function(c){return c.profile===pf&&c.tipo==='receber'&&c.status==='recebido'&&c.vencimento&&c.vencimento.startsWith(mm);}).reduce(function(a,c){return a+c.valor;},0):0;
-    var des=state.contas.filter(function(c){return c.profile===pf&&c.tipo==='pagar'&&c.status==='pago'&&c.vencimento&&c.vencimento.startsWith(mm);}).reduce(function(a,c){return a+c.valor;},0);
+    var rec=(state.receitas||[]).filter(function(r){return r.profile===pf&&r.data&&r.data.startsWith(mm);}).reduce(function(a,r){return a+r.valor;},0);
+    var recC=isPessoal?(state.contas||[]).filter(function(c){return c.profile===pf&&c.tipo==='receber'&&c.status==='recebido'&&c.vencimento&&c.vencimento.startsWith(mm);}).reduce(function(a,c){return a+c.valor;},0):0;
+    var des=(state.contas||[]).filter(function(c){return c.profile===pf&&c.tipo==='pagar'&&c.status==='pago'&&c.vencimento&&c.vencimento.startsWith(mm);}).reduce(function(a,c){return a+c.valor;},0);
     return{mes:m,rec:rec+recC,des:des,res:(rec+recC)*(1-cmvPct/100)-des};
   });
 

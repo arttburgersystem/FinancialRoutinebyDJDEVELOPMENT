@@ -765,7 +765,7 @@ function renderMovModal() {
     return el('option',{value:p.id},'🍔 '+p.nome+' ('+formatQtd(p.estoqueAtual,p.unidade)+')');
   });
   function _custoParaProd(prd) {
-    if(!prd || prd.tipo==='saida') return 0;
+    if(!prd) return 0;
     if(prd.custoMedio>0) return prd.custoMedio;
     if(prd.precoEmbalagem>0) return prd.precoEmbalagem;
     return 0;
@@ -874,7 +874,7 @@ function renderMovModal() {
 
     var novosProd = state.produtos.map(function(x){return x.id===novoProd.id?novoProd:x;});
     var novosMovs = (state.movEstoque||[]).concat([mov]);
-    var novasContas = state.contas;
+    var novasContas = state.contas||[];
 
     if (tipo==='entrada' && m.gerarDespesa) {
       var fornObj=(state.fornecedores||[]).find(function(f){return f.id===prod.fornecedor_id;});
@@ -1128,13 +1128,22 @@ function renderEstMovs() {
               onclick:function(){
                 if(!confirm('Excluir esta movimentação? O estoque será revertido.')) return;
                 var prod2 = (state.produtos||[]).find(function(p){return p.id===m.produto_id;});
-                var novosProd2 = state.produtos;
+                var novosProd2 = state.produtos||[];
                 if(prod2){
                   var qtdRev = m.tipo==='entrada'?-(m.quantidade||0):(m.tipo==='saida'?(m.quantidade||0):0);
                   var novoEst = (prod2.estoqueAtual||0)+qtdRev;
-                  novosProd2 = state.produtos.map(function(p){return p.id===prod2.id?Object.assign({},p,{estoqueAtual:novoEst}):p;});
+                  var novoCusto = prod2.custoMedio||0;
+                  if(m.tipo==='entrada'){
+                    if(novoEst>0){
+                      var totAtual=(prod2.custoMedio||0)*(prod2.estoqueAtual||0);
+                      var totEntrada=(m.custoUnitario||0)*(m.quantidade||0);
+                      novoCusto=Math.max(0,(totAtual-totEntrada)/novoEst);
+                    } else { novoCusto=0; }
+                  }
+                  novosProd2=(state.produtos||[]).map(function(p){return p.id===prod2.id?Object.assign({},p,{estoqueAtual:novoEst,custoMedio:novoCusto}):p;});
                 }
-                setState({produtos:novosProd2, movEstoque:(state.movEstoque||[]).filter(function(x){return x.id!==m.id;})});
+                setState({produtos:novosProd2,movEstoque:(state.movEstoque||[]).filter(function(x){return x.id!==m.id;})});
+                scheduleSave();
               }
             },'🗑️')
           ),
@@ -1681,7 +1690,7 @@ function renderNFModal() {
         var vdStr = vd.getFullYear()+'-'+String(vd.getMonth()+1).padStart(2,'0')+'-'+String(vd.getDate()).padStart(2,'0');
         novasContas.push({
           id:uid(), profile:state.profile,
-          tipo:'despesa', categoria:'Estoque / Insumos',
+          tipo:'pagar', categoria:'Estoque / Insumos',
           descricao:'NF '+(m.numero?m.numero+' — ':'')+m.fornecedor+(nParc>1?' ('+(pi+1)+'/'+nParc+')':''),
           valor:vlParc, vencimento:vdStr,
           formaPgto:fpg, banco:m.despBanco||'', bancoId:m.despBanco||'',

@@ -5,7 +5,7 @@ function renderMetaModal(){
   var vals={descricao:edit.descricao||'',meta:edit.meta||'',atual:edit.atual||'',categoria:edit.categoria||'Economia',prazo:edit.prazo||''};
   function g(id){return document.getElementById('mm-'+id)?document.getElementById('mm-'+id).value:vals[id];}
   function save(){
-    var d={id:edit.id||Date.now(),descricao:g('descricao'),meta:parseFloat(g('meta'))||0,atual:parseFloat(g('atual'))||0,categoria:g('categoria'),prazo:g('prazo'),profile:state.profile};
+    var d={id:edit.id||uid(),descricao:g('descricao'),meta:parseFloat(g('meta'))||0,atual:parseFloat(g('atual'))||0,categoria:g('categoria'),prazo:g('prazo'),profile:state.profile};
     if(!d.descricao||!d.meta)return;
     edit.id?updateMeta(d):addMeta(d);
   }

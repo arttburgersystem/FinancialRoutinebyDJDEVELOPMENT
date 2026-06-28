@@ -55,7 +55,7 @@ function renderEmprestimos(){
       if(!previewEl)return;
 
       var emp=todosEmprestimos.find(function(x){return x.id===empId;});
-      var banco=state.bancos.find(function(b){return b.id===bancoId;});
+      var banco=(state.bancos||[]).find(function(b){return b.id===bancoId;});
 
       // Preview saldo banco
       if(saldoEl){
@@ -116,7 +116,7 @@ function renderEmprestimos(){
       var emp=todosEmprestimos.find(function(x){return x.id===empId;});
       if(!emp){showToast('Empréstimo não encontrado','error');return;}
 
-      var banco=state.bancos.find(function(b){return b.id===bancoId;});
+      var banco=(state.bancos||[]).find(function(b){return b.id===bancoId;});
       var formaLabel=(FORMAS_ABATE.find(function(f){return f.key===formaPgto;})||{}).label||formaPgto;
       var bancoNome=banco?banco.nome:'';
 

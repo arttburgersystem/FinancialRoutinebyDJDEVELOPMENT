@@ -142,7 +142,7 @@ function renderCartoes() {
           descricao: desc,
           valor: valorFinal,
           categoria: _colCat ? (row[_colCat] || '') : '',
-          parcela: _colParc ? (row[imp.colParc] || '') : '',
+          parcela: _colParc ? (row[_colParc] || '') : '',
           fatura: _mes,
           profile: state.profile,
         });
@@ -398,6 +398,7 @@ function renderCartoes() {
         vencimento:    dataPag,
         dataPagamento: dataPag,
         pago:          true,
+        status:        'pago',
         profile:       state.profile,
         _cardId:       pm.cardId,
         _faturaRef:    pm.mes,

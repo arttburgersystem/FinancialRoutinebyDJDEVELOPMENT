@@ -1,6 +1,12 @@
 // ── VENDAS DO DIA — exclusivo Artt Burger ────────────────────────────────────
 var _vcalYear=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'})).getFullYear();
 var _vcalMonth=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'})).getMonth();
+var _closeOnOutside=function(e){
+  var cal=document.getElementById('cal-popup');
+  var calc=document.getElementById('calc-popup');
+  if(cal&&!cal.contains(e.target)&&!e.target.closest('#btn-cal-open'))cal.remove();
+  if(calc&&!calc.contains(e.target)&&!e.target.closest('#btn-calc-open'))calc.remove();
+};
 
 function renderVendas(){
   if(state.profile!=='artt'){
@@ -45,19 +51,13 @@ function renderVendas(){
     document.removeEventListener('click',_closeOnOutside);
   }
 
-  var _closeOnOutside=function(e){
-    var cal=document.getElementById('cal-popup');
-    var calc=document.getElementById('calc-popup');
-    if(cal&&!cal.contains(e.target)&&!e.target.closest('#btn-cal-open'))cal.remove();
-    if(calc&&!calc.contains(e.target)&&!e.target.closest('#btn-calc-open'))calc.remove();
-  };
 
   // ── CALENDÁRIO POPUP ──────────────────────────────────────────────────────
   function abrirCalendario(){
     var exist=document.getElementById('cal-popup');
     if(exist){exist.remove();return;}
     var d=new Date(dataSel+'T12:00:00');
-    var viewY=d.getFullYear(),viewM=d.getMonth();
+    _vcalYear=d.getFullYear();_vcalMonth=d.getMonth();
 
     function buildCal(){
       var popup=document.getElementById('cal-popup');
@@ -66,24 +66,24 @@ function renderVendas(){
 
       var header=el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}},[
         el('button',{style:{background:'none',border:'none',color:'var(--text)',cursor:'pointer',fontSize:'16px',padding:'2px 8px'},
-          onclick:function(){viewM--;if(viewM<0){viewM=11;viewY--;}buildCal();}
+          onclick:function(){_vcalMonth--;if(_vcalMonth<0){_vcalMonth=11;_vcalYear--;}buildCal();}
         },'‹'),
-        el('span',{style:{fontWeight:'700',fontSize:'13px',color:'var(--text)'}},MESES_FULL[viewM]+' '+viewY),
+        el('span',{style:{fontWeight:'700',fontSize:'13px',color:'var(--text)'}},MESES_FULL[_vcalMonth]+' '+_vcalYear),
         el('button',{style:{background:'none',border:'none',color:'var(--text)',cursor:'pointer',fontSize:'16px',padding:'2px 8px'},
-          onclick:function(){viewM++;if(viewM>11){viewM=0;viewY++;}buildCal();}
+          onclick:function(){_vcalMonth++;if(_vcalMonth>11){_vcalMonth=0;_vcalYear++;}buildCal();}
         },'›'),
       ]);
 
       var diasHead=el('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px',marginBottom:'4px'}},
         DIAS_CURTOS.map(function(d){return el('div',{style:{textAlign:'center',fontSize:'10px',fontWeight:'700',color:'var(--text3)',padding:'3px 0'}},d);}));
 
-      var firstDay=new Date(viewY,viewM,1).getDay();
-      var daysInMonth=new Date(viewY,viewM+1,0).getDate();
+      var firstDay=new Date(_vcalYear,_vcalMonth,1).getDay();
+      var daysInMonth=new Date(_vcalYear,_vcalMonth+1,0).getDate();
       var cells=[];
       for(var i=0;i<firstDay;i++)cells.push(el('div',{}));
       for(var d2=1;d2<=daysInMonth;d2++){
         (function(day){
-          var dateStr=viewY+'-'+String(viewM+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+          var dateStr=_vcalYear+'-'+String(_vcalMonth+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
           var isSel=dateStr===dataSel;
           var isToday=dateStr===today();
           var temVenda=datasComVenda[dateStr];

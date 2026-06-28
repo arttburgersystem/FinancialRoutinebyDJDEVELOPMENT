@@ -21,10 +21,10 @@ function renderOrcamento(){
   // Receita real do mês
   var recReal=state.receitas.filter(function(r){return r.profile===pf&&r.data&&r.data.startsWith(mesFiltro);}).reduce(function(a,r){return a+r.valor;},0);
   var contasRec=state.contas.filter(function(c){return c.profile===pf&&c.tipo==='receber'&&c.status==='recebido'&&c.vencimento&&c.vencimento.startsWith(mesFiltro);}).reduce(function(a,c){return a+c.valor;},0);
-  var receitaRealTotal=recReal+(pf==='pessoal'?contasRec:0);
+  var receitaRealTotal=recReal+contasRec;
 
-  // Despesas reais por categoria no mês
-  var despesas=state.contas.filter(function(c){return c.profile===pf&&c.tipo==='pagar'&&c.vencimento&&c.vencimento.startsWith(mesFiltro);});
+  // Despesas reais = somente pagas (pendentes/vencidas ainda não saíram do caixa)
+  var despesas=state.contas.filter(function(c){return c.profile===pf&&c.tipo==='pagar'&&c.status==='pago'&&c.vencimento&&c.vencimento.startsWith(mesFiltro);});
   var realByCat={};
   despesas.forEach(function(c){realByCat[c.categoria]=(realByCat[c.categoria]||0)+c.valor;});
 

@@ -1,7 +1,7 @@
 // ── FUNCIONÁRIOS ──────────────────────────────────────────────────────────────
 function renderFuncionarios(){
   var funcionarios=(state.funcionarios||[])
-    .filter(function(f){return !f.profile||f.profile===state.profile;});
+    .filter(function(f){return f.profile===state.profile||!f.profile;});
 
   // ── MODAL ADD/EDIT ─────────────────────────────────────────────────────────
   if(state.funcionarioModal){

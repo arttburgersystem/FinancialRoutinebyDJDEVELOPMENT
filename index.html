@@ -112,6 +112,11 @@ td.text-main{color:var(--text);font-weight:500}
 .form-input:focus{border-color:var(--gold)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+.btn-secondary{background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:var(--radius-sm);padding:7px 14px;font-size:13px;font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-secondary:hover{border-color:var(--border2);color:var(--text)}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.modal-body{margin-bottom:6px}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
 
 /* ALERT */
 .alert{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:var(--radius-sm);margin-bottom:8px;font-size:13px}
@@ -140,7 +145,6 @@ td.text-main{color:var(--text);font-weight:500}
 .toast.error{border-color:#ef4444;box-shadow:0 8px 32px rgba(0,0,0,.45),0 0 0 4px rgba(239,68,68,.18)}.toast.error .t-icon{background:rgba(239,68,68,.18);color:#ef4444}
 .toast.info{border-color:#3b82f6;box-shadow:0 8px 32px rgba(0,0,0,.45),0 0 0 4px rgba(59,130,246,.18)}.toast.info .t-icon{background:rgba(59,130,246,.18);color:#3b82f6}
 @keyframes toastIn{from{opacity:0;transform:translateY(14px) scale(.95)}to{opacity:1;transform:none}}
-@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes _fldshake{0%,100%{transform:translateX(0)}10%{transform:translateX(-8px)}30%{transform:translateX(8px)}50%{transform:translateX(-6px)}70%{transform:translateX(6px)}90%{transform:translateX(-3px)}}
 ._fldshake{animation:_fldshake .5s cubic-bezier(.36,.07,.19,.97);}
 @keyframes _fldblink{0%,100%{box-shadow:0 0 0 3px rgba(239,68,68,.35)}50%{box-shadow:0 0 0 5px rgba(239,68,68,.6)}}
@@ -460,6 +464,7 @@ var state={
   sessionPickerOpen: false,
   auditLog: lsGet('auditLog',[]),
   auditBusca: '',
+  fornBusca: '',
   apostas: lsGet('apostas',[]),
   apostaModal: null,
   apostaFiltro: 'todas',
@@ -660,7 +665,7 @@ function fbPut(path,data){
 
 function loadFromFirebase(){
   setState({syncStatus:'syncing'});
-  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias'),fbGet('/vendas'),fbGet('/emprestimos'),fbGet('/fornecedores'),fbGet('/funcionarios'),fbGet('/tarefas'),fbGet('/cartoes'),fbGet('/transacoesCartao'),fbGet('/usuarios'),fbGet('/auditLog'),fbGet('/produtos'),fbGet('/movEstoque'),fbGet('/empresaData'),fbGet('/setoresImpressao'),fbGet('/complementos'),fbGet('/kdsConfigs'),fbGet('/pedidos'),fbGet('/notas'),fbGet('/impressorasCadastradas'),fbGet('/configImpressao'),fbGet('/administradores'),fbGet('/estCategorias'),fbGet('/apostas')])
+  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias'),fbGet('/vendas'),fbGet('/emprestimos'),fbGet('/fornecedores'),fbGet('/funcionarios'),fbGet('/tarefas'),fbGet('/cartoes'),fbGet('/transacoesCartao'),fbGet('/usuarios'),fbGet('/auditLog'),fbGet('/produtos'),fbGet('/movEstoque'),fbGet('/empresaData'),fbGet('/setoresImpressao'),fbGet('/complementos'),fbGet('/kdsConfigs'),fbGet('/pedidos'),fbGet('/notas'),fbGet('/impressorasCadastradas'),fbGet('/configImpressao'),fbGet('/administradores'),fbGet('/estCategorias'),fbGet('/apostas'),fbGet('/orcamentos')])
     .then(function(results){
       var contas=objToArr(results[0]);
       var metas=objToArr(results[1]);
@@ -690,8 +695,10 @@ function loadFromFirebase(){
       var administradores=objToArr(results[24]||[]);
       var estCategorias=objToArr(results[25]||[]);
       var apostas=objToArr(results[26]||[]);
-      lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);lsSet('vendas',vendas);lsSet('emprestimos',emprestimos);lsSet('fornecedores',fornecedores);lsSet('funcionarios',funcionarios);lsSet('tarefas',tarefas);lsSet('cartoes',cartoes);lsSet('transacoesCartao',transacoesCartao);lsSet('usuarios',usuarios);lsSet('auditLog',auditLog);lsSet('produtos',produtos);lsSet('movEstoque',movEstoque);lsSet('empresaData',empresaData);lsSet('setoresImpressao',setoresImpressao);lsSet('complementos',complementos);lsSet('kdsConfigs',kdsConfigs);lsSet('pedidos',pedidos);lsSet('notas',notas);lsSet('impressorasCadastradas',impressorasCadastradas);lsSet('configImpressao',configImpressao);lsSet('administradores',administradores);lsSet('estCategorias',estCategorias);lsSet('apostas',apostas);
-      setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,vendas:vendas,emprestimos:emprestimos,fornecedores:fornecedores,funcionarios:funcionarios,tarefas:tarefas,cartoes:cartoes,transacoesCartao:transacoesCartao,usuarios:usuarios,auditLog:auditLog,produtos:produtos,movEstoque:movEstoque,empresaData:empresaData,setoresImpressao:setoresImpressao,complementos:complementos,kdsConfigs:kdsConfigs,pedidos:pedidos,notas:notas,impressorasCadastradas:impressorasCadastradas,configImpressao:configImpressao,administradores:administradores,estCategorias:estCategorias,apostas:apostas,syncStatus:'ok'});
+      var orcamentosFirebase=objToArr(results[27]||[]);
+      var orcamentos=orcamentosFirebase.length>0?orcamentosFirebase:lsGet('orcamentos',[]);
+      lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);lsSet('vendas',vendas);lsSet('emprestimos',emprestimos);lsSet('fornecedores',fornecedores);lsSet('funcionarios',funcionarios);lsSet('tarefas',tarefas);lsSet('cartoes',cartoes);lsSet('transacoesCartao',transacoesCartao);lsSet('usuarios',usuarios);lsSet('auditLog',auditLog);lsSet('produtos',produtos);lsSet('movEstoque',movEstoque);lsSet('empresaData',empresaData);lsSet('setoresImpressao',setoresImpressao);lsSet('complementos',complementos);lsSet('kdsConfigs',kdsConfigs);lsSet('pedidos',pedidos);lsSet('notas',notas);lsSet('impressorasCadastradas',impressorasCadastradas);lsSet('configImpressao',configImpressao);lsSet('administradores',administradores);lsSet('estCategorias',estCategorias);lsSet('apostas',apostas);lsSet('orcamentos',orcamentos);
+      setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,vendas:vendas,emprestimos:emprestimos,fornecedores:fornecedores,funcionarios:funcionarios,tarefas:tarefas,cartoes:cartoes,transacoesCartao:transacoesCartao,usuarios:usuarios,auditLog:auditLog,produtos:produtos,movEstoque:movEstoque,empresaData:empresaData,setoresImpressao:setoresImpressao,complementos:complementos,kdsConfigs:kdsConfigs,pedidos:pedidos,notas:notas,impressorasCadastradas:impressorasCadastradas,configImpressao:configImpressao,administradores:administradores,estCategorias:estCategorias,apostas:apostas,orcamentos:orcamentos,syncStatus:'ok'});
     })
     .catch(function(e){
       console.error(e);
@@ -707,7 +714,7 @@ function scheduleSave(){
   syncTimer=setTimeout(function(){
     // Atualiza badge diretamente — sem setState para não destruir inputs ativos
     _updateSyncDOM('syncing');
-    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);lsSet('notas',state.notas||[]);lsSet('impressorasCadastradas',state.impressorasCadastradas||[]);lsSet('auditLog',state.auditLog||[]);lsSet('administradores',state.administradores||[]);lsSet('estCategorias',state.estCategorias||[]);lsSet('pdvPedidos',state.pdvPedidos||[]);lsSet('pdvSessoes',state.pdvSessoes||[]);lsSet('pdvCaixaSes',state.pdvCaixaSes);
+    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);lsSet('notas',state.notas||[]);lsSet('impressorasCadastradas',state.impressorasCadastradas||[]);lsSet('auditLog',state.auditLog||[]);lsSet('administradores',state.administradores||[]);lsSet('estCategorias',state.estCategorias||[]);lsSet('pdvPedidos',state.pdvPedidos||[]);lsSet('pdvSessoes',state.pdvSessoes||[]);lsSet('pdvCaixaSes',state.pdvCaixaSes);lsSet('orcamentos',state.orcamentos||[]);
     Promise.all([
       fbPut('/contas',arrToObj(state.contas)),
       fbPut('/metas',arrToObj(state.metas)),
@@ -735,6 +742,7 @@ function scheduleSave(){
       fbPut('/administradores',arrToObj(state.administradores||[])),
       fbPut('/apostas',arrToObj(state.apostas||[])),
       fbPut('/estCategorias',arrToObj(state.estCategorias||[])),
+      fbPut('/orcamentos',arrToObj(state.orcamentos||[])),
       fbPut('/pdvPedidos',arrToObj(state.pdvPedidos||[])),
       fbPut('/pdvSessoes',arrToObj(state.pdvSessoes||[])),
     ]).then(function(){_updateSyncDOM('ok');})
@@ -770,15 +778,32 @@ function saveVenda(v){
   var existe=vendas.find(function(x){return x.id===v.id;});
   var novasVendas=existe?vendas.map(function(x){return x.id===v.id?v:x;}):vendas.concat([v]);
   var PDV_LABEL={dinheiro:'Dinheiro',pix:'Pix',credito:'Cartão Crédito',debito:'Cartão Débito',notinha:'Notinha Funcionários',ifood_online:'iFood Online',yooga:'Yooga Online'};
-  // Crédito e débito sempre caem no banco Stone (máquina Stone)
-  var stoneBanco=(state.bancos||[]).find(function(b){return b.nome&&b.nome.toLowerCase().indexOf('stone')!==-1;});
-  var stoneId=stoneBanco?stoneBanco.id:'';
+  // Busca banco por palavras-chave no nome (perfil artt)
+  var arttBancos=(state.bancos||[]).filter(function(b){return b.profile==='artt';});
+  function findBanco(kws){
+    for(var i=0;i<kws.length;i++){
+      var kw=kws[i].toLowerCase();
+      var found=arttBancos.find(function(b){return b.nome&&b.nome.toLowerCase().indexOf(kw)!==-1;});
+      if(found)return found.id;
+    }
+    return '';
+  }
+  var stoneId=findBanco(['stone']);
+  var BANCO_MAP={
+    credito:     stoneId,
+    debito:      stoneId,
+    dinheiro:    findBanco(['cofre','caixa','dinheiro']),
+    pix:         findBanco(['pix','mercado pago','nubank','inter','sicoob','sicredi']),
+    notinha:     findBanco(['cofre','caixa','func']),
+    ifood_online:findBanco(['ifood','i food','mercado pago','mp']),
+    yooga:       findBanco(['yooga','mercado pago','mp']),
+  };
   var recGeradas=[];
   Object.keys(v.pdv||{}).forEach(function(k){
     var bruto=v.pdv[k]||0;if(!bruto)return;
     var taxa=(taxas[k]||0)/100;
     var liquido=Math.round(bruto*(1-taxa)*100)/100;
-    var bancoDest=(k==='credito'||k==='debito')?stoneId:'';
+    var bancoDest=BANCO_MAP[k]||'';
     recGeradas.push({id:'rec_vnd_'+v.data+'_'+k,descricao:(PDV_LABEL[k]||k)+' — '+fmtDate(v.data),valor:liquido,data:v.data,categoria:'Vendas PDV',profile:'artt',banco:bancoDest,notas:'Bruto '+fmtMoney(bruto)+' | Taxa '+(taxas[k]||0)+'%',venda_id:v.id});
   });
   var receitas=(state.receitas||[]).filter(function(r){return r.venda_id!==v.id;}).concat(recGeradas);
@@ -796,7 +821,7 @@ function deleteVenda(id){
   showToast('Lançamento removido','error');
 }
 
-function addOrcamento(o){var os=(state.orcamentos||[]).concat([o]);lsSet('orcamentos',os);setState({orcamentos:os,orcamentoModal:null});showToast('Orçamento definido!');}
+function addOrcamento(o){var os=(state.orcamentos||[]).concat([o]);lsSet('orcamentos',os);setState({orcamentos:os,orcamentoModal:null});scheduleSave();showToast('Orçamento definido!');}
 
 function addProfile(p){
   PROFILES=PROFILES.concat([p]);
@@ -826,8 +851,8 @@ function deleteProfile(id){
   scheduleSave();
   showToast('Perfil excluído','error');
 }
-function deleteOrcamento(id){var os=(state.orcamentos||[]).filter(function(x){return x.id!==id;});lsSet('orcamentos',os);setState({orcamentos:os});showToast('Orçamento removido','error');}
-function updateOrcamento(o){var os=(state.orcamentos||[]).map(function(x){return x.id===o.id?o:x;});lsSet('orcamentos',os);setState({orcamentos:os,orcamentoModal:null});showToast('Orçamento atualizado!');}
+function deleteOrcamento(id){var os=(state.orcamentos||[]).filter(function(x){return x.id!==id;});lsSet('orcamentos',os);setState({orcamentos:os});scheduleSave();showToast('Orçamento removido','error');}
+function updateOrcamento(o){var os=(state.orcamentos||[]).map(function(x){return x.id===o.id?o:x;});lsSet('orcamentos',os);setState({orcamentos:os,orcamentoModal:null});scheduleSave();showToast('Orçamento atualizado!');}
 
 // ── RECORRÊNCIA ───────────────────────────────────────────────────────────────
 function addPeriodo(d,tipo,n){
@@ -858,7 +883,7 @@ function runRecorrencia(){
       if(r.recorrencia_fim==='ocorrencias'&&ocGeradas>=(r.recorrencia_fim_ocorrencias||12))break;
       var jaExiste=geradas.find(function(c){return c.vencimento===cursor;})||novas.find(function(c){return c.gerado_de===r.id&&c.vencimento===cursor;});
       if(!jaExiste){
-        novas.push({id:'rec_'+r.id+'_'+cursor,descricao:r.descricao,valor:r.valor,categoria:r.categoria,vencimento:cursor,status:r.tipo==='pagar'?'pendente':'previsto',tipo:r.tipo,profile:r.profile,recorrente:false,gerado_de:r.id,notas:r.notas||'',prioridade:r.prioridade||'normal'});
+        novas.push({id:'rec_'+r.id+'_'+cursor,descricao:r.descricao,valor:r.valor,categoria:r.categoria,vencimento:cursor,status:r.tipo==='pagar'?'pendente':'previsto',tipo:r.tipo,profile:r.profile,recorrente:false,gerado_de:r.id,notas:r.notas||'',prioridade:r.prioridade||'normal',banco:r.banco||'',fornecedor:r.fornecedor||'',fornecedorId:r.fornecedorId||'',formaPgto:r.formaPgto||''});
         ocGeradas++;
       }
       cursor=addPeriodo(cursor,r.recorrencia_tipo,r.recorrencia_intervalo);
@@ -1532,7 +1557,7 @@ function renderPagar(){
   var kpiBar=filtro!=='todos'?el('div',{style:{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'14px'}},[
     el('div',{style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'8px',padding:'10px 16px',flex:'1',minWidth:'130px'}},[
       el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'3px'}},'Total do mês'),
-      el('div',{style:{fontSize:'16px',fontWeight:'700',color:'var(--text1)'}},fmtMoney(_totalMes)),
+      el('div',{style:{fontSize:'16px',fontWeight:'700',color:'var(--text)'}},fmtMoney(_totalMes)),
     ]),
     el('div',{style:{background:'var(--bg3)',border:'1px solid rgba(239,68,68,.3)',borderRadius:'8px',padding:'10px 16px',flex:'1',minWidth:'130px'}},[
       el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'3px'}},'Pendente'),

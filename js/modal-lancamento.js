@@ -70,12 +70,13 @@ function renderModal(){
       }
 
       var _novasCP=[], _novasTR=[];
+      var _idBase=uid(); // ID único gerado uma vez para o lote
       for(var _pi=0;_pi<_numParc;_pi++){
         var _mf=_addMes(_fatInicio,_pi);
         var _dv=_mf+'-'+String(_diaVenc).padStart(2,'0');
         var _sfx=_numParc>1?' ('+(_pi+1)+'/'+_numParc+')':'';
         _novasCP.push({
-          id:'conta_'+Date.now()+'_p'+_pi,
+          id:'conta_'+_idBase+'_p'+_pi,
           tipo:'pagar', descricao:d.descricao+_sfx,
           valor:_valParcela, categoria:d.categoria,
           vencimento:_dv, status:'pendente', pago:false,
@@ -83,9 +84,10 @@ function renderModal(){
           formaPgto:'credito', cardId:_cardIdSel,
           parcela:(_pi+1)+'/'+_numParc, numParcelas:_numParc,
           grupoParcelamento:_grupoId,
+          fornecedor:d.fornecedor||'', fornecedorId:d.fornecedorId||'',
         });
         _novasTR.push({
-          id:'ctrans_'+Date.now()+'_p'+_pi,
+          id:'ctrans_'+_idBase+'_p'+_pi,
           cardId:_cardIdSel, data:d.vencimento,
           descricao:d.descricao+_sfx,
           valor:_valParcela, categoria:d.categoria,
@@ -191,9 +193,9 @@ function renderModal(){
     {v:'outros', l:'• Outros'},
   ];
 
-  // ── Bancos disponíveis ───────────────────────────────────────────────────
+  // ── Bancos disponíveis (filtrado pelo perfil ativo) ───────────────────────
   var bancoOpts=[{v:'',l:'— Nenhuma conta —'}].concat(
-    (state.bancos||[]).map(function(b){
+    (state.bancos||[]).filter(function(b){return !b.profile||b.profile===state.profile;}).map(function(b){
       return{v:b.id,l:b.nome+(b.saldo!=null?' ('+fmtMoney(b.saldo||0)+')':'')};
     })
   );

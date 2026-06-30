@@ -2606,6 +2606,7 @@ function render(){
   if(typeof renderDailyModal==='function'){var dlM=renderDailyModal();if(dlM)app.appendChild(dlM);}
   if(typeof renderDailyAdiModal==='function'){var daM=renderDailyAdiModal();if(daM)app.appendChild(daM);}
   if(typeof renderDailyTemplatesModal==='function'){var dtM=renderDailyTemplatesModal();if(dtM)app.appendChild(dtM);}
+  if(typeof _doCheckBanner==='function')_doCheckBanner();
   var alertaBanner=typeof renderAlertaBanner==='function'?renderAlertaBanner():null;
   if(alertaBanner)app.appendChild(alertaBanner);
   if(state.toast){

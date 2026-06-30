@@ -101,7 +101,9 @@ function _doInit(){
   ops=ops.map(function(op){
     if(op.profile===pf&&op.status==='adiada'&&op.adiada&&op.adiada.para<=hj){
       changed=true;
-      return Object.assign({},op,{status:hora06?'hoje':'programacao',data:hj,adiada:null});
+      var patch={status:hora06?'hoje':'programacao',data:hj,adiada:null};
+      if(op.adiada.hora)patch.horario=op.adiada.hora;
+      return Object.assign({},op,patch);
     }
     return op;
   });
@@ -122,11 +124,29 @@ function _doCancelar(id,motivo){
   });
   lsSet('dailyOps',ops);setState({dailyOps:ops,dailyAdiModal:null});scheduleSave();showToast('Tarefa cancelada','error');
 }
-function _doAdiar(id,para,motivo){
+function _doAdiar(id,para,hora,motivo){
   var ops=(state.dailyOps||[]).map(function(op){
-    return op.id===id?Object.assign({},op,{status:'adiada',adiada:{para:para,motivo:motivo||''}}):op;
+    return op.id===id?Object.assign({},op,{status:'adiada',adiada:{para:para,hora:hora||'',motivo:motivo||''}}):op;
   });
-  lsSet('dailyOps',ops);setState({dailyOps:ops,dailyAdiModal:null});scheduleSave();showToast('Adiada para '+_doFmtData(para));
+  lsSet('dailyOps',ops);setState({dailyOps:ops,dailyAdiModal:null});scheduleSave();
+  showToast('Adiada para '+_doFmtData(para)+(hora?' às '+hora:''));
+}
+function _doCancelarEProximas(id,motivo){
+  var op=(state.dailyOps||[]).find(function(x){return x.id===id;});if(!op)return;
+  var defId=op.defId;
+  var now=new Date().toISOString();
+  var ops=(state.dailyOps||[]).map(function(o){
+    if(o.id===id||(defId&&o.defId===defId&&o.status==='programacao')){
+      return Object.assign({},o,{status:'cancelada',canceladaEm:now,motivoCancelamento:motivo||''});
+    }
+    return o;
+  });
+  var defs=defId
+    ?(state.dailyTaskDefs||[]).map(function(d){return d.id===defId?Object.assign({},d,{ativo:false}):d;})
+    :(state.dailyTaskDefs||[]);
+  lsSet('dailyOps',ops);lsSet('dailyTaskDefs',defs);
+  setState({dailyOps:ops,dailyTaskDefs:defs,dailyAdiModal:null});scheduleSave();
+  showToast('Tarefa e rotina canceladas','error');
 }
 function _doPularHoje(id){
   var ops=(state.dailyOps||[]).map(function(op){
@@ -150,22 +170,48 @@ function _doExcluir(id){
 function renderDailyAdiModal(){
   var id=state.dailyAdiModal;if(!id)return null;
   var op=(state.dailyOps||[]).find(function(x){return x.id===id;});if(!op)return null;
-  var motiEl=el('textarea',{class:'form-input',rows:'2',placeholder:'Motivo (opcional)',style:{resize:'vertical',minHeight:'56px'}});
-  var dtEl=el('input',{class:'form-input',type:'date'});
+  var temDef=!!(op.defId&&(state.dailyTaskDefs||[]).find(function(d){return d.id===op.defId;}));
+  var motiEl=el('textarea',{class:'form-input',rows:'2',placeholder:'Motivo (opcional)',style:{resize:'vertical',minHeight:'52px'}});
+  var dtEl=el('input',{class:'form-input',type:'date',style:{flex:'1'}});
   var _amanha=new Date(today()+'T12:00:00');_amanha.setDate(_amanha.getDate()+1);
   dtEl.value=_amanha.toISOString().substring(0,10);
+  var hrEl=el('input',{class:'form-input',type:'time',style:{width:'110px'}});
+  hrEl.value=op.horario||'';
   return el('div',{class:'modal-overlay',onclick:function(e){if(e.target===this)setState({dailyAdiModal:null});}},[
-    el('div',{class:'modal-box',style:{maxWidth:'380px',width:'95vw'}},[
-      el('h3',{style:{margin:'0 0 12px',fontSize:'16px',color:'var(--text)'}},'↻ Adiar · ✕ Cancelar'),
-      el('p',{style:{fontSize:'13px',color:'var(--text2)',marginBottom:'14px',fontWeight:'600'}},op.nome),
-      div('form-group',[el('label',{class:'form-label'},'Adiar para:'),dtEl]),
+    el('div',{class:'modal-box',style:{maxWidth:'400px',width:'95vw'}},[
+      el('h3',{style:{margin:'0 0 4px',fontSize:'16px',color:'var(--text)'}},'↻ Adiar tarefa'),
+      el('p',{style:{fontSize:'13px',color:'var(--gold)',marginBottom:'16px',fontWeight:'600'}},op.nome),
+
+      // Adiar section
+      div('form-group',[
+        el('label',{class:'form-label'},'Adiar para: (data e horário)'),
+        el('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},[dtEl,hrEl]),
+      ]),
       div('form-group',[el('label',{class:'form-label'},'Motivo (opcional):'),motiEl]),
-      el('div',{style:{display:'flex',gap:'8px',marginTop:'16px',flexWrap:'wrap'}},[
-        btn('btn-primary','↻ Adiar',function(){_doAdiar(id,dtEl.value||today(),motiEl.value.trim());}),
-        el('button',{style:{padding:'8px 14px',borderRadius:'8px',border:'1px solid var(--red)',background:'none',color:'var(--red)',cursor:'pointer',fontSize:'13px',fontWeight:'600'},
-          onclick:function(){_doCancelar(id,motiEl.value.trim());}
-        },'✕ Cancelar tarefa'),
+      el('div',{style:{display:'flex',gap:'8px',marginBottom:'20px'}},[
+        btn('btn-primary','↻ Adiar',function(){_doAdiar(id,dtEl.value||today(),hrEl.value,motiEl.value.trim());}),
         btn('btn-ghost','Fechar',function(){setState({dailyAdiModal:null});}),
+      ]),
+
+      // Cancelar section
+      el('div',{style:{borderTop:'1px solid var(--border)',paddingTop:'16px'}},[
+        el('div',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'10px',fontWeight:'600'}},'✕ CANCELAR TAREFA'),
+        el('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}},[
+          el('button',{style:{
+            padding:'8px 14px',borderRadius:'8px',border:'1px solid var(--red)',
+            background:'none',color:'var(--red)',cursor:'pointer',fontSize:'12px',fontWeight:'600',
+          },onclick:function(){_doCancelar(id,motiEl.value.trim());}},'✕ Só esta'),
+          temDef?el('button',{style:{
+            padding:'8px 14px',borderRadius:'8px',border:'none',
+            background:'var(--red)',color:'#fff',cursor:'pointer',fontSize:'12px',fontWeight:'600',
+          },onclick:function(){
+            if(!confirm('Cancelar esta tarefa e desativar a rotina recorrente?'))return;
+            _doCancelarEProximas(id,motiEl.value.trim());
+          }},'✕ Esta e as próximas'):null,
+        ].filter(Boolean)),
+        el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'6px'}},
+          temDef?'« Só esta »: cancela apenas este ciclo. « Esta e as próximas »: cancela e desativa a rotina.':
+                 '« Só esta »: cancela esta tarefa.'),
       ]),
     ])
   ]);
@@ -569,6 +615,8 @@ function renderDailyOperation(){
     _doColuna('Canceladas','🚫','var(--text3)',opCanc.map(_doCard)),
   ]);
 
+  _doCheckBanner();
+
   return div('',[
     div('page-header',[
       el('h1',{},'Daily Operation'),
@@ -579,4 +627,51 @@ function renderDailyOperation(){
     actionBar,
     board,
   ].filter(Boolean));
+}
+
+// ── faixa de notificação global ───────────────────────────────────────────────
+function _doCheckBanner(){
+  var pf=state.profile;
+  var alertas=(state.dailyOps||[]).filter(function(op){
+    return op.profile===pf&&_doDeveAlertar(op);
+  }).sort(function(a,b){
+    if(!a.horario)return 1;if(!b.horario)return -1;
+    return a.horario<b.horario?-1:1;
+  });
+
+  var existente=document.getElementById('do-global-banner');
+
+  if(!alertas.length){
+    if(existente)existente.remove();
+    return;
+  }
+
+  var op=alertas[0];
+  var hora=_doHora();
+  var h=op.horario.split(':'),taMin=parseInt(h[0])*60+parseInt(h[1]);
+  var n=hora.split(':'),nowMin=parseInt(n[0])*60+parseInt(n[1]);
+  var diff=taMin-nowMin;
+  var msg=diff>0
+    ?'⏰  Daily Operation · Tarefa em '+diff+' min: '+op.nome+' · '+op.horario
+    :'🔔  Daily Operation · HORA DA TAREFA: '+op.nome+' · '+op.horario;
+
+  if(alertas.length>1)msg+='  (+'+( alertas.length-1)+' tarefa'+(alertas.length>2?'s':'')+')';
+
+  if(!existente){
+    var banner=document.createElement('div');
+    banner.id='do-global-banner';
+    Object.assign(banner.style,{
+      position:'fixed',top:'0',left:'0',right:'0',zIndex:'99999',
+      background:'linear-gradient(90deg,#b8860b,var(--gold,#e5ac00),#b8860b)',
+      color:'#000',padding:'7px 16px',
+      fontSize:'13px',fontWeight:'700',letterSpacing:'.3px',
+      textAlign:'center',cursor:'pointer',
+      boxShadow:'0 2px 8px rgba(0,0,0,.35)',
+      animation:'doPulse 2s ease-in-out infinite',
+    });
+    banner.onclick=function(){if(typeof setState==='function')setState({page:'daily'});};
+    document.body.appendChild(banner);
+    existente=banner;
+  }
+  existente.textContent=msg;
 }

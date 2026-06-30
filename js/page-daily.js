@@ -2,7 +2,9 @@
 (function(){
   if(document.getElementById('do-style'))return;
   var s=document.createElement('style');s.id='do-style';
-  s.textContent='@keyframes doPulse{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 8px rgba(229,172,0,.30)}}';
+  s.textContent=
+    '@keyframes doPulse{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 8px rgba(229,172,0,.30)}}'+
+    '@keyframes doRedPulse{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 8px rgba(224,82,82,.30)}}';
   document.head.appendChild(s);
 })();
 
@@ -17,7 +19,7 @@ function _doDeveAlertar(op){
   if(!op.horario||op.status!=='hoje')return false;
   var h=op.horario.split(':'),taMin=parseInt(h[0])*60+parseInt(h[1]);
   var n=_doHora().split(':'),nowMin=parseInt(n[0])*60+parseInt(n[1]);
-  var alMin=parseInt(op.alertaMinutos)||15;
+  var alMin=op.alertaMinutos!=null?parseInt(op.alertaMinutos):15;
   return nowMin>=(taMin-alMin)&&nowMin<=(taMin+30);
 }
 function _doFmtData(s){
@@ -29,45 +31,77 @@ function _doFmtHoraISO(iso){
   catch(e){return '';}
 }
 function _doAtrasoLabel(op){
-  var hj=today();if(!op.data||op.data>=hj)return 'pendente';
+  var hj=today();if(!op.data||op.data>=hj)return '';
   var diff=Math.round((new Date(hj+'T12:00:00')-new Date(op.data+'T12:00:00'))/86400000);
   return diff===1?'há 1 dia':'há '+diff+' dias';
 }
 
 // ── inicialização diária ──────────────────────────────────────────────────────
+// Fluxo: Programação → (06:00) → Tarefa do Dia → Concluída → (meia-noite) → Programação
+// Não concluída = fica em Tarefa do Dia como 'pendente' (atrasada, piscando vermelho)
+// Só volta para Programação se estiver em Concluída
 function _doInit(){
+  var hora06=_doHora()>='06:00';
   var hj=today(),dow=new Date(hj+'T12:00:00').getDay(),pf=state.profile;
   var defs=(state.dailyTaskDefs||[]).filter(function(d){return d.profile===pf&&d.ativo;});
   var ops=(state.dailyOps||[]).slice();var changed=false;
 
-  // 1. Marcar 'hoje' de dias anteriores como 'pendente'
+  // 1. 'hoje' de dias anteriores → 'pendente' (fica em Tarefa do Dia como atrasada)
   ops=ops.map(function(op){
     if(op.profile===pf&&op.status==='hoje'&&op.data<hj){changed=true;return Object.assign({},op,{status:'pendente'});}
     return op;
   });
 
-  // 2. Criar instâncias de hoje a partir dos templates
+  // 2. 'concluida' de ciclos anteriores (com defId) → volta para 'programacao'
+  ops=ops.map(function(op){
+    if(op.profile===pf&&op.status==='concluida'&&op.data<hj&&op.defId){
+      changed=true;
+      return Object.assign({},op,{status:'programacao',concluidaEm:null,data:hj,adiada:null,motivoCancelamento:''});
+    }
+    return op;
+  });
+
+  // 3. Garantir que cada template ativo tenha instância 'programacao' (se não houver ativa ou cancelada hoje)
   defs.forEach(function(def){
-    var dias=def.dias||[];
-    if(dias.length&&dias.indexOf(dow)<0)return;
-    var existe=ops.some(function(op){return op.defId===def.id&&op.data===hj&&op.profile===pf;});
-    if(!existe){
+    var temAtiva=ops.some(function(op){
+      return op.defId===def.id&&op.profile===pf&&
+        (op.status==='programacao'||op.status==='hoje'||op.status==='pendente'||op.status==='adiada');
+    });
+    var temCanceladaHoje=ops.some(function(op){
+      return op.defId===def.id&&op.profile===pf&&op.status==='cancelada'&&op.data===hj;
+    });
+    if(!temAtiva&&!temCanceladaHoje){
       ops.push({
         id:uid(),defId:def.id,profile:pf,
-        nome:def.nome,descricao:def.descricao||'',
-        horario:def.horario||'',cor:def.cor||'gold',
-        prioridade:def.prioridade||'media',alertaMinutos:def.alertaMinutos||15,
-        data:hj,status:'hoje',criadaEm:new Date().toISOString(),
+        nome:def.nome,descricao:def.descricao||'',horario:def.horario||'',
+        cor:def.cor||'gold',prioridade:def.prioridade||'media',
+        alertaMinutos:def.alertaMinutos!=null?def.alertaMinutos:15,
+        data:hj,status:'programacao',criadaEm:new Date().toISOString(),
         concluidaEm:null,canceladaEm:null,adiada:null,motivoCancelamento:'',
       });
       changed=true;
     }
   });
 
-  // 3. Tarefas adiadas cujo dia chegou → de volta para 'hoje'
+  // 4. Às 06:00: mover 'programacao' de hoje → 'hoje' (Tarefa do Dia)
+  if(hora06){
+    ops=ops.map(function(op){
+      if(op.profile===pf&&op.status==='programacao'){
+        var def=(state.dailyTaskDefs||[]).find(function(d){return d.id===op.defId;});
+        var dias=def?(def.dias||[]):[];
+        if(!dias.length||dias.indexOf(dow)>=0){
+          changed=true;return Object.assign({},op,{status:'hoje',data:hj});
+        }
+      }
+      return op;
+    });
+  }
+
+  // 5. Tarefas adiadas cujo dia chegou → ativa (se já 06:00) ou programacao
   ops=ops.map(function(op){
     if(op.profile===pf&&op.status==='adiada'&&op.adiada&&op.adiada.para<=hj){
-      changed=true;return Object.assign({},op,{status:'hoje',data:hj});
+      changed=true;
+      return Object.assign({},op,{status:hora06?'hoje':'programacao',data:hj,adiada:null});
     }
     return op;
   });
@@ -94,8 +128,20 @@ function _doAdiar(id,para,motivo){
   });
   lsSet('dailyOps',ops);setState({dailyOps:ops,dailyAdiModal:null});scheduleSave();showToast('Adiada para '+_doFmtData(para));
 }
+function _doPularHoje(id){
+  var ops=(state.dailyOps||[]).map(function(op){
+    return op.id===id?Object.assign({},op,{status:'cancelada',canceladaEm:new Date().toISOString(),motivoCancelamento:'Pulada'}):op;
+  });
+  lsSet('dailyOps',ops);setState({dailyOps:ops});scheduleSave();showToast('Tarefa pulada hoje','info');
+}
+function _doAtivarAgora(id){
+  var ops=(state.dailyOps||[]).map(function(op){
+    return op.id===id?Object.assign({},op,{status:'hoje',data:today()}):op;
+  });
+  lsSet('dailyOps',ops);setState({dailyOps:ops});scheduleSave();showToast('Tarefa ativada!','success');
+}
 function _doExcluir(id){
-  if(!confirm('Remover esta tarefa do dia?'))return;
+  if(!confirm('Remover esta tarefa?'))return;
   var ops=(state.dailyOps||[]).filter(function(op){return op.id!==id;});
   lsSet('dailyOps',ops);setState({dailyOps:ops});scheduleSave();
 }
@@ -195,24 +241,19 @@ function renderDailyModal(){
         dias:diasSel.slice().sort(),alertaMinutos:(function(){var s=g('alerta');return s!==''?(parseInt(s)||0):15;})(),
         cor:corSel,prioridade:g('prioridade')||'media',ativo:true,
       };
-      var defs=isEdit
+      var defs2=isEdit
         ?(state.dailyTaskDefs||[]).map(function(d){return d.id===def.id?def:d;})
         :(state.dailyTaskDefs||[]).concat([def]);
-      lsSet('dailyTaskDefs',defs);setState({dailyTaskDefs:defs,dailyModal:null});scheduleSave();
-      if(!isEdit){
-        var dow=new Date(today()+'T12:00:00').getDay();
-        if(!diasSel.length||diasSel.indexOf(dow)>=0){
-          var inst2={
-            id:uid(),defId:def.id,profile:state.profile,
-            nome:def.nome,descricao:def.descricao,horario:def.horario,
-            cor:def.cor,prioridade:def.prioridade,alertaMinutos:def.alertaMinutos,
-            data:today(),status:'hoje',criadaEm:new Date().toISOString(),
-            concluidaEm:null,canceladaEm:null,adiada:null,motivoCancelamento:'',
-          };
-          var ops3=(state.dailyOps||[]).concat([inst2]);
-          lsSet('dailyOps',ops3);setState({dailyOps:ops3});
+      // Atualizar instâncias 'programacao' existentes com dados do template editado
+      var ops4=(state.dailyOps||[]).map(function(op){
+        if(op.defId===def.id&&op.profile===state.profile&&op.status==='programacao'){
+          return Object.assign({},op,{nome:def.nome,descricao:def.descricao,horario:def.horario,
+            cor:def.cor,prioridade:def.prioridade,alertaMinutos:def.alertaMinutos});
         }
-      }
+        return op;
+      });
+      lsSet('dailyTaskDefs',defs2);lsSet('dailyOps',ops4);
+      setState({dailyTaskDefs:defs2,dailyOps:ops4,dailyModal:null});scheduleSave();
       showToast(isEdit?'Rotina atualizada!':'Rotina criada!','success');
     }
   }
@@ -301,21 +342,30 @@ function renderDailyTemplatesModal(){
 // ── card de tarefa ────────────────────────────────────────────────────────────
 function _doCard(op){
   var alerta=_doDeveAlertar(op);
+  var ehPendente=op.status==='pendente';
+  var ehProg=op.status==='programacao';
+  var hj=today();
   var corMap={gold:'var(--gold)',blue:'var(--blue)',green:'var(--green)',red:'var(--red)',purple:'#9c59b6'};
   var cor=corMap[op.cor||'gold']||'var(--gold)';
   var priIcon={alta:'🔴',media:'🟡',baixa:'🟢'}[op.prioridade||'media'];
 
+  var brdCor=ehPendente?'var(--red)':cor;
   var cardStyle={
     background:'var(--bg3)',borderRadius:'8px',padding:'12px',marginBottom:'8px',
-    borderLeft:'3px solid '+cor,
-    border:'1px solid '+(alerta?cor:'var(--border)'),
+    borderLeft:'3px solid '+brdCor,
+    border:'1px solid '+(ehPendente?'var(--red)':alerta?cor:'var(--border)'),
     transition:'border-color .3s',
+    opacity:ehProg?'.9':'1',
   };
   if(alerta)cardStyle.animation='doPulse 1.4s ease-in-out infinite';
+  if(ehPendente)cardStyle.animation='doRedPulse 1.4s ease-in-out infinite';
+
+  var hdrTxt=ehProg?'📅 ':ehPendente?'🔴 ':(alerta?'⚠️ ':priIcon+' ');
+  var hdrColor=ehPendente?'var(--red)':'var(--text)';
 
   var hdr=el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'4px'}},[
-    el('div',{style:{fontWeight:'600',fontSize:'13px',color:'var(--text)',flex:'1',marginRight:'6px',lineHeight:'1.3'}},
-      (alerta?'⚠️ ':priIcon+' ')+op.nome),
+    el('div',{style:{fontWeight:'600',fontSize:'13px',color:hdrColor,flex:'1',marginRight:'6px',lineHeight:'1.3'}},
+      hdrTxt+op.nome),
     op.horario?el('span',{style:{fontSize:'11px',color:'var(--text3)',whiteSpace:'nowrap',fontWeight:'700',fontFamily:'monospace'}},op.horario):null,
   ].filter(Boolean));
 
@@ -326,10 +376,28 @@ function _doCard(op){
     padding:'4px 8px',background:'rgba(229,172,0,.12)',borderRadius:'4px',
   }},'⏰ HORA DA TAREFA!'):null;
 
-  var pendInfo=op.status==='pendente'?el('div',{style:{
+  var pendInfo=ehPendente?el('div',{style:{
     fontSize:'11px',color:'var(--red)',marginBottom:'8px',padding:'4px 8px',
-    background:'rgba(224,82,82,.1)',borderRadius:'4px',
-  }},'📅 Era para: '+_doFmtData(op.data)+' · Atrasada '+_doAtrasoLabel(op)):null;
+    background:'rgba(224,82,82,.1)',borderRadius:'4px',fontWeight:'600',
+  }},'⚠️ ATRASADA · Era: '+_doFmtData(op.data)+(_doAtrasoLabel(op)?' · '+_doAtrasoLabel(op):'')):null;
+
+  // Para 'programacao': mostra quando ativa (hoje às 06:00 ou dias futuros)
+  var progInfo=null;
+  if(ehProg){
+    var def2=(state.dailyTaskDefs||[]).find(function(d){return d.id===op.defId;});
+    var diasN2=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    var dias2=def2?(def2.dias||[]):[];
+    var diasTxt=dias2.length?dias2.map(function(i){return diasN2[i];}).join(', '):'Todos os dias';
+    var dow2=new Date(hj+'T12:00:00').getDay();
+    var ehHojeDow=!dias2.length||dias2.indexOf(dow2)>=0;
+    var anteDas6=_doHora()<'06:00';
+    progInfo=el('div',{style:{
+      fontSize:'11px',marginBottom:'8px',padding:'4px 8px',borderRadius:'4px',
+      background:ehHojeDow?'rgba(229,172,0,.1)':'rgba(255,255,255,.04)',
+      color:ehHojeDow?'var(--gold)':'var(--text3)',
+      fontWeight:ehHojeDow?'700':'400',
+    }},ehHojeDow&&anteDas6?'⏰ Ativa hoje às 06:00':ehHojeDow?'▶ Ativa hoje':'📅 '+diasTxt);
+  }
 
   var adiInfo=(op.status==='adiada'&&op.adiada)?el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'6px'}},
     '↻ Para: '+_doFmtData(op.adiada.para)+(op.adiada.motivo?' — "'+op.adiada.motivo+'"':'')):null;
@@ -338,10 +406,19 @@ function _doCard(op){
     '✓ Concluída às '+_doFmtHoraISO(op.concluidaEm)):null;
 
   var cancInfo=op.status==='cancelada'?el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'4px'}},
-    '✕ Cancelada'+(op.motivoCancelamento?' — "'+op.motivoCancelamento+'"':'')):null;
+    (op.motivoCancelamento&&op.motivoCancelamento!=='Pulada'?'✕ Cancelada — "'+op.motivoCancelamento+'"':'✕ Cancelada')):null;
 
   var btns=[];
-  if(op.status==='hoje'||op.status==='pendente'||op.status==='adiada'){
+  if(ehProg){
+    btns.push(el('button',{style:{
+      padding:'5px 10px',borderRadius:'6px',border:'none',background:'var(--blue)',
+      color:'#fff',fontSize:'12px',fontWeight:'700',cursor:'pointer',
+    },onclick:function(){_doAtivarAgora(op.id);}},'▶ Ativar agora'));
+    btns.push(el('button',{style:{
+      padding:'5px 10px',borderRadius:'6px',border:'1px solid var(--border)',
+      background:'none',color:'var(--text3)',fontSize:'12px',cursor:'pointer',
+    },onclick:function(){_doPularHoje(op.id);}},'⏭ Pular hoje'));
+  } else if(op.status==='hoje'||op.status==='pendente'||op.status==='adiada'){
     btns.push(el('button',{style:{
       padding:'5px 10px',borderRadius:'6px',border:'none',background:'var(--green)',
       color:'#fff',fontSize:'12px',fontWeight:'700',cursor:'pointer',
@@ -357,14 +434,14 @@ function _doCard(op){
   }
 
   var actions=btns.length?el('div',{style:{display:'flex',gap:'5px',marginTop:'8px',flexWrap:'wrap'}},btns):null;
-  return el('div',{style:cardStyle},[hdr,desc,alertTag,pendInfo,adiInfo,doneInfo,cancInfo,actions].filter(Boolean));
+  return el('div',{style:cardStyle},[hdr,desc,alertTag,pendInfo,progInfo,adiInfo,doneInfo,cancInfo,actions].filter(Boolean));
 }
 
 // ── coluna kanban ─────────────────────────────────────────────────────────────
 function _doColuna(titulo,icone,cor,cards){
   return el('div',{style:{
     background:'var(--bg2)',borderRadius:'10px',padding:'12px',
-    border:'1px solid var(--border)',display:'flex',flexDirection:'column',minWidth:'220px',
+    border:'1px solid var(--border)',display:'flex',flexDirection:'column',minWidth:'200px',
   }},[
     el('div',{style:{display:'flex',alignItems:'center',gap:'7px',marginBottom:'12px',paddingBottom:'10px',borderBottom:'1px solid var(--border)'}},[
       el('span',{style:{fontSize:'16px'}},icone),
@@ -392,15 +469,28 @@ function renderDailyOperation(){
   var pf=state.profile,hj=today();
   var ops=(state.dailyOps||[]).filter(function(op){return op.profile===pf;});
 
-  var opHoje=ops.filter(function(op){return op.status==='hoje'&&op.data===hj;}).sort(function(a,b){
+  // Programação: instâncias aguardando ativação (não é hora do dia delas ainda)
+  var opProg=ops.filter(function(op){return op.status==='programacao';}).sort(function(a,b){
+    var dA=(state.dailyTaskDefs||[]).find(function(d){return d.id===a.defId;})||{};
+    var dB=(state.dailyTaskDefs||[]).find(function(d){return d.id===b.defId;})||{};
+    var dw=new Date(hj+'T12:00:00').getDay();
+    var aH=!dA.dias||!dA.dias.length||dA.dias.indexOf(dw)>=0;
+    var bH=!dB.dias||!dB.dias.length||dB.dias.indexOf(dw)>=0;
+    if(aH&&!bH)return -1;if(!aH&&bH)return 1;
     if(!a.horario&&!b.horario)return 0;if(!a.horario)return 1;if(!b.horario)return -1;
     return a.horario<b.horario?-1:1;
   });
+
+  // Tarefa do Dia: ativas de hoje + atrasadas (pendentes)
+  var opHoje=ops.filter(function(op){return op.status==='hoje'||op.status==='pendente';}).sort(function(a,b){
+    if(a.status==='pendente'&&b.status!=='pendente')return -1;
+    if(b.status==='pendente'&&a.status!=='pendente')return 1;
+    if(!a.horario&&!b.horario)return 0;if(!a.horario)return 1;if(!b.horario)return -1;
+    return a.horario<b.horario?-1:1;
+  });
+
   var opConc=ops.filter(function(op){return op.status==='concluida'&&op.data===hj;}).sort(function(a,b){
     return(b.concluidaEm||'')>(a.concluidaEm||'')?1:-1;
-  });
-  var opPend=ops.filter(function(op){return op.status==='pendente';}).sort(function(a,b){
-    return a.data<b.data?-1:1;
   });
   var opAdiada=ops.filter(function(op){return op.status==='adiada';});
   var opCanc=ops.filter(function(op){return op.status==='cancelada';});
@@ -413,7 +503,9 @@ function renderDailyOperation(){
 
   var hora=_doHora();
   var dentroHorario=hora>='06:00'&&hora<='18:00';
-  var total=opHoje.length+opConc.length;
+  var opAFazer=opHoje.filter(function(op){return op.status==='hoje';});
+  var opAtrasadas=opHoje.filter(function(op){return op.status==='pendente';});
+  var total=opAFazer.length+opConc.length;
   var pct=total>0?Math.round((opConc.length/total)*100):0;
 
   // Header stats
@@ -428,16 +520,20 @@ function renderDailyOperation(){
         dentroHorario?('⏰ '+hora+' · Horário comercial ativo'):('⏰ '+hora+' · Fora do horário comercial (06:00–18:00)')),
     ]),
     el('div',{style:{display:'flex',gap:'14px',alignItems:'center',flexWrap:'wrap'}},[
+      opProg.length>0?el('div',{style:{textAlign:'center'}},[
+        el('div',{style:{fontSize:'22px',fontWeight:'800',color:'var(--text2)',lineHeight:'1'}},String(opProg.length)),
+        el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}},'Programadas'),
+      ]):null,
       el('div',{style:{textAlign:'center'}},[
-        el('div',{style:{fontSize:'24px',fontWeight:'800',color:'var(--green)',lineHeight:'1'}},String(opConc.length)),
-        el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}},'Concluídas'),
-      ]),
-      el('div',{style:{textAlign:'center'}},[
-        el('div',{style:{fontSize:'24px',fontWeight:'800',color:'var(--gold)',lineHeight:'1'}},String(opHoje.length)),
+        el('div',{style:{fontSize:'22px',fontWeight:'800',color:'var(--gold)',lineHeight:'1'}},String(opAFazer.length)),
         el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}},'A fazer'),
       ]),
-      opPend.length>0?el('div',{style:{textAlign:'center'}},[
-        el('div',{style:{fontSize:'24px',fontWeight:'800',color:'var(--red)',lineHeight:'1'}},String(opPend.length)),
+      el('div',{style:{textAlign:'center'}},[
+        el('div',{style:{fontSize:'22px',fontWeight:'800',color:'var(--green)',lineHeight:'1'}},String(opConc.length)),
+        el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}},'Concluídas'),
+      ]),
+      opAtrasadas.length>0?el('div',{style:{textAlign:'center'}},[
+        el('div',{style:{fontSize:'22px',fontWeight:'800',color:'var(--red)',lineHeight:'1'}},String(opAtrasadas.length)),
         el('div',{style:{fontSize:'11px',color:'var(--red)',marginTop:'2px'}},'Atrasadas'),
       ]):null,
       total>0?el('div',{style:{
@@ -460,15 +556,15 @@ function renderDailyOperation(){
     btn('btn-ghost','⚙️ Rotinas',function(){setState({dailyTemplatesOpen:true});}),
   ]);
 
-  // Kanban
+  // Kanban: Programação → Tarefa do Dia → Concluídas → Adiadas → Canceladas
   var board=el('div',{style:{
     display:'grid',
     gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',
     gap:'12px',alignItems:'start',
   }},[
+    _doColuna('Programação','📅','var(--text2)',opProg.map(_doCard)),
     _doColuna('Tarefa do Dia','📋','var(--gold)',opHoje.map(_doCard)),
     _doColuna('Concluídas','✅','var(--green)',opConc.map(_doCard)),
-    _doColuna('Pendentes','⏰','var(--red)',opPend.map(_doCard)),
     _doColuna('Adiadas','↻','var(--blue)',opAdiada.map(_doCard)),
     _doColuna('Canceladas','🚫','var(--text3)',opCanc.map(_doCard)),
   ]);
@@ -476,7 +572,7 @@ function renderDailyOperation(){
   return div('',[
     div('page-header',[
       el('h1',{},'Daily Operation'),
-      el('p',{},'Diário de bordo · Checklist operacional diário · 06:00–18:00'),
+      el('p',{},'Central de operações · Programação → Tarefa do Dia · 06:00–18:00'),
     ]),
     headerStats,
     progBar,

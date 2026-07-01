@@ -2176,14 +2176,17 @@ function renderBancos(){
   ]);
 
   var cards=bs.map(function(b){
+    var isCofre=b.id==='banco_cofre'||(b.nome&&b.nome.toLowerCase().indexOf('cofre')!==-1);
+    var bCopy=b;
     var card=el('div',{class:'kpi-card'},[
       el('div',{style:{position:'absolute',top:'0',left:'0',right:'0',height:'3px',background:b.cor}}),
       el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'8px'}},[
         el('span',{style:{fontSize:'13px',fontWeight:'700',color:'var(--text)'}},b.nome),
         el('div',{style:{display:'flex',gap:'4px'}},[
-          el('button',{class:'btn-icon edit',onclick:function(){setState({bancoModal:{editItem:b}});}}, '✏️'),
-          el('button',{class:'btn-icon',onclick:function(){if(confirm('Remover '+b.nome+'?'))deleteBanco(b.id);}}, '🗑️'),
-        ]),
+          isCofre?el('button',{class:'btn-icon',title:'Contador de cédulas',onclick:function(){setState({cedurasModal:{bancoId:bCopy.id,qtds:{}}});}}, '🧮'):null,
+          el('button',{class:'btn-icon edit',onclick:function(){setState({bancoModal:{editItem:bCopy}});}}, '✏️'),
+          el('button',{class:'btn-icon',onclick:function(){if(confirm('Remover '+bCopy.nome+'?'))deleteBanco(bCopy.id);}}, '🗑️'),
+        ].filter(Boolean)),
       ]),
       el('div',{style:{fontSize:'22px',fontWeight:'800',color:b.cor,marginBottom:'4px'}},fmtMoney(b.saldo)),
       el('div',{style:{fontSize:'11px',color:'var(--text3)'}},'Saldo atual'),
@@ -2614,6 +2617,7 @@ function render(){
   if(typeof renderDailyAdiModal==='function'){var daM=renderDailyAdiModal();if(daM)app.appendChild(daM);}
   if(typeof renderDailyTemplatesModal==='function'){var dtM=renderDailyTemplatesModal();if(dtM)app.appendChild(dtM);}
   if(typeof renderImportarExtratoModal==='function'){var impExtM=renderImportarExtratoModal();if(impExtM)app.appendChild(impExtM);}
+  if(typeof renderCedulasModal==='function'){var cedM=renderCedulasModal();if(cedM)app.appendChild(cedM);}
   if(typeof _doCheckBanner==='function')_doCheckBanner();
   var alertaBanner=typeof renderAlertaBanner==='function'?renderAlertaBanner():null;
   if(alertaBanner)app.appendChild(alertaBanner);
@@ -2636,6 +2640,7 @@ function render(){
 <script src="js/modal-categorias.js"></script>
 <script src="js/modal-meta.js"></script>
 <script src="js/modal-banco.js"></script>
+<script src="js/modal-cedulas.js"></script>
 <script src="js/modal-transferencia.js"></script>
 <script src="js/modal-receita.js"></script>
 <script src="js/modal-orcamento.js"></script>

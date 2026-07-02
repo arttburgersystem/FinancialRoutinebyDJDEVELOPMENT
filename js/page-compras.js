@@ -15,12 +15,32 @@ function _compraStatus(c) {
   return c.status || 'pendente';
 }
 
+// Retorna o nome principal da compra (suporta formato antigo e novo)
+function _compraNome(c) {
+  if (c.itens && c.itens.length) {
+    var n = c.itens[0].item || '—';
+    if (c.itens.length > 1) n += ' (+' + (c.itens.length - 1) + ')';
+    return n;
+  }
+  return c.item || '—';
+}
+
+// Retorna label da quantidade
+function _compraQtdLabel(c) {
+  if (c.itens && c.itens.length > 1) return c.itens.length + ' itens';
+  if (c.itens && c.itens.length === 1) {
+    var it = c.itens[0];
+    return it.quantidade ? (it.quantidade + ' ' + (it.unidade || '')) : '—';
+  }
+  return c.quantidade ? (c.quantidade + ' ' + (c.unidade || '')) : '—';
+}
+
 function renderCompras() {
-  var pf       = state.profile;
-  var todas    = (state.compras || []).filter(function(c) { return c.profile === pf; });
+  var pf        = state.profile;
+  var todas     = (state.compras || []).filter(function(c) { return c.profile === pf; });
   var mesFiltro = state.comprasMes || today().slice(0, 7);
-  var filtro   = state.comprasFiltro || 'todos';
-  var busca    = state.comprasBusca || '';
+  var filtro    = state.comprasFiltro || 'todos';
+  var busca     = state.comprasBusca || '';
 
   function navMes(delta) {
     var p = mesFiltro.split('-');
@@ -31,7 +51,7 @@ function renderCompras() {
     setState({ comprasMes: y + '-' + String(mo + 1).padStart(2, '0') });
   }
 
-  var pParts = mesFiltro.split('-');
+  var pParts  = mesFiltro.split('-');
   var labelMes = MESES[parseInt(pParts[1]) - 1] + ' ' + pParts[0];
 
   // KPIs do mês
@@ -40,11 +60,11 @@ function renderCompras() {
   });
   var kpiTotal    = doMes.reduce(function(a, c) { return a + (c.valorTotal || 0); }, 0);
   var kpiPago     = doMes.filter(function(c) { return c.status === 'pago'; })
-                        .reduce(function(a, c) { return a + (c.valorTotal || 0); }, 0);
+                         .reduce(function(a, c) { return a + (c.valorTotal || 0); }, 0);
   var kpiPendente = doMes.filter(function(c) { return _compraStatus(c) === 'pendente'; })
-                        .reduce(function(a, c) { return a + (c.valorTotal || 0); }, 0);
+                         .reduce(function(a, c) { return a + (c.valorTotal || 0); }, 0);
   var kpiVencido  = doMes.filter(function(c) { return _compraStatus(c) === 'vencido'; })
-                        .reduce(function(a, c) { return a + (c.valorTotal || 0); }, 0);
+                         .reduce(function(a, c) { return a + (c.valorTotal || 0); }, 0);
 
   // Itens filtrados
   var filtradas = todas.filter(function(c) {
@@ -60,6 +80,12 @@ function renderCompras() {
                (c.fornecedor || '').toLowerCase().indexOf(b) !== -1 ||
                (c.categoria || '').toLowerCase().indexOf(b) !== -1 ||
                (c.nf || '').toLowerCase().indexOf(b) !== -1;
+      // Busca também nos itens individuais
+      if (!ok && c.itens && c.itens.length) {
+        c.itens.forEach(function(it) {
+          if ((it.item || '').toLowerCase().indexOf(b) !== -1) ok = true;
+        });
+      }
       if (!ok) return false;
     }
     return true;
@@ -136,6 +162,7 @@ function renderCompras() {
       var st    = _compraStatus(c);
       var stDef = stCores[st] || stCores.pendente;
       var dias  = c.dataVencimento ? diasRestantes(c.dataVencimento) : null;
+
       var row = el('div', { style: {
         display: 'grid', gridTemplateColumns: '1fr 90px 90px 100px 100px 90px',
         gap: '8px', padding: '11px 14px', borderBottom: '1px solid var(--border)',
@@ -148,19 +175,18 @@ function renderCompras() {
 
       // Coluna item
       var itemCol = el('div', {});
-      itemCol.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, c.item || '—'));
-      if (c.categoria || c.fornecedor) {
-        var sub = (c.categoria || '') + (c.categoria && c.fornecedor ? ' · ' : '') + (c.fornecedor || '');
-        itemCol.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text3)', marginTop: '2px' } }, sub));
+      itemCol.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, _compraNome(c)));
+      var subParts = [];
+      if (c.categoria) subParts.push(c.categoria);
+      if (c.fornecedor) subParts.push(c.fornecedor);
+      if (subParts.length) {
+        itemCol.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text3)', marginTop: '2px' } }, subParts.join(' · ')));
       }
       row.appendChild(itemCol);
 
-      row.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text3)', textAlign: 'center', alignSelf: 'center' } },
-        c.quantidade ? (c.quantidade + ' ' + (c.unidade || '')) : '—'));
-      row.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '700', color: 'var(--text)', textAlign: 'right', alignSelf: 'center' } },
-        fmtMoney(c.valorTotal || 0)));
-      row.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text3)', textAlign: 'center', alignSelf: 'center' } },
-        c.dataCompra ? fmtDate(c.dataCompra) : '—'));
+      row.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text3)', textAlign: 'center', alignSelf: 'center' } }, _compraQtdLabel(c)));
+      row.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '700', color: 'var(--text)', textAlign: 'right', alignSelf: 'center' } }, fmtMoney(c.valorTotal || 0)));
+      row.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text3)', textAlign: 'center', alignSelf: 'center' } }, c.dataCompra ? fmtDate(c.dataCompra) : '—'));
 
       // Vencimento
       var vencCol = el('div', { style: { textAlign: 'center', alignSelf: 'center' } });

@@ -118,7 +118,8 @@ function _temModalAberto() {
     state.kdsModal || state.pedidoModal || state.impModal || state.adminModal ||
     state.pagamentoFaturaModal ||
     state.dailyModal || state.dailyAdiModal || state.dailyTemplatesOpen ||
-    state._reprogModal || state.cedurasModal || state.compraModal);
+    state._reprogModal || state.cedurasModal || state.compraModal ||
+    state.shopListModal || state.shopItemModal);
 }
 
 // ── INDICADOR VISUAL DE SINCRONIZAÇÃO ─────────────────────────────────────────

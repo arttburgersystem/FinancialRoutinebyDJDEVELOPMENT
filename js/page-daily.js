@@ -82,7 +82,10 @@ function _doInit(){
     var temCanceladaHoje=ops.some(function(op){
       return op.defId===def.id&&op.profile===pf&&op.status==='cancelada'&&op.data===hj;
     });
-    if(!temAtiva&&!temCanceladaHoje){
+    var temConcluidaHoje=ops.some(function(op){
+      return op.defId===def.id&&op.profile===pf&&op.status==='concluida'&&op.data===hj;
+    });
+    if(!temAtiva&&!temCanceladaHoje&&!temConcluidaHoje){
       var dias=def.dias||[];
       var status=(hora06&&(!dias.length||dias.indexOf(dow)>=0))?'hoje':'programacao';
       ops.push({

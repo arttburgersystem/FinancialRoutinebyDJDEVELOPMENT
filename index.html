@@ -447,6 +447,9 @@ var state={
   shopListFiltro: 'todos',
   fornecedores: lsGet('fornecedores',[]),
   funcionarios: lsGet('funcionarios',[]),
+  feriasFuncionarios: lsGet('feriasFuncionarios',[]),
+  examesFuncionarios: lsGet('examesFuncionarios',[]),
+  funcTab: 'funcionarios',
   tarefas: lsGet('tarefas',[]),
   dailyTaskDefs: lsGet('dailyTaskDefs',[]),
   dailyOps: lsGet('dailyOps',[]),
@@ -513,6 +516,8 @@ var state={
   abaterModal: null,
   fornecedorModal: null,
   funcionarioModal: null,
+  feriasModal: null,
+  exameModal: null,
   tarefaModal: null,
   concluirModal: null,
   cartaoModal: null,
@@ -692,7 +697,7 @@ function fbPut(path,data){
 
 function loadFromFirebase(){
   setState({syncStatus:'syncing'});
-  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias'),fbGet('/vendas'),fbGet('/emprestimos'),fbGet('/fornecedores'),fbGet('/funcionarios'),fbGet('/tarefas'),fbGet('/cartoes'),fbGet('/transacoesCartao'),fbGet('/usuarios'),fbGet('/auditLog'),fbGet('/produtos'),fbGet('/movEstoque'),fbGet('/empresaData'),fbGet('/setoresImpressao'),fbGet('/complementos'),fbGet('/kdsConfigs'),fbGet('/pedidos'),fbGet('/notas'),fbGet('/impressorasCadastradas'),fbGet('/configImpressao'),fbGet('/administradores'),fbGet('/estCategorias'),fbGet('/apostas'),fbGet('/orcamentos'),fbGet('/dailyTaskDefs'),fbGet('/dailyOps'),fbGet('/compras'),fbGet('/estoqueItens'),fbGet('/estoqueMovs'),fbGet('/fichaTecnicas')])
+  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias'),fbGet('/vendas'),fbGet('/emprestimos'),fbGet('/fornecedores'),fbGet('/funcionarios'),fbGet('/tarefas'),fbGet('/cartoes'),fbGet('/transacoesCartao'),fbGet('/usuarios'),fbGet('/auditLog'),fbGet('/produtos'),fbGet('/movEstoque'),fbGet('/empresaData'),fbGet('/setoresImpressao'),fbGet('/complementos'),fbGet('/kdsConfigs'),fbGet('/pedidos'),fbGet('/notas'),fbGet('/impressorasCadastradas'),fbGet('/configImpressao'),fbGet('/administradores'),fbGet('/estCategorias'),fbGet('/apostas'),fbGet('/orcamentos'),fbGet('/dailyTaskDefs'),fbGet('/dailyOps'),fbGet('/compras'),fbGet('/estoqueItens'),fbGet('/estoqueMovs'),fbGet('/fichaTecnicas'),fbGet('/feriasFuncionarios'),fbGet('/examesFuncionarios')])
     .then(function(results){
       var contas=objToArr(results[0]);
       var metas=objToArr(results[1]);
@@ -730,8 +735,10 @@ function loadFromFirebase(){
       var estoqueItens=objToArr(results[31]||[]);
       var estoqueMovs=objToArr(results[32]||[]);
       var fichaTecnicas=objToArr(results[33]||[]);
-      lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);lsSet('vendas',vendas);lsSet('emprestimos',emprestimos);lsSet('fornecedores',fornecedores);lsSet('funcionarios',funcionarios);lsSet('tarefas',tarefas);lsSet('cartoes',cartoes);lsSet('transacoesCartao',transacoesCartao);lsSet('usuarios',usuarios);lsSet('auditLog',auditLog);lsSet('produtos',produtos);lsSet('movEstoque',movEstoque);lsSet('empresaData',empresaData);lsSet('setoresImpressao',setoresImpressao);lsSet('complementos',complementos);lsSet('kdsConfigs',kdsConfigs);lsSet('pedidos',pedidos);lsSet('notas',notas);lsSet('impressorasCadastradas',impressorasCadastradas);lsSet('configImpressao',configImpressao);lsSet('administradores',administradores);lsSet('estCategorias',estCategorias);lsSet('apostas',apostas);lsSet('orcamentos',orcamentos);lsSet('dailyTaskDefs',dailyTaskDefs);lsSet('dailyOps',dailyOps);lsSet('compras',compras);lsSet('estoqueItens',estoqueItens);lsSet('estoqueMovs',estoqueMovs);lsSet('fichaTecnicas',fichaTecnicas);
-      setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,vendas:vendas,emprestimos:emprestimos,fornecedores:fornecedores,funcionarios:funcionarios,tarefas:tarefas,cartoes:cartoes,transacoesCartao:transacoesCartao,usuarios:usuarios,auditLog:auditLog,produtos:produtos,movEstoque:movEstoque,empresaData:empresaData,setoresImpressao:setoresImpressao,complementos:complementos,kdsConfigs:kdsConfigs,pedidos:pedidos,notas:notas,impressorasCadastradas:impressorasCadastradas,configImpressao:configImpressao,administradores:administradores,estCategorias:estCategorias,apostas:apostas,orcamentos:orcamentos,dailyTaskDefs:dailyTaskDefs,dailyOps:dailyOps,compras:compras,estoqueItens:estoqueItens,estoqueMovs:estoqueMovs,fichaTecnicas:fichaTecnicas,syncStatus:'ok'});
+      var feriasFuncionarios=objToArr(results[34]||[]);
+      var examesFuncionarios=objToArr(results[35]||[]);
+      lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);lsSet('vendas',vendas);lsSet('emprestimos',emprestimos);lsSet('fornecedores',fornecedores);lsSet('funcionarios',funcionarios);lsSet('tarefas',tarefas);lsSet('cartoes',cartoes);lsSet('transacoesCartao',transacoesCartao);lsSet('usuarios',usuarios);lsSet('auditLog',auditLog);lsSet('produtos',produtos);lsSet('movEstoque',movEstoque);lsSet('empresaData',empresaData);lsSet('setoresImpressao',setoresImpressao);lsSet('complementos',complementos);lsSet('kdsConfigs',kdsConfigs);lsSet('pedidos',pedidos);lsSet('notas',notas);lsSet('impressorasCadastradas',impressorasCadastradas);lsSet('configImpressao',configImpressao);lsSet('administradores',administradores);lsSet('estCategorias',estCategorias);lsSet('apostas',apostas);lsSet('orcamentos',orcamentos);lsSet('dailyTaskDefs',dailyTaskDefs);lsSet('dailyOps',dailyOps);lsSet('compras',compras);lsSet('estoqueItens',estoqueItens);lsSet('estoqueMovs',estoqueMovs);lsSet('fichaTecnicas',fichaTecnicas);lsSet('feriasFuncionarios',feriasFuncionarios);lsSet('examesFuncionarios',examesFuncionarios);
+      setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,vendas:vendas,emprestimos:emprestimos,fornecedores:fornecedores,funcionarios:funcionarios,tarefas:tarefas,cartoes:cartoes,transacoesCartao:transacoesCartao,usuarios:usuarios,auditLog:auditLog,produtos:produtos,movEstoque:movEstoque,empresaData:empresaData,setoresImpressao:setoresImpressao,complementos:complementos,kdsConfigs:kdsConfigs,pedidos:pedidos,notas:notas,impressorasCadastradas:impressorasCadastradas,configImpressao:configImpressao,administradores:administradores,estCategorias:estCategorias,apostas:apostas,orcamentos:orcamentos,dailyTaskDefs:dailyTaskDefs,dailyOps:dailyOps,compras:compras,estoqueItens:estoqueItens,estoqueMovs:estoqueMovs,fichaTecnicas:fichaTecnicas,feriasFuncionarios:feriasFuncionarios,examesFuncionarios:examesFuncionarios,syncStatus:'ok'});
     })
     .catch(function(e){
       console.error(e);
@@ -747,7 +754,7 @@ function scheduleSave(){
   syncTimer=setTimeout(function(){
     // Atualiza badge diretamente — sem setState para não destruir inputs ativos
     _updateSyncDOM('syncing');
-    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);lsSet('notas',state.notas||[]);lsSet('impressorasCadastradas',state.impressorasCadastradas||[]);lsSet('auditLog',state.auditLog||[]);lsSet('administradores',state.administradores||[]);lsSet('estCategorias',state.estCategorias||[]);lsSet('pdvPedidos',state.pdvPedidos||[]);lsSet('pdvSessoes',state.pdvSessoes||[]);lsSet('pdvCaixaSes',state.pdvCaixaSes);lsSet('orcamentos',state.orcamentos||[]);lsSet('dailyTaskDefs',state.dailyTaskDefs||[]);lsSet('dailyOps',state.dailyOps||[]);lsSet('compras',state.compras||[]);lsSet('estoqueItens',state.estoqueItens||[]);lsSet('estoqueMovs',state.estoqueMovs||[]);lsSet('fichaTecnicas',state.fichaTecnicas||[]);
+    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);lsSet('notas',state.notas||[]);lsSet('impressorasCadastradas',state.impressorasCadastradas||[]);lsSet('auditLog',state.auditLog||[]);lsSet('administradores',state.administradores||[]);lsSet('estCategorias',state.estCategorias||[]);lsSet('pdvPedidos',state.pdvPedidos||[]);lsSet('pdvSessoes',state.pdvSessoes||[]);lsSet('pdvCaixaSes',state.pdvCaixaSes);lsSet('orcamentos',state.orcamentos||[]);lsSet('dailyTaskDefs',state.dailyTaskDefs||[]);lsSet('dailyOps',state.dailyOps||[]);lsSet('compras',state.compras||[]);lsSet('estoqueItens',state.estoqueItens||[]);lsSet('estoqueMovs',state.estoqueMovs||[]);lsSet('fichaTecnicas',state.fichaTecnicas||[]);lsSet('feriasFuncionarios',state.feriasFuncionarios||[]);lsSet('examesFuncionarios',state.examesFuncionarios||[]);
     Promise.all([
       fbPut('/contas',arrToObj(state.contas)),
       fbPut('/metas',arrToObj(state.metas)),
@@ -784,6 +791,8 @@ function scheduleSave(){
       fbPut('/estoqueItens',arrToObj(state.estoqueItens||[])),
       fbPut('/estoqueMovs',arrToObj(state.estoqueMovs||[])),
       fbPut('/fichaTecnicas',arrToObj(state.fichaTecnicas||[])),
+      fbPut('/feriasFuncionarios',arrToObj(state.feriasFuncionarios||[])),
+      fbPut('/examesFuncionarios',arrToObj(state.examesFuncionarios||[])),
     ]).then(function(){_updateSyncDOM('ok');})
       .catch(function(e){console.error(e);_updateSyncDOM('error');showToast('Erro ao salvar no Firebase','error');});
   },1500);

@@ -185,7 +185,49 @@ function renderEstoqueItemModal() {
         el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '8px' } }, '📦 Identificação'),
         div('form-group', [el('label', { class: 'form-label' }, 'Nome do produto *'), mkInp('nome', 'text', 'Ex: Coca-Cola 2L', edit.nome || '')]),
         el('div', { style: { display: 'flex', gap: '8px' } }, [
-          el('div', { style: { flex: '2' } }, [el('label', { class: 'form-label' }, 'Categoria'), mkSel('categoria', ['— Categoria —'].concat(_EI_CATS), edit.categoria || '')]),
+          el('div', { style: { flex: '2' } }, (function() {
+            var allCats = _EI_CATS.concat((state.estCategorias || []).filter(function(c) { return _EI_CATS.indexOf(c) === -1; }));
+            var catSel = el('select', { class: 'form-input', id: 'ei-categoria' });
+            ['— Categoria —'].concat(allCats).forEach(function(c) {
+              var v = c === '— Categoria —' ? '' : c;
+              var opt = el('option', { value: v }, c);
+              if (v === (edit.categoria || '')) opt.selected = true;
+              catSel.appendChild(opt);
+            });
+            var novaRow = el('div', { id: 'ei-newcat-row', style: { display: 'none', gap: '6px', marginTop: '6px' } });
+            var novaInp = el('input', { class: 'form-input', type: 'text', id: 'ei-newcat-inp', placeholder: 'Nome da categoria...', style: { flex: '1', fontSize: '12px' } });
+            var novaBtn = el('button', { class: 'btn-primary', style: { fontSize: '11px', padding: '4px 12px', whiteSpace: 'nowrap' }, onclick: function(e) {
+              e.preventDefault();
+              var nome = (document.getElementById('ei-newcat-inp') || {}).value || '';
+              nome = nome.trim();
+              if (!nome) { showToast('Informe o nome da categoria', 'error'); return; }
+              var opt2 = el('option', { value: nome }, nome);
+              opt2.selected = true;
+              catSel.appendChild(opt2);
+              var cats = (state.estCategorias || []);
+              if (cats.indexOf(nome) === -1) {
+                cats = cats.concat([nome]);
+                state.estCategorias = cats;
+                lsSet('estCategorias', cats);
+                scheduleSave();
+              }
+              novaRow.style.display = 'none';
+              showToast('Categoria "' + nome + '" adicionada!');
+            } }, 'Adicionar');
+            novaRow.style.display = 'none';
+            novaRow.appendChild(novaInp);
+            novaRow.appendChild(novaBtn);
+            var plusBtn = el('button', { class: 'btn-ghost', style: { fontSize: '11px', padding: '3px 8px', marginLeft: '6px', verticalAlign: 'middle' }, title: 'Criar nova categoria', onclick: function(e) {
+              e.preventDefault();
+              novaRow.style.display = novaRow.style.display === 'none' ? 'flex' : 'none';
+              if (novaRow.style.display === 'flex') setTimeout(function() { var i = document.getElementById('ei-newcat-inp'); if (i) i.focus(); }, 50);
+            } }, '+ Nova');
+            return [
+              el('div', { style: { display: 'flex', alignItems: 'center', marginBottom: '4px' } }, [el('label', { class: 'form-label', style: { marginBottom: '0', flex: '1' } }, 'Categoria'), plusBtn]),
+              catSel,
+              novaRow,
+            ];
+          })()),
           el('div', { style: { flex: '1' } }, [el('label', { class: 'form-label' }, 'Unidade'), mkSel('unidade', _EI_UNIDADES, edit.unidade || 'un')]),
         ]),
         div('form-group', [el('label', { class: 'form-label' }, 'Observação / código'), mkInp('obs', 'text', 'SKU, marca, referência...', edit.obs || '')]),

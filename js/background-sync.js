@@ -120,7 +120,8 @@ function _temModalAberto() {
     state.dailyModal || state.dailyAdiModal || state.dailyTemplatesOpen ||
     state._reprogModal || state.cedurasModal || state.compraModal ||
     state.shopListModal || state.shopItemModal ||
-    state.estoqueItemModal || state.estoqueMovModal || state.fichaTecnicaModal);
+    state.estoqueItemModal || state.estoqueMovModal || state.fichaTecnicaModal ||
+    state.feriasModal || state.exameModal);
 }
 
 // ── INDICADOR VISUAL DE SINCRONIZAÇÃO ─────────────────────────────────────────

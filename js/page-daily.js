@@ -425,7 +425,7 @@ function _doDefCard(def){
   var si=sm[status]||sm['none'];
   return el('div',{style:{
     background:'var(--bg3)',borderRadius:'8px',padding:'12px',marginBottom:'8px',
-    borderLeft:'3px solid '+cor,border:'1px solid var(--border)',
+    border:'1px solid var(--border)',borderLeft:'3px solid '+cor,
   }},[
     el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'4px'}},[
       el('div',{style:{fontWeight:'600',fontSize:'13px',color:'var(--text)',flex:'1',marginRight:'6px',lineHeight:'1.3'}},def.nome),
@@ -445,13 +445,13 @@ function _doCard(op){
   var hj=today();
   var corMap={gold:'var(--gold)',blue:'var(--blue)',green:'var(--green)',red:'var(--red)',purple:'#9c59b6'};
   var cor=corMap[op.cor||'gold']||'var(--gold)';
-  var priIcon={alta:'🔴',media:'🟡',baixa:'🟢'}[op.prioridade||'media'];
+  var priIcon={alta:'🔴',media:'🟡',baixa:'🟢'}[op.prioridade||'media']||'🟡';
 
   var brdCor=ehPendente?'var(--red)':cor;
   var cardStyle={
     background:'var(--bg3)',borderRadius:'8px',padding:'12px',marginBottom:'8px',
-    borderLeft:'3px solid '+brdCor,
     border:'1px solid '+(ehPendente?'var(--red)':alerta?cor:'var(--border)'),
+    borderLeft:'3px solid '+brdCor,
     transition:'border-color .3s',
     opacity:ehProg?'.9':'1',
   };
@@ -554,13 +554,14 @@ function _doColuna(titulo,icone,cor,cards){
 
 // ── render principal ──────────────────────────────────────────────────────────
 function renderDailyOperation(){
-  if(_doTimerRef)clearInterval(_doTimerRef);
-  _doTimerRef=setInterval(function(){
-    if(state.page==='daily'){
-      if(!state.dailyModal&&!state.dailyAdiModal&&!state.dailyTemplatesOpen)
-        setState({_doTick:Date.now()});
-    } else {clearInterval(_doTimerRef);_doTimerRef=null;}
-  },60000);
+  if(!_doTimerRef){
+    _doTimerRef=setInterval(function(){
+      if(state.page==='daily'){
+        if(!state.dailyModal&&!state.dailyAdiModal&&!state.dailyTemplatesOpen)
+          setState({_doTick:Date.now()});
+      } else {clearInterval(_doTimerRef);_doTimerRef=null;}
+    },60000);
+  }
 
   _doInit();
 
@@ -586,7 +587,8 @@ function renderDailyOperation(){
   });
 
   var opConc=ops.filter(function(op){return op.status==='concluida'&&op.data===hj;}).sort(function(a,b){
-    return(b.concluidaEm||'')>(a.concluidaEm||'')?1:-1;
+    var ba=b.concluidaEm||'',aa=a.concluidaEm||'';
+    return ba>aa?1:aa>ba?-1:0;
   });
   var opAdiada=ops.filter(function(op){return op.status==='adiada';});
   var opCanc=ops.filter(function(op){return op.status==='cancelada';});
@@ -664,8 +666,6 @@ function renderDailyOperation(){
     _doColuna('Adiadas','↻','var(--blue)',opAdiada.map(_doCard)),
     _doColuna('Canceladas','🚫','var(--text3)',opCanc.map(_doCard)),
   ]);
-
-  _doCheckBanner();
 
   return div('',[
     div('page-header',[

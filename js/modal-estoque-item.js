@@ -186,11 +186,14 @@ function renderEstoqueItemModal() {
         div('form-group', [el('label', { class: 'form-label' }, 'Nome do produto *'), mkInp('nome', 'text', 'Ex: Coca-Cola 2L', edit.nome || '')]),
         el('div', { style: { display: 'flex', gap: '8px' } }, [
           el('div', { style: { flex: '2' } }, (function() {
-            var allCats = _EI_CATS.concat((state.estCategorias || []).filter(function(c) { return _EI_CATS.indexOf(c) === -1; }));
+            var _rawCats = (state.estCategorias || []).map(function(c) {
+              return typeof c === 'string' ? c : (c && c.nome ? c.nome : null);
+            }).filter(function(c) { return c && _EI_CATS.indexOf(c) === -1; });
+            var allCats = _EI_CATS.concat(_rawCats);
             var catSel = el('select', { class: 'form-input', id: 'ei-categoria' });
             ['— Categoria —'].concat(allCats).forEach(function(c) {
               var v = c === '— Categoria —' ? '' : c;
-              var opt = el('option', { value: v }, c);
+              var opt = el('option', { value: v }, String(c));
               if (v === (edit.categoria || '')) opt.selected = true;
               catSel.appendChild(opt);
             });

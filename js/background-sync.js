@@ -121,7 +121,8 @@ function _temModalAberto() {
     state._reprogModal || state.cedurasModal || state.compraModal ||
     state.shopListModal || state.shopItemModal ||
     state.estoqueItemModal || state.estoqueMovModal || state.fichaTecnicaModal ||
-    state.feriasModal || state.exameModal);
+    state.feriasModal || state.exameModal ||
+    state.freelancerModal || state.servicoFreelancerModal);
 }
 
 // ── INDICADOR VISUAL DE SINCRONIZAÇÃO ─────────────────────────────────────────

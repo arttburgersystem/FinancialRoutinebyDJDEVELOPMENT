@@ -71,10 +71,118 @@ function renderFreelancers() {
     var tipoSel  = el('select', { class: 'form-input', id: 'fl-tipo' },
       tipoOpts.map(function(o){ var op = el('option', { value: o.v }, o.l); if (o.v === (efl.tipo || 'pf')) op.selected = true; return op; }));
 
-    var espSel = el('select', { class: 'form-input', id: 'fl-especialidade' },
+    // Specialty list — initialized from state or hardcoded defaults
+    var espListRef = (state.flEspecialidades && state.flEspecialidades.length > 0)
+      ? state.flEspecialidades.slice()
+      : _FL_ESPECIALIDADES.slice();
+
+    var espSel = el('select', { class: 'form-input', id: 'fl-especialidade' });
+    function rebuildEspSel() {
+      var cur = espSel.value;
+      while (espSel.firstChild) espSel.removeChild(espSel.firstChild);
       [el('option', { value: '' }, '— Especialidade —')].concat(
-        _FL_ESPECIALIDADES.map(function(e2){ var op = el('option', { value: e2 }, e2); if (e2 === efl.especialidade) op.selected = true; return op; })
-      ));
+        espListRef.map(function(e2) {
+          var op = el('option', { value: e2 }, e2);
+          if (e2 === (cur || efl.especialidade)) op.selected = true;
+          return op;
+        })
+      ).forEach(function(op){ espSel.appendChild(op); });
+    }
+    rebuildEspSel();
+
+    function saveEspList() {
+      state.flEspecialidades = espListRef.slice();
+      lsSet('flEspecialidades', state.flEspecialidades);
+      scheduleSave();
+    }
+
+    // Management panel (hidden by default)
+    var espPanelEl = el('div', { style: { display:'none', background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:'6px', padding:'10px', marginTop:'6px' } });
+
+    function renderEspRows() {
+      while (espPanelEl.firstChild) espPanelEl.removeChild(espPanelEl.firstChild);
+      var listEl = el('div', { style: { maxHeight:'170px', overflowY:'auto', marginBottom:'8px', display:'flex', flexDirection:'column', gap:'2px' } });
+      espListRef.forEach(function(esp, idx) {
+        (function(esp2, idx2) {
+          var rowEl = el('div', { style: { display:'flex', alignItems:'center', gap:'6px', padding:'5px 4px', borderBottom:'1px solid var(--border)' } });
+          var nameSpan = el('span', { style: { flex:'1', fontSize:'12px', color:'var(--text)' } }, esp2);
+          var editB = el('button', { class:'btn-icon edit', title:'Editar', style:{ fontSize:'12px' },
+            onclick: function() {
+              var inp2 = el('input', { class:'form-input', style:{ flex:'1', fontSize:'12px', padding:'3px 7px' } });
+              inp2.value = esp2;
+              var saveB = el('button', { class:'btn-primary', style:{ fontSize:'11px', padding:'3px 8px', whiteSpace:'nowrap' },
+                onclick: function() {
+                  var novo = inp2.value.trim();
+                  if (!novo || novo === esp2) { renderEspRows(); return; }
+                  if (espListRef.indexOf(novo) !== -1) { showToast('Especialidade já existe', 'error'); return; }
+                  var oldVal = espSel.value;
+                  espListRef[idx2] = novo;
+                  rebuildEspSel();
+                  if (oldVal === esp2) espSel.value = novo;
+                  saveEspList();
+                  renderEspRows();
+                  showToast('Especialidade renomeada!');
+                }
+              }, '✓');
+              var cancelB = el('button', { class:'btn-ghost', style:{ fontSize:'11px', padding:'3px 8px' },
+                onclick: function() { renderEspRows(); }
+              }, '✕');
+              while (rowEl.firstChild) rowEl.removeChild(rowEl.firstChild);
+              rowEl.appendChild(inp2); rowEl.appendChild(saveB); rowEl.appendChild(cancelB);
+              setTimeout(function(){ inp2.focus(); inp2.select(); }, 30);
+            }
+          }, '✏️');
+          var delB = el('button', { class:'btn-icon delete', title:'Excluir', style:{ fontSize:'12px' },
+            onclick: function() {
+              if (!window.confirm('Excluir especialidade "' + esp2 + '"?')) return;
+              var oldVal = espSel.value;
+              espListRef.splice(idx2, 1);
+              rebuildEspSel();
+              if (oldVal === esp2) espSel.value = '';
+              saveEspList();
+              renderEspRows();
+              showToast('Especialidade removida', 'error');
+            }
+          }, '🗑');
+          rowEl.appendChild(nameSpan); rowEl.appendChild(editB); rowEl.appendChild(delB);
+          listEl.appendChild(rowEl);
+        })(esp, idx);
+      });
+      espPanelEl.appendChild(listEl);
+      var newInp = el('input', { class:'form-input', type:'text', placeholder:'Nova especialidade...', style:{ flex:'1', fontSize:'12px' } });
+      var addBtn2 = el('button', { class:'btn-primary', style:{ fontSize:'11px', padding:'4px 12px', whiteSpace:'nowrap' },
+        onclick: function() {
+          var nome = newInp.value.trim();
+          if (!nome) { showToast('Informe o nome', 'error'); return; }
+          if (espListRef.indexOf(nome) !== -1) { showToast('Já existe', 'error'); return; }
+          espListRef.push(nome);
+          var op2 = el('option', { value: nome }, nome);
+          espSel.appendChild(op2);
+          espSel.value = nome;
+          saveEspList();
+          newInp.value = '';
+          renderEspRows();
+          showToast('Especialidade "' + nome + '" adicionada!');
+        }
+      }, '+ Adicionar');
+      newInp.onkeydown = function(e) { if (e.key === 'Enter') { e.preventDefault(); addBtn2.click(); } };
+      espPanelEl.appendChild(el('div', { style:{ display:'flex', gap:'6px' } }, [newInp, addBtn2]));
+    }
+
+    var espGearBtn = el('button', {
+      class: 'btn-ghost',
+      style: { fontSize:'11px', padding:'3px 8px', marginLeft:'6px' },
+      title: 'Gerenciar especialidades',
+      onclick: function(e) {
+        e.preventDefault();
+        if (espPanelEl.style.display === 'none') {
+          renderEspRows();
+          espPanelEl.style.display = 'block';
+        } else {
+          espPanelEl.style.display = 'none';
+        }
+      }
+    }, '⚙️ Gerenciar');
 
     var stOpts = [{ v: 'ativo', l: '✅ Ativo' }, { v: 'inativo', l: '⛔ Inativo' }];
     var stSel  = el('select', { class: 'form-input', id: 'fl-status' },
@@ -86,7 +194,17 @@ function renderFreelancers() {
         el('button', { class: 'modal-close', onclick: function(){ setState({ freelancerModal: null }); } }, '×'),
       ]),
       secBox([secTitle('👤', 'Dados do freelancer'),
-        grid2(fg('Nome completo *', fli('nome', 'text', 'Nome do freelancer', efl.nome || '')), fg('Especialidade', espSel)),
+        grid2(
+          fg('Nome completo *', fli('nome', 'text', 'Nome do freelancer', efl.nome || '')),
+          el('div', { class: 'form-group' }, [
+            el('div', { style: { display:'flex', alignItems:'center', marginBottom:'4px' } }, [
+              el('label', { class: 'form-label', style: { marginBottom:'0', flex:'1' } }, 'Especialidade'),
+              espGearBtn,
+            ]),
+            espSel,
+            espPanelEl,
+          ])
+        ),
         grid2(fg('Tipo de pessoa', tipoSel), fg('CPF / CNPJ', fli('cpfCnpj', 'text', '000.000.000-00 ou 00.000.000/0001-00', efl.cpfCnpj || ''))),
         grid2(fg('Status', stSel), fg('Valor/hora referência (R$)', fli('valorHora', 'number', '0,00', efl.valorHora || ''))),
       ]),

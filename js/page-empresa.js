@@ -145,11 +145,66 @@ function renderEmpresa() {
 
   // ── Cabeçalho visual ────────────────────────────────────────────────────────
 
+  function _abrirLogoUpload(){
+    var fi=document.createElement('input');fi.type='file';fi.accept='image/*';
+    fi.onchange=function(e){
+      var f=e.target.files[0];if(!f)return;
+      if(f.size>2*1024*1024){showToast('Imagem muito grande — máx. 2 MB','error');return;}
+      var reader=new FileReader();
+      reader.onload=function(ev){
+        var empData=Object.assign({},state.empresaData||{});
+        empData[state.profile]=Object.assign({},d,{logoBase64:ev.target.result});
+        lsSet('empresaData',empData);
+        setState({empresaData:empData});
+        try{fbPut('/empresaData',empData);}catch(e2){}
+        showToast('Logo salva!','success');
+      };
+      reader.readAsDataURL(f);
+    };
+    fi.click();
+  }
+
   var headerCard=el('div',{});
   headerCard.style.cssText='display:flex;align-items:center;gap:16px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;';
+
   var avt=el('div',{});
-  avt.style.cssText='width:64px;height:64px;border-radius:16px;background:'+pfColor+'22;border:2px solid '+pfColor+';display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;';
-  avt.textContent=pf.icon||'🏢';
+  avt.title='Clique para adicionar / trocar a logo';
+  avt.style.cssText='width:72px;height:72px;border-radius:16px;flex-shrink:0;cursor:pointer;position:relative;overflow:hidden;transition:opacity .15s;';
+  if(d.logoBase64){
+    var logoImg=document.createElement('img');
+    logoImg.src=d.logoBase64;
+    logoImg.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:16px;display:block;';
+    var logoOv=el('div',{});
+    logoOv.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;border-radius:16px;font-size:11px;font-weight:700;color:#fff;letter-spacing:.03em;';
+    logoOv.textContent='Trocar logo';
+    avt.onmouseenter=function(){logoOv.style.opacity='1';};
+    avt.onmouseleave=function(){logoOv.style.opacity='0';};
+    avt.appendChild(logoImg);avt.appendChild(logoOv);
+  } else {
+    avt.style.cssText+='background:'+pfColor+'15;border:2px dashed '+pfColor+'55;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;';
+    var avtIco=el('div',{style:{fontSize:'24px',lineHeight:'1'}});avtIco.textContent='📷';
+    var avtTxt=el('div',{style:{fontSize:'9px',fontWeight:'700',color:pfColor,letterSpacing:'.05em',textTransform:'uppercase',opacity:'.7'}});avtTxt.textContent='Logo';
+    avt.appendChild(avtIco);avt.appendChild(avtTxt);
+  }
+  avt.onclick=_abrirLogoUpload;
+
+  var headRight=el('div',{style:{display:'flex',flexDirection:'column',gap:'4px'}});
+  if(d.logoBase64){
+    var remBtn=el('button',{style:{background:'none',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text3)',fontSize:'11px',padding:'3px 8px',cursor:'pointer',fontFamily:'inherit',marginTop:'4px'}});
+    remBtn.textContent='✕ Remover logo';
+    remBtn.onclick=function(e){
+      e.stopPropagation();
+      var empData=Object.assign({},state.empresaData||{});
+      empData[state.profile]=Object.assign({},d);
+      delete empData[state.profile].logoBase64;
+      lsSet('empresaData',empData);
+      setState({empresaData:empData});
+      try{fbPut('/empresaData',empData);}catch(e2){}
+      showToast('Logo removida','error');
+    };
+    headRight.appendChild(remBtn);
+  }
+
   var headInfo=el('div',{style:{flex:'1'}},[
     el('div',{style:{fontWeight:'700',fontSize:'18px',marginBottom:'2px'}},d.nomeFantasia||pf.label),
     d.razaoSocial?el('div',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'2px'}},d.razaoSocial):null,
@@ -158,6 +213,7 @@ function renderEmpresa() {
        d.cidade?el('span',{style:{fontSize:'11px',color:'var(--text3)'}},'📍 '+d.cidade+(d.estado?' / '+d.estado:'')):null,
        d.celular?el('span',{style:{fontSize:'11px',color:'var(--text3)'}},'📱 '+d.celular):null,
       ].filter(Boolean)),
+    headRight,
   ].filter(Boolean));
   headerCard.appendChild(avt);
   headerCard.appendChild(headInfo);

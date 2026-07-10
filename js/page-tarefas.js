@@ -40,11 +40,66 @@ function _playAlertSound() {
 
 function setupTarefasNotificacoes() {
   _injectTarefaStyles();
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
-  }
+  // Não pede permissão silenciosamente — o browser ignora sem clique do usuário.
+  // O banner _renderNotifPermissaoBanner() mostra botão clicável para o usuário ativar.
   verificarAlertas();
   setInterval(verificarAlertas, 30000);
+}
+
+// Banner que aparece quando notificações não estão ativas
+function _renderNotifPermissaoBanner() {
+  if (!('Notification' in window)) return null;
+  if (Notification.permission === 'granted') return null;
+
+  var banner = el('div', {});
+  banner.style.cssText = [
+    'position:fixed;top:0;left:0;right:0;z-index:99970;',
+    'background:linear-gradient(90deg,#92400e,#d97706,#92400e);',
+    'color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;',
+    'font-size:13px;font-weight:600;font-family:inherit;',
+  ].join('');
+
+  var txt = el('span', {});
+  txt.style.cssText = 'flex:1';
+  txt.textContent = Notification.permission === 'denied'
+    ? '🔕 Notificações bloqueadas — vá em Configurações do navegador > Notificações e libere este site'
+    : '🔔 Ative as notificações para receber lembretes de tarefas na barra de tarefas';
+
+  var btn2 = el('button', {});
+  btn2.style.cssText = 'background:#fff;color:#92400e;border:none;border-radius:6px;padding:6px 14px;font-weight:700;cursor:pointer;font-size:13px;font-family:inherit;white-space:nowrap';
+  btn2.textContent = Notification.permission === 'denied' ? '📖 Como liberar' : '🔔 Ativar notificações';
+  btn2.onclick = function() {
+    if (Notification.permission === 'denied') {
+      // Abre configurações do Chrome para este site
+      window.open('chrome://settings/content/notifications', '_blank');
+      return;
+    }
+    Notification.requestPermission().then(function(perm) {
+      if (perm === 'granted') {
+        _playAlertSound();
+        if (typeof showToast === 'function') showToast('✅ Notificações ativadas com sucesso!', 'success', 3000);
+        if (typeof render === 'function') render();
+      }
+    });
+  };
+
+  var close = el('button', {});
+  close.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px;line-height:1;opacity:.7';
+  close.textContent = '×';
+  close.title = 'Fechar';
+  close.onclick = function() {
+    banner.remove();
+    lsSet('djf_notif_banner_fechado', Date.now());
+  };
+
+  // Não mostra se o usuário fechou nas últimas 24h
+  var fechado = lsGet('djf_notif_banner_fechado');
+  if (fechado && (Date.now() - fechado) < 86400000) return null;
+
+  banner.appendChild(txt);
+  banner.appendChild(btn2);
+  banner.appendChild(close);
+  return banner;
 }
 
 function verificarAlertas() {
@@ -63,13 +118,15 @@ function verificarAlertas() {
   });
 
   // Browser notification para novas (ainda não notificadas)
-  ativas.filter(function(t) { return !t.notificado; }).forEach(function(t) {
+  var novas = ativas.filter(function(t) { return !t.notificado; });
+  novas.forEach(function(t) {
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
         new Notification('⚠ Financial Routine — ' + t.titulo, {
           body: (t.descricao ? t.descricao.slice(0, 80) : '') || 'Vence em ' + fmtDate(t.data) + (t.hora ? ' às ' + t.hora : ''),
           requireInteraction: true,
           tag: 'djf_tarefa_' + t.id,
+          icon: '/icons/icon.svg',
         });
       } catch(e) {}
     }
@@ -78,6 +135,12 @@ function verificarAlertas() {
     });
     lsSet('tarefas', state.tarefas);
   });
+  // Toca som uma vez quando há novas notificações (independente do popup estar aberto)
+  if (novas.length > 0 && !window._djfNotifSomTocou) {
+    window._djfNotifSomTocou = true;
+    _playAlertSound();
+    setTimeout(function() { window._djfNotifSomTocou = false; }, 60000);
+  }
 
   // Re-render para mostrar/atualizar o banner se houver alertas
   if (ativas.length > 0) {

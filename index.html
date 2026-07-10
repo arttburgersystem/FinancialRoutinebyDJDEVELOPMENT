@@ -2679,6 +2679,8 @@ function render(){
   if(typeof renderEstoqueMovModal==='function'){var emM=renderEstoqueMovModal();if(emM)app.appendChild(emM);}
   if(typeof renderFichaTecnicaModal==='function'){var ftM=renderFichaTecnicaModal();if(ftM)app.appendChild(ftM);}
   if(typeof _doCheckBanner==='function')_doCheckBanner();
+  var notifBanner=typeof _renderNotifPermissaoBanner==='function'?_renderNotifPermissaoBanner():null;
+  if(notifBanner)app.appendChild(notifBanner);
   var alertaBanner=typeof renderAlertaBanner==='function'?renderAlertaBanner():null;
   if(alertaBanner)app.appendChild(alertaBanner);
   if(state.toast){

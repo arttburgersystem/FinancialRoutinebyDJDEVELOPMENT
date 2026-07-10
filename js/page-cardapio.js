@@ -7,6 +7,241 @@ var _crdSetFlt   = '';
 var _crdStsFlt   = '';
 var _crdSel      = {};
 var _crdCatModal = null; // {id?,nome,imagem} — categoria sendo criada/editada
+var _crdImport   = null; // null | {rows:[],loading:false}
+
+// ── IMPORTAÇÃO VIA EXCEL/CSV ──────────────────────────────────────────────────
+
+function _parseCsvSimples(text) {
+  var lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  return lines.map(function(line) {
+    var row=[]; var cell=''; var inQ=false;
+    for (var i=0;i<line.length;i++) {
+      var c=line[i];
+      if (c==='"') { if (inQ && line[i+1]==='"'){cell+='"';i++;}else inQ=!inQ; }
+      else if (c===','&&!inQ){row.push(cell);cell='';}
+      else cell+=c;
+    }
+    row.push(cell);
+    return row.map(function(v){return v.trim();});
+  }).filter(function(r){return r.some(function(c){return c;});});
+}
+
+function _xlsxToRows(file, cb) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, {type:'binary'});
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+      cb(null, rows);
+    } catch(ex) { cb(ex); }
+  };
+  reader.onerror = function(){ cb(new Error('Falha ao ler arquivo')); };
+  reader.readAsBinaryString(file);
+}
+
+function _csvToRows(file, cb) {
+  var reader = new FileReader();
+  reader.onload = function(e) { cb(null, _parseCsvSimples(e.target.result)); };
+  reader.onerror = function(){ cb(new Error('Falha ao ler arquivo')); };
+  reader.readAsText(file, 'UTF-8');
+}
+
+// Detecta colunas pelo header da planilha (linha 0)
+function _mapColunas(header) {
+  var m = {};
+  header.forEach(function(h, i) {
+    var hh = (h||'').toString().toLowerCase().trim()
+      .normalize('NFD').replace(/[̀-ͯ]/g,''); // remove acentos
+    if (/^nome/.test(hh))            m.nome      = i;
+    if (/c.?digo$/.test(hh)||/^cod/.test(hh)) m.codigo = i;
+    if (/categoria/.test(hh))        m.categoria = i;
+    if (/valor.*venda|pre.*venda/.test(hh)) m.precoVenda = i;
+    if (/valor.*custo|custo/.test(hh))      m.custoMedio = i;
+    if (/^ncm/.test(hh))             m.ncm       = i;
+    if (/^cfop/.test(hh))            m.cfop      = i;
+    if (/^cst/.test(hh))             m.cst       = i;
+    if (/cest|gest/.test(hh))        m.cest      = i;
+    if (/barra/.test(hh))            m.codBarra  = i;
+    if (/estoque/.test(hh))          m.estoque   = i;
+    if (/descri/.test(hh))           m.descricao = i;
+    if (/^tipo/.test(hh))            m.tipo      = i;
+  });
+  return m;
+}
+
+function _rowToProduto(row, map) {
+  function g(k) { return map[k]!==undefined ? (row[map[k]]||'').toString().trim() : ''; }
+  function gn(k){ var v=parseFloat((g(k)||'0').replace(',','.')); return isNaN(v)?0:v; }
+  var nome = g('nome');
+  if (!nome) return null;
+  var now = new Date().toISOString();
+  return {
+    id:          uid(),
+    profile:     state.profile,
+    tipo:        'produto',
+    nome:        nome,
+    categoria:   g('categoria'),
+    unidade:     'un',
+    sku:         g('codigo'),
+    precoVenda:  gn('precoVenda'),
+    custoMedio:  gn('custoMedio'),
+    estoqueAtual: gn('estoque'),
+    estoqueMinimo: 0,
+    disponivel:  true,
+    ativo:       true,
+    descricaoCard: g('descricao'),
+    ncm:         g('ncm'),
+    cfop:        g('cfop'),
+    cst:         g('cst'),
+    cest:        g('cest'),
+    obs:         g('codBarra') ? 'Cód.Barra: '+g('codBarra') : '',
+    criadoEm:   now,
+    atualizadoEm: now,
+  };
+}
+
+function renderCrdImportModal() {
+  var imp = _crdImport;
+  var rows = (imp && imp.rows) || [];
+  var map  = (imp && imp.map)  || {};
+
+  function fechar(){ _crdImport=null; setState({}); }
+
+  // Cabeçalho da preview
+  var COLS = [
+    {k:'nome',      l:'Nome'},
+    {k:'categoria', l:'Categoria'},
+    {k:'precoVenda',l:'Preço Venda'},
+    {k:'custoMedio',l:'Custo'},
+    {k:'codigo',    l:'Código'},
+    {k:'ncm',       l:'NCM'},
+  ];
+
+  function mkTh(txt){ var t=el('th',{});t.style.cssText='padding:7px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap;';t.textContent=txt;return t; }
+  function mkTd(txt,warn){ var t=el('td',{});t.style.cssText='padding:6px 10px;font-size:12px;color:'+(warn?'var(--danger)':'var(--text2)')+';border-bottom:1px solid var(--border);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';t.textContent=txt||'—';return t; }
+
+  var previewRows = rows.slice(0, 20).map(function(p) {
+    var tr=el('tr',{});
+    COLS.forEach(function(c){
+      var v = map[c.k]!==undefined ? (p[map[c.k]]||'').toString().trim() : '';
+      tr.appendChild(mkTd(v, c.k==='nome'&&!v));
+    });
+    return tr;
+  });
+
+  var thead = el('thead',{},COLS.map(function(c){return mkTh(c.l);}));
+  var tbody = el('tbody',{}, previewRows.length
+    ? previewRows
+    : [el('tr',{},[el('td',{colspan:'6',style:{padding:'20px',textAlign:'center',color:'var(--text3)',fontSize:'13px'}},'Nenhum dado encontrado')])]
+  );
+  var table = el('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'13px'}});
+  table.appendChild(thead); table.appendChild(tbody);
+
+  var validCount = rows.filter(function(r){ return map.nome!==undefined && (r[map.nome]||'').toString().trim(); }).length;
+
+  function confirmarImport() {
+    var prods = rows.map(function(r){ return _rowToProduto(r, map); }).filter(Boolean);
+    if (!prods.length) { showToast('Nenhum produto válido para importar','error'); return; }
+    // Remove duplicatas por nome+perfil
+    var existentes = (state.produtos||[]);
+    var nomeSet = {};
+    existentes.forEach(function(p){ if(p.profile===state.profile) nomeSet[p.nome.toLowerCase()]=true; });
+    var novos = prods.filter(function(p){ return !nomeSet[p.nome.toLowerCase()]; });
+    var atualizados = prods.filter(function(p){ return nomeSet[p.nome.toLowerCase()]; });
+    var merged = existentes.slice();
+    // Atualiza preços dos existentes
+    atualizados.forEach(function(p){
+      var idx = merged.findIndex(function(x){ return x.profile===state.profile && x.nome.toLowerCase()===p.nome.toLowerCase(); });
+      if (idx>=0) merged[idx] = Object.assign({}, merged[idx], {precoVenda:p.precoVenda,custoMedio:p.custoMedio,categoria:p.categoria,sku:p.sku,ncm:p.ncm,cfop:p.cfop,cst:p.cst,cest:p.cest});
+    });
+    merged = merged.concat(novos);
+    lsSet('produtos', merged);
+    setState({ produtos: merged });
+    scheduleSave();
+    _crdImport = null;
+    showToast('✅ '+novos.length+' produto(s) importado(s)'+(atualizados.length?' | '+atualizados.length+' atualizado(s)':''), 'success');
+  }
+
+  var body = el('div',{style:{padding:'16px',maxHeight:'55vh',overflowY:'auto'}});
+
+  if (!imp || !imp.rows) {
+    // Estado inicial: escolher arquivo
+    var fileInp = el('input',{type:'file',accept:'.xlsx,.xls,.csv',id:'_crd-file-inp',style:{display:'none'}});
+    fileInp.onchange = function() {
+      var f = this.files[0];
+      if (!f) return;
+      var isCsv = /\.csv$/i.test(f.name);
+      var loader = isCsv ? _csvToRows : _xlsxToRows;
+      loader(f, function(err, allRows) {
+        if (err || !allRows || !allRows.length) { showToast('Erro ao ler arquivo: '+(err&&err.message||'formato inválido'),'error'); return; }
+        var header = allRows[0];
+        var dataRows = allRows.slice(1);
+        var m = _mapColunas(header);
+        _crdImport = { rows: dataRows, map: m, header: header };
+        setState({});
+      });
+    };
+    var pickBtn = el('label',{for:'_crd-file-inp'});
+    pickBtn.style.cssText='display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:8px;background:var(--gold);color:#000;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;border:none;';
+    pickBtn.textContent='📂 Escolher arquivo (.xlsx ou .csv)';
+    body.appendChild(fileInp);
+    body.appendChild(el('div',{style:{textAlign:'center',padding:'30px 0'}},[
+      el('div',{style:{fontSize:'48px',marginBottom:'12px'}},'📊'),
+      el('div',{style:{fontSize:'14px',fontWeight:'700',marginBottom:'6px',color:'var(--text)'}},'Importar planilha de produtos'),
+      el('div',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'20px',lineHeight:'1.5'}},'Selecione sua planilha Excel (.xlsx) ou CSV.<br>O sistema detecta automaticamente as colunas: Nome, Categoria, Valor de Venda, Custo, Código, NCM, CFOP, CST.'),
+      pickBtn,
+    ]));
+  } else {
+    // Preview dos dados
+    var infoBanner = el('div',{style:{padding:'10px 14px',borderRadius:'8px',background:'var(--bg3)',border:'1px solid var(--border)',marginBottom:'14px',fontSize:'12px',color:'var(--text2)',display:'flex',alignItems:'center',gap:'12px'}});
+    infoBanner.innerHTML='<span style="font-size:20px">📋</span><span>'+validCount+' linha(s) encontrada(s) com nome válido. Exibindo até 20 na prévia abaixo.</span>';
+    body.appendChild(infoBanner);
+
+    var tableWrap=el('div',{style:{overflowX:'auto',border:'1px solid var(--border)',borderRadius:'8px'}});
+    tableWrap.appendChild(table);
+    body.appendChild(tableWrap);
+
+    if (rows.length > 20) {
+      var more=el('div',{style:{textAlign:'center',padding:'8px',fontSize:'11px',color:'var(--text3)'}});
+      more.textContent='... e mais '+(rows.length-20)+' linha(s) não exibidas';
+      body.appendChild(more);
+    }
+
+    // Mostra mapeamento de colunas detectado
+    var mapInfo = el('div',{style:{marginTop:'12px',padding:'10px 14px',borderRadius:'8px',background:'var(--bg3)',fontSize:'11px',color:'var(--text3)'}});
+    mapInfo.innerHTML='<strong style="color:var(--text2)">Colunas detectadas:</strong> '
+      + Object.keys(map).map(function(k){return '<span style="color:var(--gold)">'+k+'</span>=col '+(map[k]+1);}).join(', ');
+    body.appendChild(mapInfo);
+  }
+
+  var footer = el('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end',padding:'14px 16px',borderTop:'1px solid var(--border)',background:'var(--bg2)',borderRadius:'0 0 12px 12px'}});
+  if (imp && imp.rows) {
+    footer.appendChild(btn('btn-ghost','← Escolher outro',function(){ _crdImport={};setState({}); }));
+  }
+  footer.appendChild(btn('btn-ghost','Cancelar',fechar));
+  if (imp && imp.rows && validCount > 0) {
+    footer.appendChild(btn('btn-primary','✅ Importar '+validCount+' produto(s)',confirmarImport));
+  }
+
+  var modal = el('div',{});
+  modal.style.cssText='background:var(--bg2);border:1px solid var(--border);border-radius:12px;width:min(700px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;';
+
+  var header2 = el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}});
+  header2.appendChild(el('span',{style:{fontWeight:'800',fontSize:'16px'}},'📥 Importar Produtos via Planilha'));
+  var closeBtn=el('button',{onclick:fechar});
+  closeBtn.style.cssText='background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);padding:2px 6px;line-height:1;';
+  closeBtn.textContent='×';
+  header2.appendChild(closeBtn);
+  modal.appendChild(header2);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+
+  var ov = el('div',{onclick:function(e){if(e.target===this)fechar();}});
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9900;display:flex;align-items:center;justify-content:center;';
+  ov.appendChild(modal);
+  return ov;
+}
 
 function renderCardapio() {
   var perfil  = state.profile;
@@ -302,6 +537,12 @@ function renderCardapio() {
     tabBarRight.appendChild(embInfoEl);
   } else {
     tabBarRight = el('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 12px'}});
+    if (!isComp) {
+      var importBtn=el('button',{class:'btn-ghost',style:{fontSize:'12px',padding:'7px 12px',whiteSpace:'nowrap',borderColor:'var(--border)'}});
+      importBtn.textContent='📥 Importar planilha';
+      importBtn.onclick=function(){ _crdImport={}; setState({}); };
+      tabBarRight.appendChild(importBtn);
+    }
     var addBtn=el('button',{class:'btn-primary',style:{fontSize:'12px',padding:'7px 14px',whiteSpace:'nowrap'}});
     addBtn.textContent = isComp ? '+ Nova montagem' : '+ Novo produto';
     addBtn.onclick = function(){
@@ -716,9 +957,10 @@ function renderCardapio() {
   }
 
   // ── Modais adicionais ────────────────────────────────────────────────────────
-  var prodModal  = (state.produtoModal!==null&&state.produtoModal!==undefined&&typeof renderProdutoModal==='function') ? renderProdutoModal() : null;
-  var catMgrMod  = state.estCatManager ? renderEstCatManager() : null;
-  var unidMgrMod = state.estUnidManager ? renderEstUnidManager() : null;
+  var prodModal   = (state.produtoModal!==null&&state.produtoModal!==undefined&&typeof renderProdutoModal==='function') ? renderProdutoModal() : null;
+  var catMgrMod   = state.estCatManager ? renderEstCatManager() : null;
+  var unidMgrMod  = state.estUnidManager ? renderEstUnidManager() : null;
+  var importModal = (_crdImport!==null) ? renderCrdImportModal() : null;
 
   var page=el('div',{class:'page-content'},[
     el('div',{class:'page-header'},[
@@ -739,10 +981,11 @@ function renderCardapio() {
 
   var root=el('div',{});
   root.appendChild(page);
-  if(catModal)   root.appendChild(catModal);
-  if(compModal)  root.appendChild(compModal);
-  if(prodModal)  root.appendChild(prodModal);
-  if(catMgrMod)  root.appendChild(catMgrMod);
-  if(unidMgrMod) root.appendChild(unidMgrMod);
+  if(catModal)    root.appendChild(catModal);
+  if(compModal)   root.appendChild(compModal);
+  if(prodModal)   root.appendChild(prodModal);
+  if(catMgrMod)   root.appendChild(catMgrMod);
+  if(unidMgrMod)  root.appendChild(unidMgrMod);
+  if(importModal) root.appendChild(importModal);
   return root;
 }

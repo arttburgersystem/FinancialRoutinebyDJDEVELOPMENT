@@ -122,7 +122,8 @@ function _temModalAberto() {
     state.shopListModal || state.shopItemModal ||
     state.estoqueItemModal || state.estoqueMovModal || state.fichaTecnicaModal ||
     state.feriasModal || state.exameModal ||
-    state.freelancerModal || state.servicoFreelancerModal);
+    state.freelancerModal || state.servicoFreelancerModal ||
+    (typeof _crdImport !== 'undefined' && _crdImport !== null));
 }
 
 // ── INDICADOR VISUAL DE SINCRONIZAÇÃO ─────────────────────────────────────────

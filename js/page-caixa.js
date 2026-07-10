@@ -91,7 +91,7 @@ function renderCaixa() {
 
     var w=window.open('','_blank','width=700,height=900');
     w.document.write(
-      '<html><head><title>Fechamento '+fmtDate(dataSel)+'</title><style>'+
+      '<html><head><meta charset="UTF-8"><title>Fechamento '+fmtDate(dataSel)+'</title><style>'+
       'body{font-family:system-ui,sans-serif;padding:32px;color:#111;max-width:700px;margin:0 auto}'+
       'h1{font-size:20px;font-weight:900;margin:0}'+
       '.sub{font-size:12px;color:#666;margin-bottom:4px}'+

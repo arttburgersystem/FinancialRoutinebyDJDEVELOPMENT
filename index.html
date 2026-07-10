@@ -1939,7 +1939,7 @@ function renderComprovanteModal(){
   printBtn.textContent='🖨 Imprimir / Salvar PDF';
   printBtn.onclick=function(){
     var w=window.open('','_blank','width=600,height=700');
-    w.document.write('<html><head><title>Comprovante</title><style>'+
+    w.document.write('<html><head><meta charset="UTF-8"><title>Comprovante</title><style>'+
       'body{font-family:system-ui,sans-serif;padding:32px;background:#fff;color:#111;max-width:500px;margin:0 auto}'+
       'h1{font-size:18px;font-weight:800;text-align:center;margin-bottom:4px}'+
       '.sub{font-size:11px;color:#666;text-align:center;margin-bottom:4px}'+

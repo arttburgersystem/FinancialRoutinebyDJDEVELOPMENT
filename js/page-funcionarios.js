@@ -934,7 +934,7 @@ function _exportFolhaPDF(ativos, folhaMesSel) {
 
   var w=window.open('','_blank','width=900,height=700');
   w.document.write(
-    '<html><head><title>Folha '+labelMes+'</title><style>'+
+    '<html><head><meta charset="UTF-8"><title>Folha '+labelMes+'</title><style>'+
     'body{font-family:system-ui,sans-serif;padding:32px;color:#111;max-width:850px;margin:0 auto}'+
     'h1{font-size:18px;font-weight:800;margin:0}'+
     '.sub2{font-size:12px;color:#666;margin-bottom:4px}'+

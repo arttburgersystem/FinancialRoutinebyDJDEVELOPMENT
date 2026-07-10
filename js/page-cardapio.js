@@ -9,6 +9,37 @@ var _crdSel      = {};
 var _crdCatModal = null; // {id?,nome,imagem} — categoria sendo criada/editada
 var _crdImport   = null; // null | {rows:[],loading:false}
 
+// ── SINCRONIZAÇÃO DE CATEGORIAS ───────────────────────────────────────────────
+// Lê todas as strings de categoria nos produtos do perfil atual e cria
+// entradas faltantes em state.estCategorias. Retorna o nº de entradas criadas.
+function _syncCategoriasProdutos() {
+  var perfil = state.profile;
+  var prods  = (state.produtos    || []).filter(function(p){ return p.profile === perfil; });
+  var comps  = (state.complementos|| []).filter(function(c){ return c.profile === perfil; });
+  var cats   = (state.estCategorias || []);
+  var existentes = {};
+  cats.forEach(function(c){ existentes[c.nome.toLowerCase()] = true; });
+
+  var novas = [];
+  var vistas = {};
+  prods.concat(comps).forEach(function(p) {
+    var nome = (p.categoria || '').trim();
+    if (!nome) return;
+    var key = nome.toLowerCase();
+    if (!existentes[key] && !vistas[key]) {
+      vistas[key] = true;
+      novas.push({ id: 'cat_' + Date.now() + '_' + Math.floor(Math.random()*9999), nome: nome, imagem: '' });
+    }
+  });
+
+  if (!novas.length) return 0;
+  var todas = cats.concat(novas);
+  lsSet('estCategorias', todas);
+  setState({ estCategorias: todas });
+  scheduleSave();
+  return novas.length;
+}
+
 // ── IMPORTAÇÃO VIA EXCEL/CSV ──────────────────────────────────────────────────
 
 function _parseCsvSimples(text) {
@@ -191,7 +222,11 @@ function renderCrdImportModal() {
     setState({ produtos: merged });
     scheduleSave();
     _crdImport = null;
-    showToast('✅ '+novos.length+' produto(s) importado(s)'+(atualizados.length?' | '+atualizados.length+' atualizado(s)':''), 'success');
+    // Cria automaticamente categorias em estCategorias para as strings importadas
+    var catsCriadas = _syncCategoriasProdutos();
+    showToast('✅ '+novos.length+' produto(s) importado(s)'
+      +(atualizados.length?' | '+atualizados.length+' atualizado(s)':'')
+      +(catsCriadas?' | '+catsCriadas+' categoria(s) criada(s)':''), 'success');
   }
 
   var body = el('div',{style:{padding:'16px',maxHeight:'55vh',overflowY:'auto'}});
@@ -822,25 +857,70 @@ function renderCardapio() {
     cards.forEach(function(c){grid.appendChild(c);});
     grid.appendChild(addCard);
 
+    // Detecta categorias nos produtos que ainda não existem em estCategorias
+    var catsNomesSet = {};
+    catsData.forEach(function(c){ catsNomesSet[c.nome.toLowerCase()] = true; });
+    var catsSemEntrada = [];
+    var _vistasOrfas = {};
+    todosProdAll.concat(todosCompAll).forEach(function(p) {
+      var nm = (p.categoria || '').trim();
+      if (nm && !catsNomesSet[nm.toLowerCase()] && !_vistasOrfas[nm.toLowerCase()]) {
+        _vistasOrfas[nm.toLowerCase()] = true;
+        catsSemEntrada.push(nm);
+      }
+    });
+
+    var alertaOrfas = null;
+    if (catsSemEntrada.length > 0) {
+      alertaOrfas = el('div',{style:{
+        margin:'16px 20px 0',padding:'12px 16px',borderRadius:'8px',
+        background:'var(--gold-dim)',border:'1px solid var(--gold)',
+        display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap',
+      }});
+      var alertaTxt = el('span',{style:{flex:'1',fontSize:'12px',color:'var(--text)'}});
+      alertaTxt.innerHTML='<strong>'+catsSemEntrada.length+' categoria(s) nos produtos sem entrada aqui:</strong> '
+        +catsSemEntrada.map(function(n){return '<em>'+n+'</em>';}).join(', ');
+      var sincBtn = el('button',{class:'btn-primary',style:{fontSize:'11px',padding:'5px 12px',whiteSpace:'nowrap'}});
+      sincBtn.textContent='🔄 Criar automaticamente';
+      sincBtn.onclick = function() {
+        var n = _syncCategoriasProdutos();
+        showToast(n > 0 ? '✅ '+n+' categoria(s) criada(s)!' : 'Nada a sincronizar', n>0?'success':'info');
+      };
+      alertaOrfas.appendChild(alertaTxt);
+      alertaOrfas.appendChild(sincBtn);
+    }
+
     if(catsData.length===0 && !_crdBusca){
       return el('div',{style:{padding:'60px 20px',textAlign:'center',color:'var(--text3)'}},[
         el('div',{style:{fontSize:'48px',marginBottom:'12px'}},'🏷️'),
         el('div',{style:{fontWeight:'700',fontSize:'16px',marginBottom:'6px'}},'Nenhuma categoria ainda'),
         el('div',{style:{fontSize:'13px',marginBottom:'20px'}},'Crie categorias para organizar Produtos e Montagens do cardápio'),
+        alertaOrfas,
         btn('btn-primary','+ Criar primeira categoria',function(){_crdCatModal={nome:'',imagem:''};setState({});}),
-      ]);
+      ].filter(Boolean));
     }
 
     var infoBar=el('div',{style:{
       padding:'10px 20px',borderBottom:'1px solid var(--border)',
       display:'flex',alignItems:'center',justifyContent:'space-between',
-      fontSize:'12px',color:'var(--text3)',background:'var(--bg2)',
+      fontSize:'12px',color:'var(--text3)',background:'var(--bg2)',gap:'12px',flexWrap:'wrap',
     }});
-    infoBar.appendChild(el('span',{},catsData.length+' categoria(s) — clique e arraste no hover para reordenar, duplo-clique para editar'));
-    infoBar.appendChild(el('span',{style:{color:'var(--gold)',fontWeight:'600',cursor:'pointer'},
+    infoBar.appendChild(el('span',{},catsData.length+' categoria(s) — duplo-clique para editar'));
+    var infoRight = el('div',{style:{display:'flex',gap:'8px',alignItems:'center'}});
+    if (catsSemEntrada.length > 0) {
+      var sincInlineBtn = el('button',{class:'btn-ghost',style:{fontSize:'11px',padding:'4px 10px',whiteSpace:'nowrap',color:'var(--gold)',borderColor:'var(--gold)'}});
+      sincInlineBtn.textContent='🔄 Sincronizar ('+catsSemEntrada.length+' faltando)';
+      sincInlineBtn.onclick = function() {
+        var n = _syncCategoriasProdutos();
+        showToast(n > 0 ? '✅ '+n+' categoria(s) criada(s)!' : 'Tudo já sincronizado', n>0?'success':'info');
+      };
+      infoRight.appendChild(sincInlineBtn);
+    }
+    infoRight.appendChild(el('span',{style:{color:'var(--gold)',fontWeight:'600',cursor:'pointer'},
       onclick:function(){_crdCatModal={nome:'',imagem:''};setState({});}}, '+ Nova'));
+    infoBar.appendChild(infoRight);
 
-    return el('div',{},[infoBar,grid]);
+    return el('div',{},[infoBar, alertaOrfas, grid].filter(Boolean));
   }
 
   // ── Toolbar (para Produtos e Montagens) ───────────────────────────────────────

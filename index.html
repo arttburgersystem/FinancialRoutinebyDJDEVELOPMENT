@@ -3133,7 +3133,22 @@ function buildPinScreen(mode){
           msg.className='pin-msg';msg.textContent='Aguardando Face ID...';
           bioAutenticar(function(){
             msg.className='pin-msg success';msg.textContent='✓ Acesso liberado';
-            setTimeout(buildUserLoginScreen,300);
+            var _isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||window.innerWidth<=768;
+            setTimeout(function(){
+              if(_isMobile){
+                // No celular: Face ID é autenticação suficiente — vai direto para o app
+                var _ativos=(lsGet('usuarios',[])||[]).filter(function(u){return u.ativo!==false;});
+                if(_ativos.length===1){
+                  state.sessionUser=_ativos[0];
+                  try{sessionStorage.setItem('djf_session',JSON.stringify({id:_ativos[0].id,nome:_ativos[0].nome,papel:_ativos[0].papel,email:_ativos[0].email}));}catch(e){}
+                }
+                var lov2=document.getElementById('login-overlay');
+                if(lov2)lov2.style.display='none';
+                initApp();
+              } else {
+                buildUserLoginScreen();
+              }
+            },300);
           },function(){
             msg.className='pin-msg error';msg.textContent='Face ID falhou. Use o PIN.';
             setTimeout(function(){msg.className='pin-msg';msg.textContent='';},2000);

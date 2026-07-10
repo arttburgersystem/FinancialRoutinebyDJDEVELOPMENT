@@ -51,28 +51,48 @@ function _csvToRows(file, cb) {
 function _mapColunas(header) {
   var m = {};
   header.forEach(function(h, i) {
-    var hh = (h||'').toString().toLowerCase().trim()
+    var raw = (h||'').toString().trim();
+    var hh  = raw.toLowerCase()
       .normalize('NFD').replace(/[̀-ͯ]/g,''); // remove acentos
-    if (/^nome/.test(hh))            m.nome      = i;
-    if (/c.?digo$/.test(hh)||/^cod/.test(hh)) m.codigo = i;
-    if (/categoria/.test(hh))        m.categoria = i;
-    if (/valor.*venda|pre.*venda/.test(hh)) m.precoVenda = i;
-    if (/valor.*custo|custo/.test(hh))      m.custoMedio = i;
-    if (/^ncm/.test(hh))             m.ncm       = i;
-    if (/^cfop/.test(hh))            m.cfop      = i;
-    if (/^cst/.test(hh))             m.cst       = i;
-    if (/cest|gest/.test(hh))        m.cest      = i;
-    if (/barra/.test(hh))            m.codBarra  = i;
-    if (/estoque/.test(hh))          m.estoque   = i;
-    if (/descri/.test(hh))           m.descricao = i;
-    if (/^tipo/.test(hh))            m.tipo      = i;
+    // Código do produto: palavra única (sem espaço), ex: "Código", "Codigo", "Cod"
+    // Evita "Código Da Nota", "Código de Barras" etc.
+    if (!/ /.test(hh) && /^c[ao]?digo$|^cod\.?$/.test(hh)) m.codigo = i;
+    if (/^nome/.test(hh))                          m.nome      = i;
+    if (/categoria/.test(hh))                      m.categoria = i;
+    if (/valor.{0,6}venda|pre.{0,4}venda/.test(hh)) m.precoVenda = i;
+    if (/valor.{0,6}custo|^custo$/.test(hh))       m.custoMedio = i;
+    if (/^ncm$/.test(hh))                          m.ncm       = i;
+    if (/^cfop$/.test(hh))                         m.cfop      = i;
+    if (/^cst$/.test(hh))                          m.cst       = i;
+    if (/^cest$|^gest$/.test(hh))                  m.cest      = i;
+    if (/c.{0,4}d.{0,4}barra|barra/.test(hh))     m.codBarra  = i;
+    if (/^estoque$/.test(hh))                      m.estoque   = i;
+    if (/descri/.test(hh))                         m.descricao = i;
+    if (/^tipo$/.test(hh))                         m.tipo      = i;
   });
   return m;
 }
 
-function _rowToProduto(row, map) {
+// Detecta se os preços da planilha estão em centavos (inteiros ≥ 100)
+function _detectaCentavos(rows, map) {
+  if (map.precoVenda === undefined) return false;
+  var amostras = rows.slice(0,30).map(function(r){
+    return parseFloat((r[map.precoVenda]||'0').toString().replace(',','.'));
+  }).filter(function(v){ return v > 0; });
+  if (!amostras.length) return false;
+  // É centavos se: todos são inteiros E média > 200 (R$2 em reais seria improvável ser 200 centavos para cardápio)
+  var todosInteiros = amostras.every(function(v){ return Math.floor(v) === v; });
+  var media = amostras.reduce(function(a,b){return a+b;},0) / amostras.length;
+  return todosInteiros && media >= 100;
+}
+
+function _rowToProduto(row, map, centavos) {
   function g(k) { return map[k]!==undefined ? (row[map[k]]||'').toString().trim() : ''; }
-  function gn(k){ var v=parseFloat((g(k)||'0').replace(',','.')); return isNaN(v)?0:v; }
+  function gn(k){
+    var v=parseFloat((g(k)||'0').replace(',','.'));
+    if (isNaN(v)) return 0;
+    return centavos ? Math.round(v) / 100 : v;
+  }
   var nome = g('nome');
   if (!nome) return null;
   var now = new Date().toISOString();
@@ -86,7 +106,7 @@ function _rowToProduto(row, map) {
     sku:         g('codigo'),
     precoVenda:  gn('precoVenda'),
     custoMedio:  gn('custoMedio'),
-    estoqueAtual: gn('estoque'),
+    estoqueAtual: (function(){ var v=parseFloat(g('estoque')||'0'); return isNaN(v)?0:v; })(),
     estoqueMinimo: 0,
     disponivel:  true,
     ativo:       true,
@@ -102,9 +122,10 @@ function _rowToProduto(row, map) {
 }
 
 function renderCrdImportModal() {
-  var imp = _crdImport;
-  var rows = (imp && imp.rows) || [];
-  var map  = (imp && imp.map)  || {};
+  var imp      = _crdImport;
+  var rows     = (imp && imp.rows)     || [];
+  var map      = (imp && imp.map)      || {};
+  var centavos = !!(imp && imp.centavos);
 
   function fechar(){ _crdImport=null; setState({}); }
 
@@ -118,14 +139,24 @@ function renderCrdImportModal() {
     {k:'ncm',       l:'NCM'},
   ];
 
+  function fmtPreview(raw, isMoney) {
+    if (!raw) return '—';
+    if (!isMoney) return raw;
+    var v = parseFloat(raw.replace(',','.'));
+    if (isNaN(v)) return raw;
+    if (centavos) v = Math.round(v) / 100;
+    return 'R$ '+v.toFixed(2).replace('.',',');
+  }
+
   function mkTh(txt){ var t=el('th',{});t.style.cssText='padding:7px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap;';t.textContent=txt;return t; }
   function mkTd(txt,warn){ var t=el('td',{});t.style.cssText='padding:6px 10px;font-size:12px;color:'+(warn?'var(--danger)':'var(--text2)')+';border-bottom:1px solid var(--border);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';t.textContent=txt||'—';return t; }
 
   var previewRows = rows.slice(0, 20).map(function(p) {
     var tr=el('tr',{});
     COLS.forEach(function(c){
-      var v = map[c.k]!==undefined ? (p[map[c.k]]||'').toString().trim() : '';
-      tr.appendChild(mkTd(v, c.k==='nome'&&!v));
+      var raw = map[c.k]!==undefined ? (p[map[c.k]]||'').toString().trim() : '';
+      var isMoney = c.k==='precoVenda' || c.k==='custoMedio';
+      tr.appendChild(mkTd(fmtPreview(raw, isMoney), c.k==='nome'&&!raw));
     });
     return tr;
   });
@@ -141,7 +172,7 @@ function renderCrdImportModal() {
   var validCount = rows.filter(function(r){ return map.nome!==undefined && (r[map.nome]||'').toString().trim(); }).length;
 
   function confirmarImport() {
-    var prods = rows.map(function(r){ return _rowToProduto(r, map); }).filter(Boolean);
+    var prods = rows.map(function(r){ return _rowToProduto(r, map, centavos); }).filter(Boolean);
     if (!prods.length) { showToast('Nenhum produto válido para importar','error'); return; }
     // Remove duplicatas por nome+perfil
     var existentes = (state.produtos||[]);
@@ -175,10 +206,11 @@ function renderCrdImportModal() {
       var loader = isCsv ? _csvToRows : _xlsxToRows;
       loader(f, function(err, allRows) {
         if (err || !allRows || !allRows.length) { showToast('Erro ao ler arquivo: '+(err&&err.message||'formato inválido'),'error'); return; }
-        var header = allRows[0];
+        var header   = allRows[0];
         var dataRows = allRows.slice(1);
-        var m = _mapColunas(header);
-        _crdImport = { rows: dataRows, map: m, header: header };
+        var m        = _mapColunas(header);
+        var cents    = _detectaCentavos(dataRows, m);
+        _crdImport = { rows: dataRows, map: m, header: header, centavos: cents };
         setState({});
       });
     };
@@ -194,8 +226,17 @@ function renderCrdImportModal() {
     ]));
   } else {
     // Preview dos dados
-    var infoBanner = el('div',{style:{padding:'10px 14px',borderRadius:'8px',background:'var(--bg3)',border:'1px solid var(--border)',marginBottom:'14px',fontSize:'12px',color:'var(--text2)',display:'flex',alignItems:'center',gap:'12px'}});
-    infoBanner.innerHTML='<span style="font-size:20px">📋</span><span>'+validCount+' linha(s) encontrada(s) com nome válido. Exibindo até 20 na prévia abaixo.</span>';
+    var infoBanner = el('div',{style:{padding:'10px 14px',borderRadius:'8px',background:'var(--bg3)',border:'1px solid var(--border)',marginBottom:'10px',fontSize:'12px',color:'var(--text2)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'12px',flexWrap:'wrap'}});
+    var infoLeft = el('span',{},'📋 '+validCount+' linha(s) encontrada(s). Exibindo até 20 na prévia.');
+    // Toggle centavos
+    var centRow = el('label',{style:{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'12px',color:'var(--text2)',whiteSpace:'nowrap'}});
+    var centChk = el('input',{type:'checkbox',style:{cursor:'pointer',width:'14px',height:'14px'}});
+    if (centavos) centChk.checked = true;
+    centChk.onchange = function(){ _crdImport.centavos = this.checked; setState({}); };
+    centRow.appendChild(centChk);
+    centRow.appendChild(el('span',{},'Preços em centavos (÷100)'));
+    infoBanner.appendChild(infoLeft);
+    infoBanner.appendChild(centRow);
     body.appendChild(infoBanner);
 
     var tableWrap=el('div',{style:{overflowX:'auto',border:'1px solid var(--border)',borderRadius:'8px'}});

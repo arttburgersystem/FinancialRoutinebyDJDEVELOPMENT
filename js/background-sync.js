@@ -123,7 +123,7 @@ function _temModalAberto() {
     state.estoqueItemModal || state.estoqueMovModal || state.fichaTecnicaModal ||
     state.feriasModal || state.exameModal ||
     state.freelancerModal || state.servicoFreelancerModal ||
-    state.comprovanteModal ||
+    state.comprovanteModal || state.patrimonioModal || state.patrimonioDelModal ||
     (typeof _crdImport !== 'undefined' && _crdImport !== null));
 }
 

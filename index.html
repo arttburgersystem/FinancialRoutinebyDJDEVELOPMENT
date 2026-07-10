@@ -589,6 +589,9 @@ var state={
   fechamentosCaixa: lsGet('fechamentosCaixa',[]),
   caixaVals: lsGet('caixaVals',{}),
   caixaDataSel: null,
+  patrimonios: lsGet('patrimonios',[]),
+  patrimonioModal: null,
+  patrimonioDelModal: null,
   administradores: lsGet('administradores',[]),
   adminModal: null,
   pagamentoFaturaModal: null,
@@ -795,7 +798,7 @@ function scheduleSave(){
   syncTimer=setTimeout(function(){
     // Atualiza badge diretamente — sem setState para não destruir inputs ativos
     _updateSyncDOM('syncing');
-    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);lsSet('notas',state.notas||[]);lsSet('impressorasCadastradas',state.impressorasCadastradas||[]);lsSet('auditLog',state.auditLog||[]);lsSet('administradores',state.administradores||[]);lsSet('estCategorias',state.estCategorias||[]);lsSet('pdvPedidos',state.pdvPedidos||[]);lsSet('pdvSessoes',state.pdvSessoes||[]);lsSet('pdvCaixaSes',state.pdvCaixaSes);lsSet('orcamentos',state.orcamentos||[]);lsSet('dailyTaskDefs',state.dailyTaskDefs||[]);lsSet('dailyOps',state.dailyOps||[]);lsSet('compras',state.compras||[]);lsSet('estoqueItens',state.estoqueItens||[]);lsSet('estoqueMovs',state.estoqueMovs||[]);lsSet('fichaTecnicas',state.fichaTecnicas||[]);lsSet('feriasFuncionarios',state.feriasFuncionarios||[]);lsSet('examesFuncionarios',state.examesFuncionarios||[]);lsSet('freelancers',state.freelancers||[]);lsSet('servicosFreelancer',state.servicosFreelancer||[]);lsSet('flEspecialidades',state.flEspecialidades||[]);lsSet('fechamentosCaixa',state.fechamentosCaixa||[]);lsSet('caixaVals',state.caixaVals||{});
+    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);lsSet('notas',state.notas||[]);lsSet('impressorasCadastradas',state.impressorasCadastradas||[]);lsSet('auditLog',state.auditLog||[]);lsSet('administradores',state.administradores||[]);lsSet('estCategorias',state.estCategorias||[]);lsSet('pdvPedidos',state.pdvPedidos||[]);lsSet('pdvSessoes',state.pdvSessoes||[]);lsSet('pdvCaixaSes',state.pdvCaixaSes);lsSet('orcamentos',state.orcamentos||[]);lsSet('dailyTaskDefs',state.dailyTaskDefs||[]);lsSet('dailyOps',state.dailyOps||[]);lsSet('compras',state.compras||[]);lsSet('estoqueItens',state.estoqueItens||[]);lsSet('estoqueMovs',state.estoqueMovs||[]);lsSet('fichaTecnicas',state.fichaTecnicas||[]);lsSet('feriasFuncionarios',state.feriasFuncionarios||[]);lsSet('examesFuncionarios',state.examesFuncionarios||[]);lsSet('freelancers',state.freelancers||[]);lsSet('servicosFreelancer',state.servicosFreelancer||[]);lsSet('flEspecialidades',state.flEspecialidades||[]);lsSet('fechamentosCaixa',state.fechamentosCaixa||[]);lsSet('caixaVals',state.caixaVals||{});lsSet('patrimonios',state.patrimonios||[]);
     Promise.all([
       fbPut('/contas',arrToObj(state.contas)),
       fbPut('/metas',arrToObj(state.metas)),
@@ -839,6 +842,7 @@ function scheduleSave(){
       fbPut('/flEspecialidades',state.flEspecialidades||[]),
       fbPut('/fechamentosCaixa',arrToObj(state.fechamentosCaixa||[])),
       fbPut('/caixaVals',state.caixaVals||{}),
+      fbPut('/patrimonios',arrToObj(state.patrimonios||[])),
     ]).then(function(){_updateSyncDOM('ok');})
       .catch(function(e){console.error(e);_updateSyncDOM('error');showToast('Erro ao salvar no Firebase','error');});
   },1500);
@@ -1274,6 +1278,7 @@ function renderSidebar(){
     // ── sistema ──
     {id:'empresa',label:'Dados da Empresa',icon:'🏢',section:'sistema'},
     {id:'usuarios',label:'Usuários & Permissões',icon:'🔐',section:'sistema'},
+    {id:'patrimonio',label:'Patrimônio',icon:'🏛️',section:'sistema'},
     {id:'auditoria',label:'Histórico',icon:'🕐',section:'sistema'},
     {id:'ajuda',label:'Central de Ajuda',icon:'❓',section:'sistema'},
   ];
@@ -2822,7 +2827,7 @@ function render(){
   var _hiddenPages=['estoque','impressoes','pdv','kds','mapa'];
   if(_hiddenPages.indexOf(state.page)!==-1){setState({page:'dashboard'});return;}
 
-  var pages={dashboard:isAEProfile()&&typeof renderDashboardAE==='function'?renderDashboardAE:renderDashboard,apostas:typeof renderApostas==='function'?renderApostas:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,compras:renderCompras,'lista-compras':renderListaCompras,'estoque-insumos':renderEstoqueInsumos,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,freelancers:renderFreelancers,administrador:renderAdministrador,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas,usuarios:renderUsuarios,recorrencias:renderRecorrencias,auditoria:renderAuditoria,ajuda:renderAjuda,estoque:renderEstoque,empresa:renderEmpresa,cardapio:renderCardapio,impressoes:renderImpressoes,kds:renderKDS,notas:renderNotas,mapa:renderMapa,pdv:renderPDV,daily:renderDailyOperation,caixa:renderCaixa};
+  var pages={dashboard:isAEProfile()&&typeof renderDashboardAE==='function'?renderDashboardAE:renderDashboard,apostas:typeof renderApostas==='function'?renderApostas:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,compras:renderCompras,'lista-compras':renderListaCompras,'estoque-insumos':renderEstoqueInsumos,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,freelancers:renderFreelancers,administrador:renderAdministrador,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas,usuarios:renderUsuarios,recorrencias:renderRecorrencias,auditoria:renderAuditoria,ajuda:renderAjuda,estoque:renderEstoque,empresa:renderEmpresa,cardapio:renderCardapio,impressoes:renderImpressoes,kds:renderKDS,notas:renderNotas,mapa:renderMapa,pdv:renderPDV,daily:renderDailyOperation,caixa:renderCaixa,patrimonio:renderPatrimonio};
   var pageContent=(pages[state.page]||renderDashboard)();
   var content=div('content',[pageContent]);
   var mainCls='main'+(state.sidebarCollapsed?' sb-collapsed':'');
@@ -2880,6 +2885,8 @@ function render(){
   if(typeof renderEstoqueItemModal==='function'){var eiM=renderEstoqueItemModal();if(eiM)app.appendChild(eiM);}
   if(typeof renderEstoqueMovModal==='function'){var emM=renderEstoqueMovModal();if(emM)app.appendChild(emM);}
   if(typeof renderFichaTecnicaModal==='function'){var ftM=renderFichaTecnicaModal();if(ftM)app.appendChild(ftM);}
+  if(typeof renderPatrimonioModal==='function'){var patM=renderPatrimonioModal();if(patM)app.appendChild(patM);}
+  if(typeof renderPatrimonioDelModal==='function'){var patDM=renderPatrimonioDelModal();if(patDM)app.appendChild(patDM);}
   if(typeof _doCheckBanner==='function')_doCheckBanner();
   var notifBanner=typeof _renderNotifPermissaoBanner==='function'?_renderNotifPermissaoBanner():null;
   if(notifBanner)app.appendChild(notifBanner);
@@ -2937,6 +2944,7 @@ function render(){
 <script src="js/page-estoque.js"></script>
 <script src="js/page-empresa.js"></script>
 <script src="js/page-caixa.js"></script>
+<script src="js/page-patrimonio.js"></script>
 <script src="js/page-impressoes.js"></script>
 <script src="js/xlsx.min.js"></script>
 <script src="js/page-cardapio.js"></script>

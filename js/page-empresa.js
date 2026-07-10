@@ -337,7 +337,7 @@ function _backupExportar() {
     'funcionarios','ferias','exames','freelancers','servicosFreelancer','especialidades',
     'produtos','complementos','estCategorias','movEstoque','estoqueItens',
     'empresaData','setoresImpressao','administradores','notas',
-    'fechamentosCaixa','caixaVals',
+    'fechamentosCaixa','caixaVals','patrimonios',
   ];
   var backup = {
     _versao: '1.0',

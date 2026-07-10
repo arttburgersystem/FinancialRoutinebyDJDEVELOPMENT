@@ -1,4 +1,4 @@
-// ── AJUDA — CENTRAL DE AJUDA v2.2.0 ─────────────────────────────────────────
+// ── AJUDA — CENTRAL DE AJUDA v2.3.0 ─────────────────────────────────────────
 
 var _ajudaSecao = null; // seção expandida atual
 
@@ -7,11 +7,11 @@ var AJUDA_SECOES = [
     id: 'acesso',
     icon: '🔐',
     titulo: 'Acesso ao Sistema',
-    subtitulo: 'PIN, biometria e perfis de usuário',
+    subtitulo: 'PIN, biometria Face ID e perfis de usuário',
     conteudo: [
       {
         tipo: 'intro',
-        texto: 'O sistema é protegido por um PIN de 8 dígitos. Após entrar, você pode identificar qual usuário está operando pelo rodapé da barra lateral.',
+        texto: 'O sistema é protegido por um PIN de 8 dígitos. Cada dispositivo (celular, tablet, PC) registra seu próprio PIN e biometria de forma independente.',
       },
       {
         tipo: 'steps',
@@ -25,22 +25,22 @@ var AJUDA_SECOES = [
       },
       {
         tipo: 'steps',
-        titulo: 'Ativar Biometria (Face ID / Digital)',
+        titulo: 'Configurar Face ID / Digital (iPhone, Android, Windows Hello)',
         items: [
           'Na primeira entrada com PIN correto, o sistema perguntará se deseja ativar biometria',
-          'Clique em "Ativar Face ID / Digital" e siga as instruções do dispositivo',
-          'Nas próximas entradas um botão biométrico aparecerá automaticamente',
-          'Compatível com iPhone (Face ID), Android e computadores com Windows Hello',
-          'Dica rápida: pressione Enter na tela de Face ID para dispensar e entrar sem biometria',
+          'Clique em "✓ Ativar Face ID / Digital" e siga as instruções do dispositivo',
+          'Nas próximas entradas o Face ID é acionado automaticamente ao abrir o app',
+          'Se o Face ID não estiver registrado no dispositivo, aparece o link "⚙ Configurar Face ID neste dispositivo" abaixo do teclado numérico — clique para registrar sem precisar recriar o PIN',
+          'Compatível com iPhone (Face ID/Touch ID), Android (impressão digital) e Windows (Windows Hello)',
         ],
       },
       {
-        tipo: 'tip',
-        texto: '⌨️ Atalho: após digitar o PIN, pressione Enter na tela de "Ativar Face ID?" para dispensá-la sem usar o mouse — vai direto para o sistema.',
+        tipo: 'warn',
+        texto: '⚠️ Cada dispositivo registra biometria separadamente. O Face ID do celular não funciona no PC e vice-versa — configure em cada aparelho que usar o sistema.',
       },
       {
         tipo: 'tip',
-        texto: '📱 iPhone: Adicione o sistema à tela inicial (Compartilhar → Adicionar à Tela de Início) para o melhor resultado com Face ID.',
+        texto: '📱 iPhone: Adicione o sistema à tela inicial (Chrome → ⋮ → Adicionar à tela inicial) para abrir em tela cheia como um app. O Face ID dispara automaticamente ao abrir.',
       },
       {
         tipo: 'steps',
@@ -69,12 +69,9 @@ var AJUDA_SECOES = [
         cols: ['Seção', 'Módulos'],
         rows: [
           ['📊 Principal', 'Dashboard com visão geral financeira'],
-          ['💰 Financeiro', 'Bancos, Receitas, Despesas, DRE, Fluxo, Cartões, Empréstimos, Fornecedores, Funcionários, Estoque'],
-          ['🍽️ Negócio', 'Cardápio, KDS, Setores de Impressão'],
-          ['🎯 Planejamento', 'Tarefas, Orçamento, Metas, Alertas, Recorrências'],
-          ['🛠️ Utilidades', 'Bloco de Notas, Mapa'],
-          ['🔗 Integração', 'Relatórios e Exportação'],
-          ['🔐 Sistema', 'Usuários & Permissões, Auditoria, Empresa, Ajuda'],
+          ['💰 Financeiro', 'Bancos, Receitas, Despesas, DRE, Fluxo de Caixa, Cartões, Empréstimos, Lista de Compras, Estoque, Fornecedores, Funcionários, Freelancers, Administrador & Sócios, Cardápio'],
+          ['🎯 Planejamento', 'Tarefas & Agenda, Orçamento, Alertas, Recorrências'],
+          ['🔐 Sistema', 'Dados da Empresa, Usuários & Permissões, Histórico (Auditoria), Central de Ajuda'],
         ],
       },
       {
@@ -578,60 +575,200 @@ var AJUDA_SECOES = [
     ],
   },
   {
-    id: 'cardapio',
-    icon: '🍽️',
-    titulo: 'Cardápio',
-    subtitulo: 'Tabela de produtos, filtros e complementos',
+    id: 'funcionarios',
+    icon: '👥',
+    titulo: 'Funcionários',
+    subtitulo: 'Cadastro, férias, exames médicos e controle de RH',
     conteudo: [
       {
         tipo: 'intro',
-        texto: 'O módulo de Cardápio gerencia todos os produtos vendáveis e complementos do seu negócio, com filtros por categoria e setor de impressão, além de controle de disponibilidade.',
+        texto: 'O módulo de Funcionários centraliza o cadastro da equipe e o controle de RH básico: dados pessoais, cargo, salário, férias e exames médicos periódicos.',
       },
       {
         tipo: 'tabela',
-        titulo: 'Abas do Cardápio',
+        titulo: 'Abas do Módulo',
         cols: ['Aba', 'Conteúdo'],
         rows: [
-          ['🍽️ Produtos', 'Todos os itens do cardápio com preço, categoria, setor de impressão e disponibilidade'],
-          ['➕ Complementos', 'Adicionais e opções de personalização — acréscimos, remoções, substituições'],
+          ['👥 Funcionários', 'Lista de colaboradores com nome, cargo, salário, CPF, banco e chave Pix'],
+          ['🌴 Férias', 'Registro e controle de períodos de férias por funcionário'],
+          ['🩺 Exames', 'Agenda de exames médicos periódicos (admissional, demissional, periódico)'],
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Cadastrar Funcionário',
+        items: [
+          'Acesse "Funcionários" no menu lateral (seção Financeiro)',
+          'Clique em "+ Novo Funcionário"',
+          'Preencha: nome, cargo, CPF, data de admissão, salário, banco e chave Pix',
+          'Clique em "Salvar"',
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Registrar Férias',
+        items: [
+          'Clique na aba "🌴 Férias"',
+          'Clique em "+ Registrar Férias"',
+          'Selecione o funcionário e informe o período (data início e fim)',
+          'O sistema calcula automaticamente os dias de gozo',
+          'Clique em "Salvar"',
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Agendar Exame Médico',
+        items: [
+          'Clique na aba "🩺 Exames"',
+          'Clique em "+ Novo Exame"',
+          'Selecione o funcionário, tipo de exame e data agendada',
+          'Tipos disponíveis: Admissional, Periódico, Demissional, Retorno ao trabalho',
+          'Clique em "Salvar"',
+        ],
+      },
+      {
+        tipo: 'tip',
+        texto: '💡 Os dados de banco e Pix do funcionário facilitam o pagamento de salários diretamente pelo sistema ou via cópia da chave.',
+      },
+    ],
+  },
+  {
+    id: 'freelancers',
+    icon: '🎨',
+    titulo: 'Freelancers',
+    subtitulo: 'Cadastro, serviços, especialidades e controle de pagamentos',
+    conteudo: [
+      {
+        tipo: 'intro',
+        texto: 'O módulo de Freelancers permite gerenciar prestadores de serviço externos: cadastro completo, registro de serviços prestados, controle de pagamentos e KPIs mensais.',
+      },
+      {
+        tipo: 'tabela',
+        titulo: 'Abas do Módulo',
+        cols: ['Aba', 'Conteúdo'],
+        rows: [
+          ['🎨 Freelancers', 'Cadastro dos prestadores: nome, especialidade, tipo PF/PJ, Pix, banco e valor/hora'],
+          ['📋 Serviços', 'Registro de serviços prestados com valor, data, status de pagamento e notas'],
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Cadastrar Freelancer',
+        items: [
+          'Acesse "Freelancers" no menu lateral (seção Financeiro)',
+          'Clique em "+ Novo Freelancer"',
+          'Preencha: nome, especialidade, tipo (PF/PJ), CPF/CNPJ, e-mail, telefone',
+          'Informe dados de pagamento: chave Pix, banco, valor/hora',
+          'Clique em "Salvar"',
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Registrar Serviço Prestado',
+        items: [
+          'Na aba "📋 Serviços", clique em "+ Novo Serviço"',
+          'Selecione o freelancer, descreva o serviço, informe a data e o valor',
+          'Defina o status: Pendente, Pago ou Cancelado',
+          'Clique em "Salvar"',
+          'Use o botão "✅ Marcar pago" na lista para registrar o pagamento rapidamente',
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Gerenciar Especialidades',
+        items: [
+          'No modal de cadastro do freelancer, clique em "⚙️ Gerenciar" ao lado do campo Especialidade',
+          'Um painel abre inline — crie novas especialidades ou edite/exclua as existentes',
+          'As especialidades são compartilhadas entre todos os freelancers do perfil',
+          'Especialidades padrão: Designer, Fotógrafo, Programador, Videomaker e outros',
+        ],
+      },
+      {
+        tipo: 'tabela',
+        titulo: 'KPIs do Módulo',
+        cols: ['Indicador', 'Significado'],
+        rows: [
+          ['Total pago no mês', 'Soma de todos os serviços pagos no mês selecionado'],
+          ['Serviços pendentes', 'Quantidade de serviços ainda não pagos'],
+          ['Freelancers ativos', 'Quantidade de prestadores com status ativo'],
+          ['Ticket médio', 'Valor médio por serviço no período'],
+        ],
+      },
+      {
+        tipo: 'tip',
+        texto: '💡 Os pagamentos de serviços são integrados ao financeiro — ao marcar um serviço como pago, a despesa pode ser lançada automaticamente em Despesas.',
+      },
+    ],
+  },
+  {
+    id: 'cardapio',
+    icon: '🍽️',
+    titulo: 'Cardápio',
+    subtitulo: '4 abas: Produtos, Montagens, Categorias, Embalagens + importação de planilha',
+    conteudo: [
+      {
+        tipo: 'intro',
+        texto: 'O módulo Cardápio gerencia todos os itens vendáveis do negócio. Possui 4 abas independentes e importação em massa via planilha Excel ou CSV.',
+      },
+      {
+        tipo: 'tabela',
+        titulo: '4 Abas do Cardápio',
+        cols: ['Aba', 'Conteúdo'],
+        rows: [
+          ['🍽️ Produtos', 'Todos os itens com preço, categoria, setor de impressão, custo e disponibilidade'],
+          ['➕ Montagens', 'Adicionais e complementos (bacon extra, queijo, molho especial) com preço e custo'],
+          ['🏷️ Categorias', 'Gerencia as categorias do cardápio com nome e foto de capa'],
+          ['📦 Embalagens', 'Configura quais insumos de embalagem são baixados do estoque por canal (Delivery / Salão)'],
         ],
       },
       {
         tipo: 'lista',
-        titulo: 'Filtros Disponíveis',
+        titulo: 'Filtros Disponíveis (aba Produtos)',
         items: [
           'Busca por nome ou código do produto',
-          'Filtro por categoria (ex: Lanches, Bebidas, Sobremesas)',
+          'Filtro por categoria (ex: Tradicionais, Clássicos, Premium, Bebidas)',
           'Filtro por setor de impressão (ex: Cozinha, Bar, Frituras)',
           'Filtro por status: Ativo, Inativo ou Todos',
+          'Ações em massa: ativar, desativar ou excluir produtos selecionados',
         ],
       },
       {
         tipo: 'steps',
-        titulo: 'Cadastrar Produto no Cardápio',
+        titulo: 'Importar Produtos via Planilha Excel ou CSV',
         items: [
-          'Na aba Produtos, clique em "+ Produto"',
+          'Na aba Produtos, clique em "📥 Importar planilha"',
+          'Clique em "📂 Escolher arquivo" e selecione seu .xlsx ou .csv',
+          'O sistema detecta automaticamente as colunas pelo cabeçalho (Nome, Categoria, Valor de Venda, Custo, Código, NCM, CFOP, CST)',
+          'Se a planilha armazena preços em centavos (ex: 2000 = R$20,00), o toggle "Preços em centavos ÷100" será marcado automaticamente',
+          'Revise a prévia (até 20 linhas exibidas) e ajuste o toggle se necessário',
+          'Clique em "✅ Importar X produto(s)" — produtos novos são criados, existentes têm preço/custo atualizados',
+          'As categorias encontradas na planilha são criadas automaticamente em "Categorias"',
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Sincronizar Categorias dos Produtos',
+        items: [
+          'Na aba "🏷️ Categorias", o sistema detecta automaticamente categorias que estão nos produtos mas não têm entrada em Categorias',
+          'Um banner amarelo aparece listando as categorias pendentes',
+          'Clique em "🔄 Criar automaticamente" para criar todas de uma vez',
+          'As categorias criadas ficam disponíveis nos filtros da aba Produtos',
+        ],
+      },
+      {
+        tipo: 'steps',
+        titulo: 'Cadastrar Produto Manualmente',
+        items: [
+          'Na aba Produtos, clique em "+ Novo produto"',
           'Preencha: nome, código, categoria, preço de venda e custo',
-          'Selecione o setor de impressão (onde o pedido será impresso)',
-          'Defina se está disponível ou indisponível (toggle)',
-          'Adicione complementos vinculados se necessário',
-          'Clique em "Criar"',
-        ],
-      },
-      {
-        tipo: 'steps',
-        titulo: 'Cadastrar Complemento',
-        items: [
-          'Alterne para a aba "Complementos"',
-          'Clique em "+ Complemento"',
-          'Preencha: nome, código, categoria, preço e custo',
-          'Complementos podem ser gratuitos (preço 0) ou cobrados',
+          'Selecione o setor de impressão (onde o pedido é exibido no KDS/impressora)',
+          'Ative ou desative a disponibilidade pelo toggle',
           'Clique em "Criar"',
         ],
       },
       {
         tipo: 'tip',
-        texto: '💡 O setor de impressão define para qual impressora/KDS o pedido é enviado. Configure os setores em "Setores de Impressão" antes de cadastrar produtos.',
+        texto: '💡 O toggle de disponibilidade (🔵/⚪) na tabela de produtos ativa ou desativa o item instantaneamente sem abrir o modal de edição.',
       },
     ],
   },

@@ -982,6 +982,7 @@ function renderCardapio() {
       thCell('Estoque','90px','right'),
       thCell('Custo','110px','right'),
       thCell('Venda','110px','right'),
+      thCell('CMV%','80px','right'),
       thCell('Ativo','70px','center'),
       el('th',{style:{width:'70px'}}),
     ];
@@ -1057,6 +1058,16 @@ function renderCardapio() {
       td5.textContent=fmtMoney(p.custoMedio||p.custo||0);tr.appendChild(td5);
       var td6=tdCell('text-align:right;width:110px;font-weight:600;color:var(--gold);');
       td6.textContent=fmtMoney(p.precoVenda||p.preco||0);tr.appendChild(td6);
+      // CMV%
+      var custo6=p.custoMedio||p.custo||0;
+      var venda6=p.precoVenda||p.preco||0;
+      var cmvPct6=venda6>0?Math.round((custo6/venda6)*1000)/10:null;
+      var cmvColor=cmvPct6===null?'var(--text3)':cmvPct6>60?'var(--red)':cmvPct6>40?'var(--gold)':'var(--green)';
+      var tdCmv=tdCell('text-align:right;width:80px;font-weight:700;');
+      tdCmv.style.color=cmvColor;
+      tdCmv.textContent=cmvPct6!==null?cmvPct6.toFixed(1)+'%':'—';
+      if(cmvPct6!==null){tdCmv.title='Custo representa '+cmvPct6.toFixed(1)+'% do preço de venda';}
+      tr.appendChild(tdCmv);
       var td7=tdCell('width:70px;text-align:center;');td7.appendChild(track);tr.appendChild(td7);
       var td8=tdCell('width:70px;text-align:right;white-space:nowrap;');
       td8.appendChild(editB);td8.appendChild(delB);tr.appendChild(td8);

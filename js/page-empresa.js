@@ -250,6 +250,108 @@ function renderEmpresa() {
       ]),
     ]),
 
+    card('Backup & Segurança','🔒',[
+      el('p',{style:{fontSize:'13px',color:'var(--text2)',marginBottom:'16px',lineHeight:'1.6'}},
+        'Exporte todos os dados do sistema em JSON para guardar uma cópia de segurança. '+
+        'Use a importação para restaurar em caso de perda ou migrar para outro dispositivo.'
+      ),
+      el('div',{style:{display:'flex',gap:'12px',flexWrap:'wrap'}},[
+        el('button',{class:'btn-primary',style:{gap:'6px',display:'flex',alignItems:'center'},onclick:function(){
+          _backupExportar();
+        }},['💾 Exportar backup JSON']),
+        el('button',{class:'btn-ghost',style:{gap:'6px',display:'flex',alignItems:'center'},onclick:function(){
+          _backupImportar();
+        }},['📂 Importar backup JSON']),
+      ]),
+      el('div',{style:{marginTop:'12px',padding:'10px 14px',background:'var(--bg3)',borderRadius:'8px',fontSize:'12px',color:'var(--text3)',lineHeight:'1.5'}},[
+        el('strong',{},'O backup inclui: '),
+        'contas a pagar/receber, receitas, bancos, tarefas, metas, funcionários, freelancers, produtos, estoque, orçamentos, dados da empresa e configurações.'
+      ]),
+    ]),
+
     saveFooter,
   ]);
+}
+
+// ── BACKUP EXPORTAR / IMPORTAR ────────────────────────────────────────────────
+
+function _backupExportar() {
+  var CHAVES = [
+    'contas','receitas','bancos','tarefas','metas','orcamentos',
+    'funcionarios','ferias','exames','freelancers','servicosFreelancer','especialidades',
+    'produtos','complementos','estCategorias','movEstoque','estoqueItens',
+    'empresaData','setoresImpressao','administradores','notas',
+    'fechamentosCaixa','caixaVals',
+  ];
+  var backup = {
+    _versao: '1.0',
+    _exportadoEm: new Date().toISOString(),
+    _perfil: state.profile,
+    dados: {},
+  };
+  CHAVES.forEach(function(k) {
+    backup.dados[k] = lsGet(k, null);
+  });
+  var json = JSON.stringify(backup, null, 2);
+  var blob = new Blob([json], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  var data = new Date().toLocaleDateString('sv-SE');
+  a.href = url;
+  a.download = 'backup-djfinance-' + data + '.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+  showToast('Backup exportado com sucesso!', 'success');
+}
+
+function _backupImportar() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var backup = JSON.parse(ev.target.result);
+        if (!backup || !backup.dados) throw new Error('Formato inválido');
+        if (!confirm(
+          'Importar backup de ' + (backup._exportadoEm ? new Date(backup._exportadoEm).toLocaleString('pt-BR') : 'data desconhecida') + '?\n\n' +
+          'ATENÇÃO: os dados atuais serão substituídos pelos dados do backup.\n\n' +
+          'Clique em OK para confirmar.'
+        )) return;
+        Object.keys(backup.dados).forEach(function(k) {
+          if (backup.dados[k] !== null && backup.dados[k] !== undefined) {
+            lsSet(k, backup.dados[k]);
+          }
+        });
+        // Recarrega o estado principal
+        setState({
+          contas:          lsGet('contas',[]),
+          receitas:        lsGet('receitas',[]),
+          bancos:          lsGet('bancos',[]),
+          tarefas:         lsGet('tarefas',[]),
+          metas:           lsGet('metas',[]),
+          orcamentos:      lsGet('orcamentos',[]),
+          produtos:        lsGet('produtos',[]),
+          complementos:    lsGet('complementos',[]),
+          estCategorias:   lsGet('estCategorias',[]),
+          movEstoque:      lsGet('movEstoque',[]),
+          administradores: lsGet('administradores',[]),
+          empresaData:     lsGet('empresaData',{}),
+          notas:           lsGet('notas',[]),
+        });
+        showToast('Backup importado com sucesso! Sincronizando...', 'success', 3000);
+        scheduleSave();
+      } catch(err) {
+        showToast('Arquivo inválido ou corrompido.', 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+  document.body.appendChild(input);
+  input.click();
+  setTimeout(function(){ document.body.removeChild(input); }, 2000);
 }

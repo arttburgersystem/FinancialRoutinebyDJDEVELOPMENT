@@ -231,8 +231,36 @@ pre{font-size:11px;color:var(--text2);background:var(--bg3);padding:12px;border-
   .action-row .search-wrap{width:100%}
   .action-row .btn-primary,.action-row .btn-ghost{width:100%;justify-content:center}
   .modal-overlay{padding:0!important;align-items:flex-end!important}
-  .modal{border-radius:20px 20px 0 0!important;max-height:93vh!important;max-width:100%!important;width:100%!important;padding:20px 16px 24px}
+  .modal{
+    border-radius:20px 20px 0 0!important;
+    max-height:92dvh!important;
+    max-width:100%!important;
+    width:100%!important;
+    padding:20px 16px env(safe-area-inset-bottom,20px)!important;
+    overflow-y:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior:contain!important;
+  }
   .modal-title{font-size:15px}
+  .form-input{
+    font-size:16px!important; /* impede zoom automático do iOS em inputs < 16px */
+    min-height:44px!important;
+    -webkit-appearance:none;
+    touch-action:manipulation;
+  }
+  textarea.form-input{min-height:80px!important}
+  select.form-input{min-height:44px!important}
+  .btn-primary,.btn-ghost,.btn-secondary{
+    min-height:44px!important;
+    -webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
+  }
+  .modal-actions{
+    padding-bottom:max(12px,env(safe-area-inset-bottom));
+    flex-wrap:wrap;
+    gap:10px!important;
+  }
+  .modal-actions .btn-primary,.modal-actions .btn-ghost{flex:1;min-width:120px;justify-content:center}
   .page-header{margin-bottom:14px}
   .page-header h1{font-size:17px}
   .page-header p{font-size:12px}
@@ -557,6 +585,10 @@ var state={
   impressorasCadastradas: lsGet('impressorasCadastradas',[]),
   impModal: null,
   pagarAtrasadoModal: null,
+  comprovanteModal: null,
+  fechamentosCaixa: lsGet('fechamentosCaixa',[]),
+  caixaVals: lsGet('caixaVals',{}),
+  caixaDataSel: null,
   administradores: lsGet('administradores',[]),
   adminModal: null,
   pagamentoFaturaModal: null,
@@ -763,7 +795,7 @@ function scheduleSave(){
   syncTimer=setTimeout(function(){
     // Atualiza badge diretamente — sem setState para não destruir inputs ativos
     _updateSyncDOM('syncing');
-    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);lsSet('notas',state.notas||[]);lsSet('impressorasCadastradas',state.impressorasCadastradas||[]);lsSet('auditLog',state.auditLog||[]);lsSet('administradores',state.administradores||[]);lsSet('estCategorias',state.estCategorias||[]);lsSet('pdvPedidos',state.pdvPedidos||[]);lsSet('pdvSessoes',state.pdvSessoes||[]);lsSet('pdvCaixaSes',state.pdvCaixaSes);lsSet('orcamentos',state.orcamentos||[]);lsSet('dailyTaskDefs',state.dailyTaskDefs||[]);lsSet('dailyOps',state.dailyOps||[]);lsSet('compras',state.compras||[]);lsSet('estoqueItens',state.estoqueItens||[]);lsSet('estoqueMovs',state.estoqueMovs||[]);lsSet('fichaTecnicas',state.fichaTecnicas||[]);lsSet('feriasFuncionarios',state.feriasFuncionarios||[]);lsSet('examesFuncionarios',state.examesFuncionarios||[]);lsSet('freelancers',state.freelancers||[]);lsSet('servicosFreelancer',state.servicosFreelancer||[]);lsSet('flEspecialidades',state.flEspecialidades||[]);
+    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);lsSet('notas',state.notas||[]);lsSet('impressorasCadastradas',state.impressorasCadastradas||[]);lsSet('auditLog',state.auditLog||[]);lsSet('administradores',state.administradores||[]);lsSet('estCategorias',state.estCategorias||[]);lsSet('pdvPedidos',state.pdvPedidos||[]);lsSet('pdvSessoes',state.pdvSessoes||[]);lsSet('pdvCaixaSes',state.pdvCaixaSes);lsSet('orcamentos',state.orcamentos||[]);lsSet('dailyTaskDefs',state.dailyTaskDefs||[]);lsSet('dailyOps',state.dailyOps||[]);lsSet('compras',state.compras||[]);lsSet('estoqueItens',state.estoqueItens||[]);lsSet('estoqueMovs',state.estoqueMovs||[]);lsSet('fichaTecnicas',state.fichaTecnicas||[]);lsSet('feriasFuncionarios',state.feriasFuncionarios||[]);lsSet('examesFuncionarios',state.examesFuncionarios||[]);lsSet('freelancers',state.freelancers||[]);lsSet('servicosFreelancer',state.servicosFreelancer||[]);lsSet('flEspecialidades',state.flEspecialidades||[]);lsSet('fechamentosCaixa',state.fechamentosCaixa||[]);lsSet('caixaVals',state.caixaVals||{});
     Promise.all([
       fbPut('/contas',arrToObj(state.contas)),
       fbPut('/metas',arrToObj(state.metas)),
@@ -805,6 +837,8 @@ function scheduleSave(){
       fbPut('/freelancers',arrToObj(state.freelancers||[])),
       fbPut('/servicosFreelancer',arrToObj(state.servicosFreelancer||[])),
       fbPut('/flEspecialidades',state.flEspecialidades||[]),
+      fbPut('/fechamentosCaixa',arrToObj(state.fechamentosCaixa||[])),
+      fbPut('/caixaVals',state.caixaVals||{}),
     ]).then(function(){_updateSyncDOM('ok');})
       .catch(function(e){console.error(e);_updateSyncDOM('error');showToast('Erro ao salvar no Firebase','error');});
   },1500);
@@ -1225,6 +1259,7 @@ function renderSidebar(){
     {id:'freelancers',label:'Freelancers',icon:'🎨',section:'financeiro',hideAE:true},
     {id:'administrador',label:'Administrador',icon:'👤',section:'financeiro',hideAE:true},
     {id:'fluxo',label:'Fluxo de caixa',icon:'📈',section:'financeiro',hideAE:true},
+    {id:'caixa',label:'Fechamento de Caixa',icon:'🏧',section:'financeiro',hideAE:true},
     // ── planejamento genérico (oculto em A>E) ──
     {id:'tarefas',label:'Tarefas & Agenda',icon:'✅',section:'planejamento',hideAE:true},
     {id:'orcamento',label:'Orçamento',icon:'💰',section:'planejamento',hideAE:true},
@@ -1548,7 +1583,62 @@ function renderDashboard(){
     chartCard=div('card',[div('card-title','Evolução mensal — últimos 6 meses'),el('div',{style:{overflowX:'auto'}},chartSvg),legend]);
   }
 
-  return div('',[kpis,chartCard,catCard,alertsCard,metasCard].filter(Boolean));
+  // ── CARD INADIMPLÊNCIA ─────────────────────────────────────────────────────
+  var vencidas=pagar.filter(function(c){return c.status!=='pago'&&diasRestantes(c.vencimento)<0;})
+    .sort(function(a,b){return new Date(a.vencimento)-new Date(b.vencimento);}); // mais antigas primeiro
+  var totalVencido=vencidas.reduce(function(a,c){return a+c.valor;},0);
+  var inadCard=null;
+  if(vencidas.length>0){
+    var iHeader=el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px'}});
+    var iTitle=el('div',{style:{display:'flex',alignItems:'center',gap:'10px'}});
+    var iIcon=el('div',{style:{width:'36px',height:'36px',borderRadius:'50%',background:'rgba(239,68,68,.18)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}});
+    iIcon.textContent='🚨';
+    var iTexts=el('div',{});
+    var iLabel=el('div',{style:{fontSize:'11px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'.8px',color:'var(--red)'}});
+    iLabel.textContent=vencidas.length+' conta'+(vencidas.length>1?'s vencidas':' vencida');
+    var iVal=el('div',{style:{fontSize:'20px',fontWeight:'800',color:'var(--red)',lineHeight:'1.2'}});
+    iVal.textContent=fmtMoney(totalVencido);
+    iTexts.appendChild(iLabel); iTexts.appendChild(iVal);
+    iTitle.appendChild(iIcon); iTitle.appendChild(iTexts);
+    var iBtn=el('button',{class:'btn-primary',style:{fontSize:'12px',padding:'6px 14px',background:'var(--red)',borderColor:'var(--red)'}});
+    iBtn.textContent='Ver todas';
+    iBtn.onclick=function(){var fi=Object.assign({},state.filtro);fi.pagar='vencido';setState({page:'pagar',filtro:fi,pagarMes:today().slice(0,7)});};
+    iHeader.appendChild(iTitle); iHeader.appendChild(iBtn);
+    var iList=el('div',{style:{display:'flex',flexDirection:'column',gap:'6px'}});
+    vencidas.slice(0,5).forEach(function(c){
+      var diasAtr=Math.abs(diasRestantes(c.vencimento));
+      var iRow=el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'rgba(239,68,68,.07)',borderRadius:'8px',border:'1px solid rgba(239,68,68,.15)',gap:'8px'}});
+      var iRowLeft=el('div',{style:{flex:'1',minWidth:0}});
+      var iRowDesc=el('div',{style:{fontSize:'13px',fontWeight:'600',color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}});
+      iRowDesc.textContent=c.descricao;
+      var iRowSub=el('div',{style:{fontSize:'11px',color:'var(--red)',marginTop:'1px'}});
+      iRowSub.textContent=fmtDate(c.vencimento)+' · há '+diasAtr+' dia'+(diasAtr>1?'s':'');
+      iRowLeft.appendChild(iRowDesc); iRowLeft.appendChild(iRowSub);
+      var iRowVal=el('div',{style:{fontSize:'14px',fontWeight:'700',color:'var(--red)',whiteSpace:'nowrap'}});
+      iRowVal.textContent=fmtMoney(c.valor);
+      var iPayBtn=el('button',{style:{background:'var(--red)',color:'#fff',border:'none',borderRadius:'6px',padding:'4px 10px',fontSize:'12px',fontWeight:'700',cursor:'pointer',whiteSpace:'nowrap'}});
+      iPayBtn.textContent='✓ Pagar';
+      iPayBtn.onclick=(function(conta){return function(){
+        setState({pagarAtrasadoModal:conta});
+      };})(c);
+      iRow.appendChild(iRowLeft); iRow.appendChild(iRowVal); iRow.appendChild(iPayBtn);
+      iList.appendChild(iRow);
+    });
+    if(vencidas.length>5){
+      var iMore=el('div',{style:{fontSize:'12px',color:'var(--text3)',textAlign:'center',padding:'4px'}});
+      iMore.textContent='+ '+(vencidas.length-5)+' outras contas vencidas';
+      iList.appendChild(iMore);
+    }
+    inadCard=el('div',{style:{
+      background:'linear-gradient(135deg,rgba(239,68,68,.08),rgba(239,68,68,.03))',
+      border:'1.5px solid rgba(239,68,68,.35)',borderRadius:'var(--radius)',padding:'16px',
+      position:'relative',overflow:'hidden',marginBottom:'0',
+    }});
+    var inadStripe=el('div',{style:{position:'absolute',top:0,left:0,right:0,height:'3px',background:'linear-gradient(90deg,var(--red),#f87171)'}});
+    inadCard.appendChild(inadStripe); inadCard.appendChild(iHeader); inadCard.appendChild(iList);
+  }
+
+  return div('',[kpis,inadCard,chartCard,catCard,alertsCard,metasCard].filter(Boolean));
 }
 
 // ── CONTAS A PAGAR ────────────────────────────────────────────────────────────
@@ -1660,11 +1750,16 @@ function renderPagar(){
         el('td',{},[el('span',{class:'badge '+st},st),temJuros?el('span',{style:{fontSize:'9px',display:'block',color:'var(--red)',marginTop:'2px'}},'⚠ pago c/ atraso'):null].filter(Boolean)),
         el('td',{style:{textAlign:'center'}},c.recorrente?'✓':''),
         el('td',{},[
-          c.status!=='pago'?el('button',{class:'btn-icon edit',title:'Marcar como pago',onclick:function(){
-            var dias=diasRestantes(c.vencimento);
-            if(dias!==null&&dias<0){setState({pagarAtrasadoModal:c});}
-            else{updateConta(Object.assign({},c,{status:'pago',dataPagamento:today()}));}
-          }},'✓'):null,
+          c.status!=='pago'?el('button',{class:'btn-icon edit',title:'Marcar como pago',onclick:(function(cc){return function(){
+            var dias=diasRestantes(cc.vencimento);
+            if(dias!==null&&dias<0){setState({pagarAtrasadoModal:cc});}
+            else{
+              var upd=Object.assign({},cc,{status:'pago',dataPagamento:today()});
+              var cs=(state.contas||[]).map(function(x){return x.id===upd.id?upd:x;});
+              setState({contas:cs,modal:null,comprovanteModal:{conta:upd,tipo:'despesa'}});
+              scheduleSave();
+            }
+          };})(c)},'✓'):null,
           el('button',{class:'btn-icon edit',onclick:function(){setState({modal:{tipo:'pagar',editItem:c}});}}, '✏️'),
           el('button',{class:'btn-icon',onclick:function(){deleteConta(c.id);}}, '🗑️'),
         ].filter(Boolean)),
@@ -1758,18 +1853,123 @@ function renderPagarAtrasadoModal(){
     var raw=valorPagoInp.value.replace(/[^\d,\.]/g,'').replace(',','.');
     var vPago=parseFloat(raw)||c.valor;
     var juros=parseFloat((vPago-c.valor).toFixed(2));
+    var dataPag=dataPagInp.value||today();
     var updated=Object.assign({},c,{
       status:'pago',
       valorPago:vPago,
       jurosAtraso:juros,
-      dataPagamento:dataPagInp.value||today(),
+      dataPagamento:dataPag,
     });
     var contas=state.contas.map(function(x){return x.id===c.id?updated:x;});
-    setState({contas:contas,pagarAtrasadoModal:null});
+    setState({contas:contas,pagarAtrasadoModal:null,comprovanteModal:{conta:updated,tipo:'despesa'}});
     scheduleSave();
     if(typeof logAudit==='function')logAudit('pagamento em atraso',c.descricao+' · '+diasAtr+'d atraso · juros: '+fmtMoney(juros));
-    showToast(juros>0?'Pago com juros/multa de '+fmtMoney(juros):'Pagamento registrado!',juros>0?'error':'success');
   }));
+  modal.appendChild(actions);
+  overlay.appendChild(modal);
+  return overlay;
+}
+
+// ── MODAL COMPROVANTE DE PAGAMENTO ────────────────────────────────────────────
+function renderComprovanteModal(){
+  var d=state.comprovanteModal;
+  if(!d)return null;
+  var c=d.conta;
+  var emp=((state.empresaData||{})[state.profile])||{};
+  var nomeEmp=emp.nomeFantasia||emp.razaoSocial||'Financial Routine';
+  var juros=c.jurosAtraso||0;
+  var valorPago=c.valorPago!=null?c.valorPago:c.valor;
+
+  var overlay=el('div',{class:'modal-overlay',onclick:function(e){if(e.target===this)setState({comprovanteModal:null});}});
+  var modal=el('div',{class:'modal',style:{maxWidth:'420px'}});
+
+  modal.appendChild(el('div',{class:'modal-title'},[
+    el('span',{},'🧾 Comprovante de Pagamento'),
+    el('button',{class:'modal-close',onclick:function(){setState({comprovanteModal:null});}}, '✕'),
+  ]));
+
+  // Recibo visual
+  var recibo=el('div',{id:'djf-comprovante-print'});
+  recibo.style.cssText='background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;font-family:inherit;';
+
+  // Cabeçalho empresa
+  var cabec=el('div',{style:{textAlign:'center',marginBottom:'16px',paddingBottom:'14px',borderBottom:'1px dashed var(--border)'}});
+  cabec.appendChild(el('div',{style:{fontSize:'16px',fontWeight:'800',color:'var(--text)'}},nomeEmp));
+  if(emp.cnpj){
+    var cnpjEl=el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}});
+    cnpjEl.textContent='CNPJ: '+emp.cnpj;
+    cabec.appendChild(cnpjEl);
+  }
+  var tituloRecibo=el('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--text2)',marginTop:'10px',textTransform:'uppercase',letterSpacing:'1px'}});
+  tituloRecibo.textContent='Comprovante de Pagamento';
+  cabec.appendChild(tituloRecibo);
+  recibo.appendChild(cabec);
+
+  // Dados do pagamento
+  function linha(label,valor,destaque){
+    var row=el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,.05)'}});
+    var lEl=el('span',{style:{fontSize:'12px',color:'var(--text3)'}});lEl.textContent=label;
+    var vEl=el('span',{style:{fontSize:'13px',fontWeight:destaque?'700':'500',color:destaque?'var(--text)':'var(--text2)'}});vEl.textContent=valor;
+    row.appendChild(lEl);row.appendChild(vEl);
+    return row;
+  }
+  recibo.appendChild(linha('Descrição',c.descricao,true));
+  recibo.appendChild(linha('Categoria',c.categoria||'—'));
+  recibo.appendChild(linha('Vencimento',fmtDate(c.vencimento)));
+  recibo.appendChild(linha('Data do pagamento',fmtDate(c.dataPagamento||today())));
+  if(juros!==0){
+    recibo.appendChild(linha('Valor original',fmtMoney(c.valor)));
+    recibo.appendChild(linha(juros>0?'Juros/multa':'Desconto',(juros>0?'+ ':' -')+fmtMoney(Math.abs(juros))));
+  }
+  var valRow=el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'12px',paddingTop:'10px',borderTop:'2px solid var(--border)'}});
+  var valLabel=el('span',{style:{fontSize:'13px',fontWeight:'700',color:'var(--text)'}});valLabel.textContent='VALOR PAGO';
+  var valNum=el('span',{style:{fontSize:'20px',fontWeight:'800',color:'var(--green)'}});valNum.textContent=fmtMoney(valorPago);
+  valRow.appendChild(valLabel);valRow.appendChild(valNum);
+  recibo.appendChild(valRow);
+
+  // Rodapé
+  var rodape=el('div',{style:{textAlign:'center',marginTop:'14px',paddingTop:'10px',borderTop:'1px dashed var(--border)',fontSize:'10px',color:'var(--text3)'}});
+  rodape.textContent='Emitido em '+new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+' · Financial Routine';
+  recibo.appendChild(rodape);
+  modal.appendChild(recibo);
+
+  // Ações
+  var actions=el('div',{class:'modal-actions'});
+  var printBtn=el('button',{class:'btn-primary',style:{display:'flex',alignItems:'center',gap:'6px'}});
+  printBtn.textContent='🖨 Imprimir / Salvar PDF';
+  printBtn.onclick=function(){
+    var w=window.open('','_blank','width=600,height=700');
+    w.document.write('<html><head><title>Comprovante</title><style>'+
+      'body{font-family:system-ui,sans-serif;padding:32px;background:#fff;color:#111;max-width:500px;margin:0 auto}'+
+      'h1{font-size:18px;font-weight:800;text-align:center;margin-bottom:4px}'+
+      '.sub{font-size:11px;color:#666;text-align:center;margin-bottom:4px}'+
+      '.titulo{font-size:12px;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:1px;color:#333;margin-top:10px;margin-bottom:16px}'+
+      '.linha{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;font-size:13px}'+
+      '.label{color:#666}.value{font-weight:500;color:#222}'+
+      '.total{display:flex;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:2px solid #333}'+
+      '.total .label{font-size:13px;font-weight:700;color:#111}.total .value{font-size:20px;font-weight:800;color:#16a34a}'+
+      '.rodape{text-align:center;margin-top:14px;padding-top:10px;border-top:1px dashed #ccc;font-size:10px;color:#999}'+
+      '@media print{body{padding:16px}button{display:none}}'+
+    '</style></head><body>'+
+    '<h1>'+nomeEmp+'</h1>'+
+    (emp.cnpj?'<div class="sub">CNPJ: '+emp.cnpj+'</div>':'')+
+    '<div class="titulo">Comprovante de Pagamento</div>'+
+    '<div class="linha"><span class="label">Descrição</span><span class="value">'+c.descricao+'</span></div>'+
+    '<div class="linha"><span class="label">Categoria</span><span class="value">'+(c.categoria||'—')+'</span></div>'+
+    '<div class="linha"><span class="label">Vencimento</span><span class="value">'+fmtDate(c.vencimento)+'</span></div>'+
+    '<div class="linha"><span class="label">Data do pagamento</span><span class="value">'+fmtDate(c.dataPagamento||today())+'</span></div>'+
+    (juros!==0?'<div class="linha"><span class="label">Valor original</span><span class="value">'+fmtMoney(c.valor)+'</span></div>'+
+    '<div class="linha"><span class="label">'+(juros>0?'Juros/multa':'Desconto')+'</span><span class="value">'+(juros>0?'+ ':'-')+fmtMoney(Math.abs(juros))+'</span></div>':'')+
+    '<div class="total"><span class="label">VALOR PAGO</span><span class="value">'+fmtMoney(valorPago)+'</span></div>'+
+    '<div class="rodape">Emitido em '+new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+' · Financial Routine</div>'+
+    '<br><button onclick="window.print()" style="padding:10px 24px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer">🖨 Imprimir</button>'+
+    '</body></html>');
+    w.document.close();
+    setTimeout(function(){w.print();},300);
+  };
+  var closeBtn=btn('btn-ghost','Fechar',function(){setState({comprovanteModal:null});});
+  actions.appendChild(closeBtn);
+  actions.appendChild(printBtn);
   modal.appendChild(actions);
   overlay.appendChild(modal);
   return overlay;
@@ -2622,7 +2822,7 @@ function render(){
   var _hiddenPages=['estoque','impressoes','pdv','kds','mapa'];
   if(_hiddenPages.indexOf(state.page)!==-1){setState({page:'dashboard'});return;}
 
-  var pages={dashboard:isAEProfile()&&typeof renderDashboardAE==='function'?renderDashboardAE:renderDashboard,apostas:typeof renderApostas==='function'?renderApostas:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,compras:renderCompras,'lista-compras':renderListaCompras,'estoque-insumos':renderEstoqueInsumos,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,freelancers:renderFreelancers,administrador:renderAdministrador,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas,usuarios:renderUsuarios,recorrencias:renderRecorrencias,auditoria:renderAuditoria,ajuda:renderAjuda,estoque:renderEstoque,empresa:renderEmpresa,cardapio:renderCardapio,impressoes:renderImpressoes,kds:renderKDS,notas:renderNotas,mapa:renderMapa,pdv:renderPDV,daily:renderDailyOperation};
+  var pages={dashboard:isAEProfile()&&typeof renderDashboardAE==='function'?renderDashboardAE:renderDashboard,apostas:typeof renderApostas==='function'?renderApostas:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,compras:renderCompras,'lista-compras':renderListaCompras,'estoque-insumos':renderEstoqueInsumos,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,freelancers:renderFreelancers,administrador:renderAdministrador,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas,usuarios:renderUsuarios,recorrencias:renderRecorrencias,auditoria:renderAuditoria,ajuda:renderAjuda,estoque:renderEstoque,empresa:renderEmpresa,cardapio:renderCardapio,impressoes:renderImpressoes,kds:renderKDS,notas:renderNotas,mapa:renderMapa,pdv:renderPDV,daily:renderDailyOperation,caixa:renderCaixa};
   var pageContent=(pages[state.page]||renderDashboard)();
   var content=div('content',[pageContent]);
   var mainCls='main'+(state.sidebarCollapsed?' sb-collapsed':'');
@@ -2665,6 +2865,8 @@ function render(){
   if(typeof renderKDSPedidoModal==='function'){var kdsP=renderKDSPedidoModal();if(kdsP)app.appendChild(kdsP);}
   // Modal pagamento em atraso
   var patrM=renderPagarAtrasadoModal();if(patrM)app.appendChild(patrM);
+  // Modal comprovante de pagamento
+  var comprM=renderComprovanteModal();if(comprM)app.appendChild(comprM);
   // Modal administrador/sócio
   if(typeof renderAdminModal==='function'){var admM=renderAdminModal();if(admM)app.appendChild(admM);}
   if(typeof renderDailyModal==='function'){var dlM=renderDailyModal();if(dlM)app.appendChild(dlM);}
@@ -2734,6 +2936,7 @@ function render(){
 <script src="js/page-mapa.js"></script>
 <script src="js/page-estoque.js"></script>
 <script src="js/page-empresa.js"></script>
+<script src="js/page-caixa.js"></script>
 <script src="js/page-impressoes.js"></script>
 <script src="js/xlsx.min.js"></script>
 <script src="js/page-cardapio.js"></script>

@@ -2,7 +2,7 @@
 // Mantém o app funcionando offline e dispara notificações de tarefas
 // mesmo com a aba em segundo plano
 
-var CACHE_NAME = 'djf-cache-v6';
+var CACHE_NAME = 'djf-cache-v7';
 var ASSETS = [
   '/',
   '/index.html',
@@ -13,6 +13,7 @@ var ASSETS = [
   '/js/page-ajuda.js',
   '/js/page-usuarios.js',
   '/js/page-recorrencias.js',
+  '/js/page-caixa.js',
 ];
 
 // ── INSTALL: cacheia o app ────────────────────────────────────────────────────

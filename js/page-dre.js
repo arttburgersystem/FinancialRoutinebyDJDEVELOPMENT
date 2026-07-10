@@ -161,11 +161,79 @@ function renderDRE(){
       el('p',{},pf==='artt'?'Artt Burger — resultado operacional por período':'Resultado financeiro pessoal'),
     ]),
     div('action-row',[
-      el('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},[selMes,selAno]),
-      cmvArea||el('div',{}),
+      el('div',{style:{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}},[selMes,selAno,cmvArea||null].filter(Boolean)),
+      el('button',{class:'btn-ghost',style:{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px'},onclick:function(){_printDRE(MESES[mes]+' '+ano,receitaTotal,cmvValor,lucroBruto,totalDespesas,resultado,margem,recByCat,desByCat,cmvPct,isPessoal);}},['📄 Exportar PDF']),
     ]),
     kpis,
     el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px',marginBottom:'14px'}},[grafico,lineCard]),
     demonstrativo,
   ]);
+}
+
+function _printDRE(periodo,receitaTotal,cmvValor,lucroBruto,totalDespesas,resultado,margem,recByCat,desByCat,cmvPct,isPessoal){
+  var emp=((state.empresaData||{})[state.profile])||{};
+  var nomeEmp=emp.nomeFantasia||emp.razaoSocial||'Financial Routine';
+  var M=function(v){return'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});};
+  var linhas='';
+  function addRow(label,valor,bold,indent,color){
+    linhas+='<div class="row'+(bold?' bold':'')+(indent?' indent':'')+'">'+
+      '<span style="'+(color?'color:'+color:'')+'">'+label+'</span>'+
+      '<span style="'+(color?'color:'+color:'')+'">'+M(valor)+'</span></div>';
+  }
+  function addSec(t){linhas+='<div class="sec">'+t+'</div>';}
+
+  addSec('(+) RECEITAS');
+  Object.keys(recByCat).sort(function(a,b){return recByCat[b]-recByCat[a];}).forEach(function(c){addRow(c,recByCat[c],false,true);});
+  addRow('Total Receitas',receitaTotal,true,false,'#16a34a');
+  if(!isPessoal){
+    addSec('(-) CMV — Custo de Mercadoria Vendida');
+    addRow('CMV ('+cmvPct+'% da Receita)',cmvValor,false,true,'#dc2626');
+    addRow('= Lucro Bruto',lucroBruto,true,false,lucroBruto>=0?'#16a34a':'#dc2626');
+  }
+  addSec('(-) DESPESAS OPERACIONAIS');
+  Object.keys(desByCat).sort(function(a,b){return desByCat[b]-desByCat[a];}).forEach(function(c){addRow(c,desByCat[c],false,true);});
+  addRow('Total Despesas',totalDespesas,true,false,'#dc2626');
+
+  var w=window.open('','_blank','width=700,height=900');
+  w.document.write(
+    '<html><head><title>DRE '+periodo+'</title><style>'+
+    'body{font-family:system-ui,sans-serif;padding:40px;color:#111;max-width:600px;margin:0 auto}'+
+    'h1{font-size:20px;font-weight:900;margin:0}'+
+    '.sub{font-size:12px;color:#666;margin-bottom:4px}'+
+    '.periodo{font-size:14px;font-weight:700;margin:16px 0 6px;color:#333}'+
+    '.kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}'+
+    '.kpi{border:1px solid #e5e7eb;border-radius:8px;padding:12px;text-align:center}'+
+    '.kpi .label{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}'+
+    '.kpi .value{font-size:18px;font-weight:800}'+
+    '.sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#666;padding:14px 0 5px;border-bottom:1px solid #e5e7eb;margin-bottom:2px}'+
+    '.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:13px}'+
+    '.row.bold{font-weight:700;font-size:14px;padding:10px 0;border-bottom:2px solid #e5e7eb}'+
+    '.row.indent{padding-left:16px;color:#555}'+
+    '.resultado{margin-top:16px;padding:16px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;'+
+      (resultado>=0?'background:#f0fdf4;border:1px solid #bbf7d0;':'background:#fef2f2;border:1px solid #fecaca;')+'}'+
+    '.res-label{font-size:14px;font-weight:700;color:'+(resultado>=0?'#15803d':'#dc2626')+'}'+
+    '.res-value{font-size:24px;font-weight:900;color:'+(resultado>=0?'#15803d':'#dc2626')+'}'+
+    '.rodape{margin-top:20px;font-size:10px;color:#999;text-align:center;border-top:1px dashed #ccc;padding-top:10px}'+
+    '@media print{button{display:none}body{padding:20px}}'+
+    '</style></head><body>'+
+    '<h1>'+nomeEmp+'</h1>'+
+    (emp.cnpj?'<div class="sub">CNPJ: '+emp.cnpj+'</div>':'')+
+    '<div class="sub">DRE — Demonstração de Resultado do Exercício</div>'+
+    '<div class="periodo">Período: '+periodo+'</div>'+
+    '<div class="kpis">'+
+      '<div class="kpi"><div class="label">Receita Bruta</div><div class="value" style="color:#16a34a">'+M(receitaTotal)+'</div></div>'+
+      '<div class="kpi"><div class="label">Total Despesas</div><div class="value" style="color:#dc2626">'+M(totalDespesas)+'</div></div>'+
+      '<div class="kpi"><div class="label">Lucro Bruto</div><div class="value" style="color:'+(lucroBruto>=0?'#16a34a':'#dc2626')+'">'+M(lucroBruto)+'</div></div>'+
+      '<div class="kpi"><div class="label">Margem Líquida</div><div class="value" style="color:'+(resultado>=0?'#16a34a':'#dc2626')+'">'+margem.toFixed(1)+'%</div></div>'+
+    '</div>'+
+    linhas+
+    '<div class="resultado">'+
+      '<span class="res-label">RESULTADO LÍQUIDO</span>'+
+      '<span class="res-value">'+M(resultado)+'</span>'+
+    '</div>'+
+    '<div class="rodape">Emitido em '+new Date().toLocaleString('pt-BR')+' · Financial Routine</div>'+
+    '<br><button onclick="window.print()" style="padding:10px 24px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px">🖨 Imprimir / Salvar PDF</button>'+
+    '</body></html>'
+  );
+  w.document.close();
 }

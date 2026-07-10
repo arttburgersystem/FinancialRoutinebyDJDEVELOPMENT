@@ -422,6 +422,7 @@ function renderFuncionarios() {
     {id:'funcionarios', label:'👥 Funcionários', badge:0},
     {id:'ferias',       label:'🏖 Férias',       badge:feriasNecessarias.length, badgeColor:'var(--gold)'},
     {id:'exames',       label:'🩺 Exames',       badge:examesVencidos+examesAVencer, badgeColor:examesVencidos>0?'#e05252':'var(--gold)'},
+    {id:'folha',        label:'💰 Folha',         badge:0},
   ];
   var tabsEl=el('div',{style:{display:'flex',gap:'0',borderBottom:'2px solid var(--border)',marginBottom:'20px'}},
     tabDefs.map(function(t){
@@ -454,6 +455,8 @@ function renderFuncionarios() {
     actionBtn=btn('btn-primary','🏖 Programar férias',function(){setState({feriasModal:{}});});
   } else if(funcTab==='exames'){
     actionBtn=btn('btn-primary','🩺 Novo exame',function(){setState({exameModal:{}});});
+  } else if(funcTab==='folha'){
+    actionBtn=btn('btn-ghost','🖨 Exportar PDF',function(){_exportFolhaPDF(ativos,state.folhaMes||(today().slice(0,7)));});
   }
 
   // ── CONTEÚDO: FUNCIONÁRIOS ────────────────────────────────────────────────
@@ -769,6 +772,116 @@ function renderFuncionarios() {
     ]);
   }
 
+  // ── CONTEÚDO: FOLHA DE PAGAMENTO ──────────────────────────────────────────
+  if (funcTab === 'folha') {
+    var folhaMesSel = state.folhaMes || today().slice(0,7);
+    var fParts = folhaMesSel.split('-');
+    var fAno = parseInt(fParts[0]), fMes = parseInt(fParts[1])-1;
+
+    function navFolhaMes(delta){
+      var mo = fMes + delta, an = fAno;
+      if(mo<0){mo=11;an--;}if(mo>11){mo=0;an++;}
+      setState({folhaMes:an+'-'+String(mo+1).padStart(2,'0')});
+    }
+
+    var MESES_F=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    var labelFolha = MESES_F[fMes] + ' ' + fAno;
+
+    // Calcula encargos simplificados para cada funcionário ativo
+    var folhaItens = ativos.map(function(f){
+      var sal = f.salario || 0;
+      // INSS tabela simplificada 2025
+      var inss = sal <= 1518 ? sal*0.075
+               : sal <= 2793.88 ? sal*0.09
+               : sal <= 4190.83 ? sal*0.12
+               : sal <= 8157.41 ? sal*0.14
+               : 1201.86; // teto INSS
+      inss = Math.round(inss*100)/100;
+      var baseIrrf = sal - inss;
+      // IRRF simplificado (isento até R$2.824,00 com desconto)
+      var irrf = baseIrrf <= 2824 ? 0
+               : baseIrrf <= 3751.05 ? baseIrrf*0.075 - 158.40
+               : baseIrrf <= 4664.68 ? baseIrrf*0.15  - 370.40
+               : baseIrrf <= 6101.06 ? baseIrrf*0.225 - 651.73
+               : baseIrrf*0.275 - 884.96;
+      irrf = Math.max(0, Math.round(irrf*100)/100);
+      var liquido = Math.round((sal - inss - irrf)*100)/100;
+      var fgts = Math.round(sal*0.08*100)/100;
+      return {f:f, sal:sal, inss:inss, irrf:irrf, liquido:liquido, fgts:fgts};
+    });
+
+    var totalSal     = folhaItens.reduce(function(s,i){return s+i.sal;},0);
+    var totalInss    = folhaItens.reduce(function(s,i){return s+i.inss;},0);
+    var totalIrrf    = folhaItens.reduce(function(s,i){return s+i.irrf;},0);
+    var totalLiquido = folhaItens.reduce(function(s,i){return s+i.liquido;},0);
+    var totalFgts    = folhaItens.reduce(function(s,i){return s+i.fgts;},0);
+
+    var mesNav2 = el('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'20px'}});
+    var prevBtn2 = el('button',{style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',cursor:'pointer',padding:'5px 12px',fontSize:'14px'}},'‹');
+    prevBtn2.onclick=function(){navFolhaMes(-1);};
+    var mesLabel2 = el('div',{style:{padding:'6px 20px',borderRadius:'6px',fontSize:'14px',fontWeight:'700',background:'var(--bg3)',border:'1px solid var(--border)',color:'var(--gold)',minWidth:'180px',textAlign:'center'}});
+    mesLabel2.textContent = labelFolha;
+    var nextBtn2 = el('button',{style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',cursor:'pointer',padding:'5px 12px',fontSize:'14px'}},'›');
+    nextBtn2.onclick=function(){navFolhaMes(1);};
+    mesNav2.appendChild(prevBtn2); mesNav2.appendChild(mesLabel2); mesNav2.appendChild(nextBtn2);
+
+    var kpiFolha = el('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'12px',marginBottom:'20px'}},[
+      el('div',{class:'kpi-card'},[el('div',{class:'kpi-label'},'Funcionários'),el('div',{class:'kpi-value'},String(ativos.length)),el('div',{class:'kpi-sub'},'ativos')]),
+      el('div',{class:'kpi-card red'},[el('div',{class:'kpi-label'},'Total bruto'),el('div',{class:'kpi-value red'},fmtMoney(totalSal)),el('div',{class:'kpi-sub'},'salários')]),
+      el('div',{class:'kpi-card'},[el('div',{class:'kpi-label'},'INSS desconto'),el('div',{class:'kpi-value'},fmtMoney(totalInss)),el('div',{class:'kpi-sub'},'retido funcionários')]),
+      el('div',{class:'kpi-card'},[el('div',{class:'kpi-label'},'IRRF desconto'),el('div',{class:'kpi-value'},fmtMoney(totalIrrf)),el('div',{class:'kpi-sub'},'retido funcionários')]),
+      el('div',{class:'kpi-card green'},[el('div',{class:'kpi-label'},'Total líquido'),el('div',{class:'kpi-value green'},fmtMoney(totalLiquido)),el('div',{class:'kpi-sub'},'a pagar')]),
+      el('div',{class:'kpi-card gold'},[el('div',{class:'kpi-label'},'FGTS empresa'),el('div',{class:'kpi-value gold'},fmtMoney(totalFgts)),el('div',{class:'kpi-sub'},'8% sobre salários')]),
+    ]);
+
+    var aviso = el('div',{style:{background:'rgba(201,168,76,.1)',border:'1px solid rgba(201,168,76,.3)',borderRadius:'8px',padding:'10px 14px',marginBottom:'16px',fontSize:'12px',color:'var(--text2)',lineHeight:'1.5'}});
+    aviso.textContent='⚠ Cálculos estimados com base na tabela INSS/IRRF 2025. Consulte seu contador para valores oficiais com adicionais, benefícios e horas extras.';
+
+    var theadCols = ['Funcionário / Cargo','Salário Bruto','INSS (desc.)','IRRF (desc.)','Salário Líquido','FGTS (emp.)','Pix / Banco'];
+    var tbody = folhaItens.length === 0
+      ? [el('tr',{},[el('td',{colspan:'7',style:{textAlign:'center',padding:'30px',color:'var(--text3)'}},'Nenhum funcionário ativo')])]
+      : folhaItens.map(function(item){
+        var f = item.f;
+        var pix = [f.chavePix?'Pix: '+f.chavePix:null, f.banco?f.banco:null].filter(Boolean).join('\n') || '—';
+        return el('tr',{},[
+          el('td',{class:'text-main'},[
+            f.nome,
+            f.cargo?el('span',{style:{fontSize:'11px',color:'var(--text3)',display:'block'}},f.cargo):null
+          ].filter(Boolean)),
+          el('td',{style:{fontWeight:'600',color:'var(--text)'}},fmtMoney(item.sal)),
+          el('td',{style:{color:'var(--red)'}},fmtMoney(item.inss)),
+          el('td',{style:{color:'var(--red)'}},item.irrf>0?fmtMoney(item.irrf):'—'),
+          el('td',{style:{fontWeight:'700',color:'var(--green)'}},fmtMoney(item.liquido)),
+          el('td',{style:{color:'var(--gold)'}},fmtMoney(item.fgts)),
+          el('td',{style:{fontSize:'11px',color:'var(--text3)',whiteSpace:'pre-line'}},pix),
+        ]);
+      });
+
+    var tfoot = el('tr',{style:{borderTop:'2px solid var(--border)',fontWeight:'700',background:'var(--bg3)'}},[
+      el('td',{style:{padding:'10px 14px',fontWeight:'700'}},'TOTAIS'),
+      el('td',{style:{padding:'10px 14px',fontWeight:'700'}},fmtMoney(totalSal)),
+      el('td',{style:{padding:'10px 14px',color:'var(--red)'}},fmtMoney(totalInss)),
+      el('td',{style:{padding:'10px 14px',color:'var(--red)'}},totalIrrf>0?fmtMoney(totalIrrf):'—'),
+      el('td',{style:{padding:'10px 14px',fontWeight:'800',color:'var(--green)'}},fmtMoney(totalLiquido)),
+      el('td',{style:{padding:'10px 14px',color:'var(--gold)'}},fmtMoney(totalFgts)),
+      el('td',{},''),
+    ]);
+
+    contentEl = div('',[
+      mesNav2,
+      aviso,
+      kpiFolha,
+      el('div',{style:{overflowX:'auto'}},[
+        el('table',{style:{width:'100%',borderCollapse:'collapse'}},[
+          el('thead',{},[el('tr',{style:{borderBottom:'2px solid var(--border)'}},
+            theadCols.map(function(h){return el('th',{style:{padding:'8px 14px',textAlign:'left',fontSize:'11px',color:'var(--text3)',fontWeight:'700',textTransform:'uppercase'}},h);}))]),
+          el('tbody',{},tbody),
+          el('tfoot',{},[tfoot]),
+        ]),
+      ]),
+    ]);
+  }
+
   return div('',[
     div('page-header',[
       el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},[
@@ -782,4 +895,83 @@ function renderFuncionarios() {
     tabsEl,
     contentEl,
   ]);
+}
+
+function _exportFolhaPDF(ativos, folhaMesSel) {
+  var emp = ((state.empresaData||{})[state.profile])||{};
+  var nomeEmp = emp.nomeFantasia||emp.razaoSocial||'Financial Routine';
+  var MESES_F=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var p=folhaMesSel.split('-');
+  var labelMes = MESES_F[parseInt(p[1])-1]+' '+p[0];
+  var M=function(v){return'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});};
+
+  var rows = ativos.map(function(f){
+    var sal=f.salario||0;
+    var inss=sal<=1518?sal*0.075:sal<=2793.88?sal*0.09:sal<=4190.83?sal*0.12:sal<=8157.41?sal*0.14:1201.86;
+    inss=Math.round(inss*100)/100;
+    var baseIrrf=sal-inss;
+    var irrf=baseIrrf<=2824?0:baseIrrf<=3751.05?baseIrrf*0.075-158.40:baseIrrf<=4664.68?baseIrrf*0.15-370.40:baseIrrf<=6101.06?baseIrrf*0.225-651.73:baseIrrf*0.275-884.96;
+    irrf=Math.max(0,Math.round(irrf*100)/100);
+    var liquido=Math.round((sal-inss-irrf)*100)/100;
+    var fgts=Math.round(sal*0.08*100)/100;
+    return {f:f,sal:sal,inss:inss,irrf:irrf,liquido:liquido,fgts:fgts};
+  });
+
+  var totSal=rows.reduce(function(s,i){return s+i.sal;},0);
+  var totLiq=rows.reduce(function(s,i){return s+i.liquido;},0);
+  var totFgts=rows.reduce(function(s,i){return s+i.fgts;},0);
+
+  var tr=rows.map(function(item){
+    return '<tr>'+
+      '<td>'+item.f.nome+(item.f.cargo?'<br><span class="sub">'+item.f.cargo+'</span>':'')+'</td>'+
+      '<td class="num">'+M(item.sal)+'</td>'+
+      '<td class="num red">'+M(item.inss)+'</td>'+
+      '<td class="num red">'+(item.irrf>0?M(item.irrf):'—')+'</td>'+
+      '<td class="num green bold">'+M(item.liquido)+'</td>'+
+      '<td class="num gold">'+M(item.fgts)+'</td>'+
+    '</tr>';
+  }).join('');
+
+  var w=window.open('','_blank','width=900,height=700');
+  w.document.write(
+    '<html><head><title>Folha '+labelMes+'</title><style>'+
+    'body{font-family:system-ui,sans-serif;padding:32px;color:#111;max-width:850px;margin:0 auto}'+
+    'h1{font-size:18px;font-weight:800;margin:0}'+
+    '.sub2{font-size:12px;color:#666;margin-bottom:4px}'+
+    '.periodo{font-size:15px;font-weight:700;margin:16px 0 16px;color:#333;padding:10px 16px;background:#f9f9f9;border-radius:8px;border:1px solid #e5e7eb}'+
+    'table{width:100%;border-collapse:collapse;margin-top:16px}'+
+    'th{padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#666;border-bottom:2px solid #e5e7eb}'+
+    'td{padding:8px 12px;border-bottom:1px solid #f3f4f6;font-size:13px}'+
+    'tfoot td{font-weight:700;border-top:2px solid #111;background:#f9f9f9}'+
+    '.num{text-align:right}'+
+    '.red{color:#dc2626}'+
+    '.green{color:#16a34a}'+
+    '.gold{color:#b45309}'+
+    '.bold{font-weight:800}'+
+    '.sub{font-size:11px;color:#666;display:block}'+
+    '.aviso{margin-top:20px;padding:10px 14px;background:#fefce8;border:1px solid #fef08a;border-radius:6px;font-size:11px;color:#713f12}'+
+    '.rodape{margin-top:16px;font-size:10px;color:#999;text-align:center;border-top:1px dashed #ccc;padding-top:10px}'+
+    '@media print{button{display:none}body{padding:16px}}'+
+    '</style></head><body>'+
+    '<h1>'+nomeEmp+'</h1>'+
+    (emp.cnpj?'<div class="sub2">CNPJ: '+emp.cnpj+'</div>':'')+
+    '<div class="periodo">💰 Folha de Pagamento — '+labelMes+'</div>'+
+    '<table>'+
+    '<thead><tr><th>Funcionário</th><th class="num">Salário Bruto</th><th class="num">INSS desc.</th><th class="num">IRRF desc.</th><th class="num">Salário Líquido</th><th class="num">FGTS (8%)</th></tr></thead>'+
+    '<tbody>'+tr+'</tbody>'+
+    '<tfoot><tr>'+
+      '<td>TOTAIS ('+rows.length+' funcionários)</td>'+
+      '<td class="num">'+M(totSal)+'</td>'+
+      '<td class="num red">—</td>'+
+      '<td class="num red">—</td>'+
+      '<td class="num green">'+M(totLiq)+'</td>'+
+      '<td class="num gold">'+M(totFgts)+'</td>'+
+    '</tr></tfoot>'+
+    '</table>'+
+    '<div class="aviso">⚠ Cálculos estimados com base na tabela INSS/IRRF 2025. Consulte seu contador para valores oficiais.</div>'+
+    '<div class="rodape">Emitido em '+new Date().toLocaleString('pt-BR')+' · Financial Routine</div>'+
+    '<br><button onclick="window.print()" style="padding:10px 24px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px">🖨 Imprimir / Salvar PDF</button>'+
+    '</body></html>'
+  );
+  w.document.close();
 }

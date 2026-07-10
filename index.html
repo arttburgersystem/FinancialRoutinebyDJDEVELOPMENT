@@ -2912,27 +2912,41 @@ function buildPinScreen(mode){
 
     box.appendChild(logo);box.appendChild(dev);box.appendChild(title);box.appendChild(sub);
     box.appendChild(dotsEl);box.appendChild(pad);box.appendChild(msg);
-    if(mode==='enter'&&typeof bioSuportado==='function'&&bioSuportado()&&bioRegistrado()){
-      var bioSep=document.createElement('div');
-      bioSep.style.cssText='font-size:11px;color:var(--text3);margin:6px 0 8px;letter-spacing:.5px;';
-      bioSep.textContent='— ou —';
-      var bioBtnEl=document.createElement('button');
-      bioBtnEl.style.cssText='width:234px;height:48px;border-radius:12px;background:rgba(91,155,213,.1);border:1px solid var(--blue);color:var(--blue);font-size:15px;font-family:inherit;cursor:pointer;transition:all .15s;margin-bottom:4px;';
-      bioBtnEl.textContent='🔐 Usar Face ID / Digital';
-      bioBtnEl.onmouseenter=function(){bioBtnEl.style.background='rgba(91,155,213,.2)';};
-      bioBtnEl.onmouseleave=function(){bioBtnEl.style.background='rgba(91,155,213,.1)';};
-      bioBtnEl.onclick=function(){
-        msg.className='pin-msg';msg.textContent='Aguardando verificação biométrica...';
-        bioAutenticar(function(){
-          msg.className='pin-msg success';msg.textContent='✓ Acesso liberado';
-          setTimeout(buildUserLoginScreen,300);
-        },function(){
-          msg.className='pin-msg error';msg.textContent='Biometria falhou. Use o PIN.';
-          setTimeout(function(){msg.className='pin-msg';msg.textContent='';},2000);
-        });
-      };
-      box.appendChild(bioSep);
-      box.appendChild(bioBtnEl);
+
+    if(mode==='enter'&&typeof bioSuportado==='function'&&bioSuportado()){
+      if(bioRegistrado()){
+        // ── Face ID registrado: mostra botão E auto-dispara ──────────────────
+        var bioSep=document.createElement('div');
+        bioSep.style.cssText='font-size:11px;color:var(--text3);margin:6px 0 8px;letter-spacing:.5px;';
+        bioSep.textContent='— ou —';
+        var bioBtnEl=document.createElement('button');
+        bioBtnEl.style.cssText='width:234px;height:52px;border-radius:12px;background:rgba(91,155,213,.15);border:1.5px solid var(--blue);color:var(--blue);font-size:16px;font-family:inherit;cursor:pointer;transition:all .15s;margin-bottom:4px;font-weight:700;';
+        bioBtnEl.textContent='🔐 Usar Face ID / Digital';
+        bioBtnEl.onmouseenter=function(){bioBtnEl.style.background='rgba(91,155,213,.28)';};
+        bioBtnEl.onmouseleave=function(){bioBtnEl.style.background='rgba(91,155,213,.15)';};
+        function _triggerBio(){
+          msg.className='pin-msg';msg.textContent='Aguardando Face ID...';
+          bioAutenticar(function(){
+            msg.className='pin-msg success';msg.textContent='✓ Acesso liberado';
+            setTimeout(buildUserLoginScreen,300);
+          },function(){
+            msg.className='pin-msg error';msg.textContent='Face ID falhou. Use o PIN.';
+            setTimeout(function(){msg.className='pin-msg';msg.textContent='';},2000);
+          });
+        }
+        bioBtnEl.onclick=_triggerBio;
+        box.appendChild(bioSep);
+        box.appendChild(bioBtnEl);
+        // Auto-dispara Face ID após a tela renderizar (comportamento nativo)
+        setTimeout(_triggerBio, 400);
+      } else {
+        // ── Face ID disponível mas não registrado: oferece configuração ──────
+        var cfgLink=document.createElement('button');
+        cfgLink.style.cssText='background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;margin-top:10px;text-decoration:underline;font-family:inherit;';
+        cfgLink.textContent='⚙ Configurar Face ID / Digital neste dispositivo';
+        cfgLink.onclick=function(){ oferecerBiometria(); };
+        box.appendChild(cfgLink);
+      }
     }
     ov.appendChild(box);
   }

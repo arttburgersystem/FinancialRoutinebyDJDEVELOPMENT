@@ -2,6 +2,8 @@
 
 var _ftIngredientes = [];
 var _ftModalId      = null;
+var _ftEmbSalao     = null; // { insumoId, insumoNome, quantidade, custoUnit, custoTotal }
+var _ftEmbDeliv     = null;
 
 function _ftNovoIngrediente() {
   return { insumoId: '', insumoNome: '', quantidade: 1, unidade: 'un', custoUnit: 0, custoTotal: 0 };
@@ -14,56 +16,89 @@ function _ftSomaCusto() {
 }
 
 function _ftAtualizarResumo() {
-  var rend  = parseFloat((document.getElementById('ft-rendimento')  || {}).value) || 1;
+  var rend  = parseFloat((document.getElementById('ft-rendimento') || {}).value) || 1;
   var custo = _ftSomaCusto();
   var cp    = custo / rend;
-  var pv    = parseFloat((document.getElementById('ft-precoVenda')  || {}).value) || 0;
-  var das   = parseFloat((document.getElementById('ft-das')         || {}).value) || 0;
-  var tcr   = parseFloat((document.getElementById('ft-credito')     || {}).value) || 0;
-  var tdb   = parseFloat((document.getElementById('ft-debito')      || {}).value) || 0;
+  var pv    = parseFloat((document.getElementById('ft-precoVenda') || {}).value) || 0;
+  var das   = parseFloat((document.getElementById('ft-das')        || {}).value) || 0;
+  var tcr   = parseFloat((document.getElementById('ft-credito')    || {}).value) || 0;
+  var tdb   = parseFloat((document.getElementById('ft-debito')     || {}).value) || 0;
 
-  var dasRs   = pv * das  / 100;
-  var crRs    = pv * tcr  / 100;
-  var dbRs    = pv * tdb  / 100;
-  var lDin    = pv - dasRs - cp;
-  var lCred   = pv - dasRs - crRs  - cp;
-  var lDeb    = pv - dasRs - dbRs  - cp;
-  var mgDin   = pv ? lDin  / pv * 100 : null;
-  var mgCred  = pv ? lCred / pv * 100 : null;
-  var mgDeb   = pv ? lDeb  / pv * 100 : null;
-  var cmv     = pv && cp ? cp / pv * 100 : null;
+  var dasRs = pv * das / 100;
+  var crRs  = pv * tcr / 100;
+  var dbRs  = pv * tdb / 100;
+  var denD  = 1 - das / 100;
 
-  // Preço mínimo (break-even por forma de pagamento)
-  var denDin  = 1 - das / 100;
-  var denCred = 1 - das / 100 - tcr / 100;
-  var denDeb  = 1 - das / 100 - tdb / 100;
-  var pmDin   = cp && denDin  > 0 ? cp / denDin  : null;
-  var pmCred  = cp && denCred > 0 ? cp / denCred : null;
-  var pmDeb   = cp && denDeb  > 0 ? cp / denDeb  : null;
+  // Custo total por canal (receita + embalagem)
+  var embS  = _ftEmbSalao ? (_ftEmbSalao.custoTotal  || 0) : 0;
+  var embD  = _ftEmbDeliv ? (_ftEmbDeliv.custoTotal || 0) : 0;
+  var cpS   = cp + embS;
+  var cpD   = cp + embD;
 
-  function cor(v) { return v === null ? 'var(--text3)' : v >= 40 ? '#00a86b' : v >= 20 ? 'var(--gold)' : '#e05252'; }
-  function corCmv(v) { return v === null ? 'var(--text3)' : v <= 30 ? '#00a86b' : v <= 40 ? 'var(--gold)' : '#e05252'; }
-  function set(id, txt, c) { var e = document.getElementById(id); if (e) { e.textContent = txt; if (c !== undefined) e.style.color = c; } }
+  // CMV por canal
+  var cmvS  = pv ? cpS / pv * 100 : null;
+  var cmvD  = pv ? cpD / pv * 100 : null;
+
+  // Preço mínimo por canal (dinheiro/PIX)
+  var pmS   = cpS && denD > 0 ? cpS / denD : null;
+  var pmD   = cpD && denD > 0 ? cpD / denD : null;
+
+  // Lucro por canal × forma de pagamento
+  var lDinS = pv ? pv - dasRs - cpS : null;
+  var lDinD = pv ? pv - dasRs - cpD : null;
+  var lCrS  = pv ? pv - dasRs - crRs - cpS : null;
+  var lCrD  = pv ? pv - dasRs - crRs - cpD : null;
+  var lDbS  = pv ? pv - dasRs - dbRs - cpS : null;
+  var lDbD  = pv ? pv - dasRs - dbRs - cpD : null;
+
+  // Margens
+  var mgDinS = pv && lDinS !== null ? lDinS / pv * 100 : null;
+  var mgDinD = pv && lDinD !== null ? lDinD / pv * 100 : null;
+  var mgCrS  = pv && lCrS  !== null ? lCrS  / pv * 100 : null;
+  var mgCrD  = pv && lCrD  !== null ? lCrD  / pv * 100 : null;
+  var mgDbS  = pv && lDbS  !== null ? lDbS  / pv * 100 : null;
+  var mgDbD  = pv && lDbD  !== null ? lDbD  / pv * 100 : null;
 
   var markup3     = cp ? cp * 3 : null;
   var markupAtual = cp && pv ? pv / cp : null;
 
-  set('ft-custo-total',      fmtMoney(custo));
-  set('ft-custo-porcao',     fmtMoney(cp));
-  set('ft-das-rs',           pv ? '−' + fmtMoney(dasRs) : '—', pv && dasRs ? '#e05252' : 'var(--text3)');
-  set('ft-cmv',              cmv !== null ? cmv.toFixed(1) + '%' : '—', corCmv(cmv));
-  set('ft-markup3',          markup3 ? fmtMoney(markup3) : '—', 'var(--text2)');
-  set('ft-markup-atual',     markupAtual ? markupAtual.toFixed(2) + '×' : '—',
+  function cor(v)    { return v === null ? 'var(--text3)' : v >= 40 ? '#00a86b' : v >= 20 ? 'var(--gold)' : '#e05252'; }
+  function corCmv(v) { return v === null ? 'var(--text3)' : v <= 30 ? '#00a86b' : v <= 40 ? 'var(--gold)' : '#e05252'; }
+  function corL(v)   { return v === null ? 'var(--text3)' : v >= 0 ? '#00a86b' : '#e05252'; }
+  function set(id, txt, c) { var e = document.getElementById(id); if (e) { e.textContent = txt; if (c !== undefined) e.style.color = c; } }
+  function money(v)  { return v !== null ? fmtMoney(v) : '—'; }
+  function pct(v)    { return v !== null ? v.toFixed(1) + '%' : '—'; }
+
+  set('ft-custo-total',       fmtMoney(custo));
+  set('ft-das-rs',            pv ? '−' + fmtMoney(dasRs) : '—', pv && dasRs ? '#e05252' : 'var(--text3)');
+  set('ft-markup3',           markup3 ? fmtMoney(markup3) : '—', 'var(--text2)');
+  set('ft-markup-atual',      markupAtual ? markupAtual.toFixed(2) + '×' : '—',
     markupAtual === null ? 'var(--text3)' : markupAtual >= 3 ? '#00a86b' : markupAtual >= 2 ? 'var(--gold)' : '#e05252');
-  set('ft-pmin-dinheiro',    pmDin  ? fmtMoney(pmDin)  : '—', 'var(--text2)');
-  set('ft-pmin-credito',     pmCred ? fmtMoney(pmCred) : '—', 'var(--text2)');
-  set('ft-pmin-debito',      pmDeb  ? fmtMoney(pmDeb)  : '—', 'var(--text2)');
-  set('ft-lucro-dinheiro',   pv ? fmtMoney(lDin)  : '—', pv ? (lDin  >= 0 ? '#00a86b' : '#e05252') : 'var(--text3)');
-  set('ft-lucro-credito',    pv ? fmtMoney(lCred) : '—', pv ? (lCred >= 0 ? '#00a86b' : '#e05252') : 'var(--text3)');
-  set('ft-lucro-debito',     pv ? fmtMoney(lDeb)  : '—', pv ? (lDeb  >= 0 ? '#00a86b' : '#e05252') : 'var(--text3)');
-  set('ft-margem-dinheiro',  mgDin  !== null ? mgDin.toFixed(1)  + '%' : '—', cor(mgDin));
-  set('ft-margem-credito',   mgCred !== null ? mgCred.toFixed(1) + '%' : '—', cor(mgCred));
-  set('ft-margem-debito',    mgDeb  !== null ? mgDeb.toFixed(1)  + '%' : '—', cor(mgDeb));
+
+  // Canal: embalagem
+  set('ft-emb-salao-rs',      embS ? fmtMoney(embS) : '—', 'var(--text2)');
+  set('ft-emb-deliv-rs',      embD ? fmtMoney(embD) : '—', 'var(--text2)');
+  // Canal: custo total
+  set('ft-custo-salao',       fmtMoney(cpS), 'var(--gold)');
+  set('ft-custo-deliv',       fmtMoney(cpD), 'var(--gold)');
+  // Canal: CMV
+  set('ft-cmv-salao',         pct(cmvS), corCmv(cmvS));
+  set('ft-cmv-deliv',         pct(cmvD), corCmv(cmvD));
+  // Canal: preço mínimo
+  set('ft-pmin-salao',        pmS ? fmtMoney(pmS) : '—', 'var(--text2)');
+  set('ft-pmin-deliv',        pmD ? fmtMoney(pmD) : '—', 'var(--text2)');
+  // Canal: lucro dinheiro
+  set('ft-lucro-din-salao',   money(lDinS), corL(lDinS));
+  set('ft-lucro-din-deliv',   money(lDinD), corL(lDinD));
+  // Canal: margem dinheiro
+  set('ft-mgdin-salao',       pct(mgDinS), cor(mgDinS));
+  set('ft-mgdin-deliv',       pct(mgDinD), cor(mgDinD));
+  // Canal: margem crédito
+  set('ft-mgcr-salao',        pct(mgCrS),  cor(mgCrS));
+  set('ft-mgcr-deliv',        pct(mgCrD),  cor(mgCrD));
+  // Canal: margem débito
+  set('ft-mgdb-salao',        pct(mgDbS),  cor(mgDbS));
+  set('ft-mgdb-deliv',        pct(mgDbD),  cor(mgDbD));
 }
 
 function _ftRenderIngredientes() {
@@ -207,6 +242,112 @@ function _ftRenderIngredientes() {
   _ftAtualizarResumo();
 }
 
+function _ftRenderEmbalagem() {
+  var pf    = state.profile;
+  var itens = (state.estoqueItens || []).filter(function(x) { return x.profile === pf; });
+
+  ['salao','deliv'].forEach(function(canal) {
+    var obj    = canal === 'salao' ? _ftEmbSalao : _ftEmbDeliv;
+    var contId = 'ft-emb-' + canal + '-container';
+    var cont   = document.getElementById(contId);
+    if (!cont) return;
+    while (cont.firstChild) cont.removeChild(cont.firstChild);
+
+    var wrapper = el('div', { style: { position: 'relative', flex: '1' } });
+    var srch = el('input', { class: 'form-input', type: 'text', autocomplete: 'off',
+      placeholder: 'Buscar embalagem...', style: { fontSize: '12px', padding: '4px 6px' } });
+    if (obj && obj.insumoNome) srch.value = obj.insumoNome;
+    var drop = el('div', { style: { display: 'none', position: 'absolute', top: '100%', left: '0', right: '0',
+      background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px',
+      zIndex: '9999', maxHeight: '160px', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,.25)' } });
+
+    var hiIdx = -1; var filtered = [];
+    function renderDrop(q) {
+      while (drop.firstChild) drop.removeChild(drop.firstChild);
+      q = (q || '').toLowerCase();
+      filtered = q ? itens.filter(function(x){ return x.nome.toLowerCase().indexOf(q) >= 0; }) : itens.slice(0, 40);
+      hiIdx = -1;
+      if (!filtered.length) { drop.style.display = 'none'; return; }
+      filtered.forEach(function(x, fi) {
+        var item = el('div', { style: { padding: '6px 10px', cursor: 'pointer', fontSize: '12px', borderBottom: '1px solid var(--border)' } },
+          x.nome + ' (' + (x.unidade || 'un') + ')');
+        item.onmouseenter = function() { hiIdx = fi; upHi(); };
+        item.onmousedown  = function(e) { e.preventDefault(); pick(x); };
+        drop.appendChild(item);
+      });
+      drop.style.display = 'block';
+    }
+    function upHi() {
+      var kids = drop.children;
+      for (var j = 0; j < kids.length; j++) { kids[j].style.background = j === hiIdx ? 'var(--primary)' : ''; kids[j].style.color = j === hiIdx ? '#fff' : ''; }
+    }
+    function pick(x) {
+      var ref = canal === 'salao' ? _ftEmbSalao : _ftEmbDeliv;
+      if (!ref) ref = { insumoId:'', insumoNome:'', quantidade:1, custoUnit:0, custoTotal:0 };
+      ref.insumoId   = x.id;
+      ref.insumoNome = x.nome;
+      ref.custoUnit  = x.custoMedio || 0;
+      ref.custoTotal = (ref.quantidade || 1) * ref.custoUnit;
+      if (canal === 'salao') _ftEmbSalao = ref; else _ftEmbDeliv = ref;
+      srch.value = x.nome;
+      drop.style.display = 'none';
+      var puEl  = document.getElementById('ft-emb-' + canal + '-pu');
+      var totEl = document.getElementById('ft-emb-' + canal + '-tot');
+      if (puEl)  puEl.value  = ref.custoUnit.toFixed(4);
+      if (totEl) totEl.value = fmtMoney(ref.custoTotal);
+      _ftAtualizarResumo();
+      setTimeout(function() { var q = document.getElementById('ft-emb-' + canal + '-qtd'); if (q) { q.focus(); q.select(); } }, 50);
+    }
+    srch.oninput   = function() { renderDrop(srch.value); };
+    srch.onfocus   = function() { renderDrop(srch.value); };
+    srch.onblur    = function() { setTimeout(function(){ drop.style.display = 'none'; }, 160); };
+    srch.onkeydown = function(e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); hiIdx = Math.min(hiIdx+1, filtered.length-1); upHi(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); hiIdx = Math.max(hiIdx-1, 0); upHi(); }
+      else if ((e.key === 'Tab' || e.key === 'Enter') && drop.style.display !== 'none' && filtered.length) { e.preventDefault(); pick(filtered[hiIdx >= 0 ? hiIdx : 0]); }
+      else if (e.key === 'Escape') { drop.style.display = 'none'; }
+    };
+    wrapper.appendChild(srch); wrapper.appendChild(drop);
+
+    var qtdInp = el('input', { class: 'form-input', type: 'number', id: 'ft-emb-' + canal + '-qtd',
+      placeholder: '1', style: { fontSize: '12px', width: '60px' } });
+    qtdInp.value = String((obj && obj.quantidade) || 1);
+    qtdInp.setAttribute('min','0'); qtdInp.setAttribute('step','any');
+    qtdInp.oninput = function() {
+      var ref = canal === 'salao' ? _ftEmbSalao : _ftEmbDeliv;
+      if (!ref) return;
+      ref.quantidade = parseFloat(qtdInp.value) || 1;
+      ref.custoTotal = ref.quantidade * (ref.custoUnit || 0);
+      if (canal === 'salao') _ftEmbSalao = ref; else _ftEmbDeliv = ref;
+      var totEl = document.getElementById('ft-emb-' + canal + '-tot');
+      if (totEl) totEl.value = fmtMoney(ref.custoTotal);
+      _ftAtualizarResumo();
+    };
+
+    var puEl = el('input', { class: 'form-input', type: 'number', id: 'ft-emb-' + canal + '-pu',
+      style: { fontSize: '12px', width: '80px', textAlign: 'right' } });
+    if (obj && obj.custoUnit) puEl.value = obj.custoUnit.toFixed(4);
+    puEl.setAttribute('readonly', true);
+
+    var totEl = el('input', { class: 'form-input', id: 'ft-emb-' + canal + '-tot',
+      style: { fontSize: '12px', width: '80px', fontWeight: '700', color: 'var(--gold)', background: 'var(--bg2)', textAlign: 'right' } });
+    if (obj && obj.custoTotal) totEl.value = fmtMoney(obj.custoTotal);
+    totEl.setAttribute('readonly', true);
+
+    var rmBtn = el('button', {}, '×');
+    rmBtn.style.cssText = 'background:none;border:1px solid var(--border);border-radius:4px;color:#e05252;cursor:pointer;font-size:16px;padding:1px 5px;width:28px;';
+    rmBtn.onclick = function() {
+      if (canal === 'salao') _ftEmbSalao = null; else _ftEmbDeliv = null;
+      srch.value = ''; if (puEl) puEl.value = ''; if (totEl) totEl.value = '';
+      _ftAtualizarResumo();
+    };
+
+    var row = el('div', { style: { display: 'flex', gap: '4px', alignItems: 'center' } });
+    row.appendChild(wrapper); row.appendChild(qtdInp); row.appendChild(puEl); row.appendChild(totEl); row.appendChild(rmBtn);
+    cont.appendChild(row);
+  });
+}
+
 function renderFichaTecnicaModal() {
   var m = state.fichaTecnicaModal;
   if (!m) { _ftModalId = null; return null; }
@@ -215,7 +356,7 @@ function renderFichaTecnicaModal() {
   var isEdit = !!edit.id;
   var curId  = edit.id || '__ft_new__';
 
-  // Inicializa ingredientes apenas ao abrir
+  // Inicializa ingredientes e embalagens apenas ao abrir
   if (curId !== _ftModalId) {
     _ftModalId = curId;
     if (isEdit && edit.ingredientes && edit.ingredientes.length) {
@@ -223,6 +364,8 @@ function renderFichaTecnicaModal() {
     } else {
       _ftIngredientes = [_ftNovoIngrediente()];
     }
+    _ftEmbSalao = edit.embalagemSalao ? Object.assign({}, edit.embalagemSalao) : null;
+    _ftEmbDeliv = edit.embalagemDelivery ? Object.assign({}, edit.embalagemDelivery) : null;
   }
 
   function g(id) { var e = document.getElementById('ft-' + id); return e ? e.value : ''; }
@@ -281,7 +424,9 @@ function renderFichaTecnicaModal() {
       criadoEm:      edit.criadoEm || new Date().toISOString(),
     };
 
-    ft.produtoId = g('produtoId') || edit.produtoId || '';
+    ft.produtoId          = g('produtoId') || edit.produtoId || '';
+    ft.embalagemSalao     = _ftEmbSalao || null;
+    ft.embalagemDelivery  = _ftEmbDeliv  || null;
 
     var lista = state.fichaTecnicas || [];
     if (isEdit) {
@@ -342,63 +487,58 @@ function renderFichaTecnicaModal() {
   debInp.setAttribute('min', '0'); debInp.setAttribute('max', '100'); debInp.setAttribute('step', '0.1');
   debInp.oninput = _ftAtualizarResumo;
 
-  function _mkResumoCell(label, id, big) {
-    return el('div', { style: { textAlign: 'center', padding: '6px 4px' } }, [
-      el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px', letterSpacing: '.5px' } }, label),
-      el('span', { id: id, style: { fontSize: big ? '16px' : '13px', fontWeight: '800', color: 'var(--text3)' } }, '—'),
-    ]);
-  }
-
-  function _rsCell(lbl, id, color) {
-    return el('div', { style: { background: 'var(--bg3)', padding: '8px 4px', textAlign: 'center' } }, [
-      el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px', letterSpacing: '.4px' } }, lbl),
-      el('span', { id: id, style: { fontSize: '15px', fontWeight: '800', color: color || 'var(--text3)' } }, '—'),
-    ]);
-  }
-  function _pgRow(lbl, idSuf, big) {
-    var fs = big ? '18px' : '14px';
-    return el('div', { style: { display: 'grid', gridTemplateColumns: '90px 1fr 1fr 1fr', background: 'var(--bg3)', padding: '6px 8px', alignItems: 'center', borderTop: '1px solid var(--border)' } }, [
-      el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase', lineHeight: '1.2' } }, lbl),
-      el('div', { style: { textAlign: 'center', fontSize: fs, fontWeight: '800' } }, [el('span', { id: 'ft-' + idSuf + '-dinheiro' }, '—')]),
-      el('div', { style: { textAlign: 'center', fontSize: fs, fontWeight: '800' } }, [el('span', { id: 'ft-' + idSuf + '-credito'  }, '—')]),
-      el('div', { style: { textAlign: 'center', fontSize: fs, fontWeight: '800' } }, [el('span', { id: 'ft-' + idSuf + '-debito'   }, '—')]),
+  function _cRow(lbl, idS, idD, big) {
+    var fs = big ? '17px' : '13px';
+    return el('div', { style: { display: 'grid', gridTemplateColumns: '90px 1fr 1fr', background: 'var(--bg3)', padding: '6px 10px', alignItems: 'center', borderTop: '1px solid var(--border)' } }, [
+      el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase' } }, lbl),
+      el('div', { style: { textAlign: 'center', fontSize: fs, fontWeight: '800' } }, [el('span', { id: idS }, '—')]),
+      el('div', { style: { textAlign: 'center', fontSize: fs, fontWeight: '800' } }, [el('span', { id: idD }, '—')]),
     ]);
   }
 
   var resumoBox = el('div', { style: { borderRadius: '8px', background: 'var(--bg3)', border: '1px solid var(--border)', marginTop: '8px', overflow: 'hidden' } }, [
-    // Linha 1: Custo total | Custo/porção | DAS R$ | CMV%
+    // Linha 1: Custo receita | DAS | Markup 3× | Markup atual
     el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1px', background: 'var(--border)', borderBottom: '1px solid var(--border)' } }, [
-      _rsCell('Custo Total',    'ft-custo-total',  'var(--text)'),
-      _rsCell('Custo / Porção', 'ft-custo-porcao', 'var(--gold)'),
-      _rsCell('DAS (imposto)',  'ft-das-rs',        'var(--text3)'),
       el('div', { style: { background: 'var(--bg3)', padding: '8px 4px', textAlign: 'center' } }, [
-        el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, 'CMV%'),
-        el('div', { style: { fontSize: '8px', color: 'var(--text3)', marginBottom: '2px' } }, '(custo/preço)'),
-        el('span', { id: 'ft-cmv', style: { fontSize: '15px', fontWeight: '800', color: 'var(--text3)' } }, '—'),
+        el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, 'Custo Receita'),
+        el('span', { id: 'ft-custo-total', style: { fontSize: '14px', fontWeight: '800', color: 'var(--text)' } }, '—'),
       ]),
-    ]),
-    // Linha markup
-    el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 14px', background: 'var(--bg2)', borderBottom: '1px solid var(--border)', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: '8px' } }, [
-      el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
-        el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase' } }, '💡 Preço sugerido (markup 3×):'),
+      el('div', { style: { background: 'var(--bg3)', padding: '8px 4px', textAlign: 'center' } }, [
+        el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, 'DAS (imposto)'),
+        el('span', { id: 'ft-das-rs', style: { fontSize: '14px', fontWeight: '800', color: 'var(--text3)' } }, '—'),
+      ]),
+      el('div', { style: { background: 'var(--bg3)', padding: '8px 4px', textAlign: 'center' } }, [
+        el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, '💡 Markup 3× (sugerido)'),
         el('span', { id: 'ft-markup3', style: { fontSize: '14px', fontWeight: '800', color: 'var(--text2)' } }, '—'),
-        el('span', { style: { fontSize: '10px', color: 'var(--text3)' } }, '(custo × 3)'),
       ]),
-      el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
-        el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase' } }, 'Markup atual:'),
+      el('div', { style: { background: 'var(--bg3)', padding: '8px 4px', textAlign: 'center' } }, [
+        el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, 'Markup Atual'),
         el('span', { id: 'ft-markup-atual', style: { fontSize: '14px', fontWeight: '800', color: 'var(--text3)' } }, '—'),
       ]),
     ]),
-    // Header pagamentos
-    el('div', { style: { display: 'grid', gridTemplateColumns: '90px 1fr 1fr 1fr', background: 'var(--bg2)', padding: '6px 8px', alignItems: 'center', borderBottom: '1px solid var(--border)' } }, [
+    // Header canais
+    el('div', { style: { display: 'grid', gridTemplateColumns: '90px 1fr 1fr', background: 'var(--bg2)', padding: '6px 10px', alignItems: 'center', borderBottom: '1px solid var(--border)' } }, [
       el('span', {}),
-      el('div', { style: { textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text2)' } }, '💵 Dinheiro/PIX'),
-      el('div', { style: { textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text2)' } }, '💳 Crédito'),
-      el('div', { style: { textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text2)' } }, '💳 Débito'),
+      el('div', { style: { textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text2)' } }, '🍽️ Salão'),
+      el('div', { style: { textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text2)' } }, '🛵 Delivery'),
     ]),
-    _pgRow('Preço Mínimo', 'pmin', false),
-    _pgRow('Lucro R$',     'lucro', false),
-    _pgRow('Margem',       'margem', true),
+    _cRow('Embalagem',      'ft-emb-salao-rs',   'ft-emb-deliv-rs',   false),
+    _cRow('Custo Total',    'ft-custo-salao',     'ft-custo-deliv',    false),
+    _cRow('CMV%',           'ft-cmv-salao',       'ft-cmv-deliv',      false),
+    _cRow('Preço Mínimo',   'ft-pmin-salao',      'ft-pmin-deliv',     false),
+    _cRow('Lucro Din/PIX',  'ft-lucro-din-salao', 'ft-lucro-din-deliv',false),
+    _cRow('Margem Din/PIX', 'ft-mgdin-salao',     'ft-mgdin-deliv',    true),
+    // Linha separadora crédito/débito
+    el('div', { style: { display: 'grid', gridTemplateColumns: '90px 1fr 1fr', background: 'var(--bg2)', padding: '4px 10px', borderTop: '1px solid var(--border)' } }, [
+      el('span', { style: { fontSize: '9px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase' } }, '💳 Crédito'),
+      el('div', { style: { textAlign: 'center', fontSize: '12px', fontWeight: '700' } }, [el('span', { id: 'ft-mgcr-salao' }, '—')]),
+      el('div', { style: { textAlign: 'center', fontSize: '12px', fontWeight: '700' } }, [el('span', { id: 'ft-mgcr-deliv' }, '—')]),
+    ]),
+    el('div', { style: { display: 'grid', gridTemplateColumns: '90px 1fr 1fr', background: 'var(--bg2)', padding: '4px 10px', borderTop: '1px solid var(--border)' } }, [
+      el('span', { style: { fontSize: '9px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase' } }, '💳 Débito'),
+      el('div', { style: { textAlign: 'center', fontSize: '12px', fontWeight: '700' } }, [el('span', { id: 'ft-mgdb-salao' }, '—')]),
+      el('div', { style: { textAlign: 'center', fontSize: '12px', fontWeight: '700' } }, [el('span', { id: 'ft-mgdb-deliv' }, '—')]),
+    ]),
   ]);
 
   var modal = div('modal', [
@@ -454,6 +594,31 @@ function renderFichaTecnicaModal() {
         resumoBox,
       ]),
 
+      // Embalagem por canal
+      el('div', { style: { borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '12px' } }, [
+        el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '8px' } }, '📦 Embalagem por Canal'),
+        el('div', { style: { fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' } }, 'Selecione o insumo de embalagem usado em cada canal de venda.'),
+        // Header
+        el('div', { style: { display: 'grid', gridTemplateColumns: '90px 1fr 60px 80px 80px 28px', gap: '4px', marginBottom: '4px' } }, [
+          el('span', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase' } }, 'Canal'),
+          el('span', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase' } }, 'Embalagem'),
+          el('span', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase' } }, 'Qtd'),
+          el('span', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', textAlign: 'right' } }, 'Custo unit.'),
+          el('span', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', textAlign: 'right' } }, 'Total'),
+          el('span', {}),
+        ]),
+        // Salão
+        el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' } }, [
+          el('span', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--green)', background: 'rgba(45,184,122,.12)', border: '1px solid rgba(45,184,122,.3)', borderRadius: '12px', padding: '3px 8px', whiteSpace: 'nowrap', minWidth: '80px', textAlign: 'center' } }, '🍽️ Salão'),
+          el('div', { id: 'ft-emb-salao-container', style: { flex: '1', display: 'flex' } }),
+        ]),
+        // Delivery
+        el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+          el('span', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--gold)', background: 'rgba(201,168,60,.12)', border: '1px solid rgba(201,168,60,.3)', borderRadius: '12px', padding: '3px 8px', whiteSpace: 'nowrap', minWidth: '80px', textAlign: 'center' } }, '🛵 Delivery'),
+          el('div', { id: 'ft-emb-deliv-container', style: { flex: '1', display: 'flex' } }),
+        ]),
+      ]),
+
       // Precificação
       el('div', {}, [
         el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '8px' } }, '💰 Precificação'),
@@ -475,6 +640,6 @@ function renderFichaTecnicaModal() {
   modal.style.maxWidth = '680px';
 
   var ov = div('modal-overlay', [modal]);
-  setTimeout(function() { _ftRenderIngredientes(); }, 0);
+  setTimeout(function() { _ftRenderIngredientes(); _ftRenderEmbalagem(); }, 0);
   return ov;
 }

@@ -388,14 +388,39 @@ function renderProdutoModal() {
     return b;
   }
 
-  // ── CATEGORIA + gerenciar ──────────────────────────────────────────────────
+  // ── CATEGORIA + criar inline ───────────────────────────────────────────────
   var cats = estCats();
   var catSel = el('select',{class:'form-input',onchange:function(){p.categoria=this.value;}},
     cats.map(function(c){return el('option',{value:c,selected:(p.categoria||cats[0])===c},c);}));
-  var catRow = el('div',{style:{display:'flex',gap:'8px',alignItems:'flex-end'}},[
-    el('div',{style:{flex:'1'}},[el('label',{class:'form-label'},'Categoria'),catSel]),
-    el('button',{class:'btn-ghost',style:{padding:'8px 10px',fontSize:'11px',flexShrink:'0',whiteSpace:'nowrap'},
-      onclick:function(e){e.preventDefault();setState({estCatManager:{open:true}});}}, '⚙️ Gerenciar'),
+
+  // Área de nova categoria inline (sem abrir outro modal)
+  var novaCatInp = el('input',{class:'form-input',placeholder:'Nome da nova categoria...',style:{flex:'1',fontSize:'12px'}});
+  var novaCatWrap = el('div',{style:{display:'none',gap:'6px',alignItems:'center',marginTop:'6px'}});
+  function _adicionarCatInline(){
+    var nome=(novaCatInp.value||'').trim();
+    if(!nome){novaCatInp.style.borderColor='var(--red)';return;}
+    var arr=state.estCategorias||[];
+    if(arr.find(function(c){return c.nome.toLowerCase()===nome.toLowerCase();})){showToast('Categoria já existe','error');return;}
+    var nova={id:'cat_'+Date.now(),nome:nome};
+    var novas=arr.concat([nova]);
+    lsSet('estCategorias',novas);
+    p.categoria=nome;
+    setState({estCategorias:novas,produtoModal:Object.assign({},state.produtoModal,{categoria:nome})});
+    scheduleSave();
+    showToast('Categoria "'+nome+'" criada!','success');
+  }
+  novaCatInp.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();_adicionarCatInline();}};
+  var novaCatAddBtn=el('button',{class:'btn-primary',style:{padding:'7px 12px',fontSize:'12px',flexShrink:'0'},onclick:function(e){e.preventDefault();_adicionarCatInline();}},'＋ Adicionar');
+  var novaCatCancelBtn=el('button',{class:'btn-ghost',style:{padding:'7px 10px',fontSize:'12px',flexShrink:'0'},onclick:function(e){e.preventDefault();novaCatWrap.style.display='none';}},'✕');
+  novaCatWrap.appendChild(novaCatInp);novaCatWrap.appendChild(novaCatAddBtn);novaCatWrap.appendChild(novaCatCancelBtn);
+
+  var catRow = el('div',{style:{gridColumn:'1/-1'}},[
+    el('div',{style:{display:'flex',gap:'8px',alignItems:'flex-end'}},[
+      el('div',{style:{flex:'1'}},[el('label',{class:'form-label'},'Categoria'),catSel]),
+      el('button',{class:'btn-ghost',style:{padding:'8px 10px',fontSize:'11px',flexShrink:'0',whiteSpace:'nowrap'},
+        onclick:function(e){e.preventDefault();novaCatWrap.style.display=novaCatWrap.style.display==='none'?'flex':'none';if(novaCatWrap.style.display==='flex')novaCatInp.focus();}}, '＋ Nova categoria'),
+    ]),
+    novaCatWrap,
   ]);
 
   // ── UNIDADE + gerenciar ────────────────────────────────────────────────────

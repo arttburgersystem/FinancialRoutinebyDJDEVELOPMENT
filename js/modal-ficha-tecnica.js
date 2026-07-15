@@ -244,7 +244,9 @@ function _ftRenderIngredientes() {
 
 function _ftRenderEmbalagem() {
   var pf    = state.profile;
-  var itens = (state.estoqueItens || []).filter(function(x) { return x.profile === pf; });
+  // Busca nos dois sistemas: estoqueItens (novo) + produtos tipo=insumo (antigo)
+  var itens = (state.estoqueItens || []).filter(function(x) { return x.profile === pf; })
+    .concat((state.produtos || []).filter(function(x) { return x.tipo === 'insumo' && x.profile === pf; }));
 
   ['salao','deliv'].forEach(function(canal) {
     var obj    = canal === 'salao' ? _ftEmbSalao : _ftEmbDeliv;
@@ -364,8 +366,25 @@ function renderFichaTecnicaModal() {
     } else {
       _ftIngredientes = [_ftNovoIngrediente()];
     }
+    // Carrega embalagem salva na ficha; se não tiver, tenta puxar do produto vinculado
     _ftEmbSalao = edit.embalagemSalao ? Object.assign({}, edit.embalagemSalao) : null;
     _ftEmbDeliv = edit.embalagemDelivery ? Object.assign({}, edit.embalagemDelivery) : null;
+    if (!_ftEmbSalao && !_ftEmbDeliv && edit.produtoId) {
+      var _prodVinc = (state.produtos || []).filter(function(p) { return p.id === edit.produtoId; })[0];
+      if (_prodVinc && _prodVinc.embalagens && _prodVinc.embalagens.ativo) {
+        var _todosIns = (state.estoqueItens || []).concat(state.produtos || []);
+        ['salao','delivery'].forEach(function(ch) {
+          var conf = _prodVinc.embalagens[ch];
+          if (conf && conf.ativo && conf.itens && conf.itens.length) {
+            var item = conf.itens[0];
+            var ins  = _todosIns.filter(function(x) { return x.id === item.estoqueId; })[0];
+            var custo = ins ? (ins.custoMedio || ins.custo || 0) : 0;
+            var obj = { insumoId: item.estoqueId || '', insumoNome: ins ? ins.nome : (item.nome || ''), quantidade: item.qtd || 1, custoUnit: custo, custoTotal: (item.qtd || 1) * custo };
+            if (ch === 'salao') _ftEmbSalao = obj; else _ftEmbDeliv = obj;
+          }
+        });
+      }
+    }
   }
 
   function g(id) { var e = document.getElementById('ft-' + id); return e ? e.value : ''; }
@@ -572,6 +591,27 @@ function renderFichaTecnicaModal() {
             if (nomeEl) nomeEl.value = prod.nome;
             if (catEl) { for (var i = 0; i < catEl.options.length; i++) { if (catEl.options[i].value === (prod.categoria || '')) { catEl.selectedIndex = i; break; } } }
             if (pvEl)  pvEl.value = prod.precoVenda || prod.preco || '';
+            // Auto-preenche embalagem a partir da aba Embalagens do Cardápio
+            if (prod.embalagens && prod.embalagens.ativo) {
+              var todosIns = (state.estoqueItens || []).concat(state.produtos || []);
+              ['salao','delivery'].forEach(function(ch) {
+                var conf = prod.embalagens[ch];
+                if (conf && conf.ativo && conf.itens && conf.itens.length) {
+                  var item = conf.itens[0];
+                  var ins  = todosIns.filter(function(x) { return x.id === item.estoqueId; })[0];
+                  var custo = ins ? (ins.custoMedio || ins.custo || 0) : 0;
+                  var obj = {
+                    insumoId:   item.estoqueId || '',
+                    insumoNome: ins ? ins.nome : (item.nome || ''),
+                    quantidade: item.qtd || 1,
+                    custoUnit:  custo,
+                    custoTotal: (item.qtd || 1) * custo,
+                  };
+                  if (ch === 'salao') _ftEmbSalao = obj; else _ftEmbDeliv = obj;
+                }
+              });
+              _ftRenderEmbalagem();
+            }
             _ftAtualizarResumo();
           };
           return div('form-group', [el('label', { class: 'form-label' }, 'Produto do Cardápio'), prodSel]);

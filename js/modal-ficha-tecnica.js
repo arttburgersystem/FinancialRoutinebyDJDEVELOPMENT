@@ -48,34 +48,65 @@ function _ftRenderIngredientes() {
       gap: '4px', marginBottom: '4px', alignItems: 'center',
     }});
 
-    // Select insumo
-    var insSel = el('select', { class: 'form-input', style: { fontSize: '12px', padding: '4px 6px' } });
-    insumoOpts.forEach(function(o) {
-      var opt = el('option', { value: o.v }, o.l);
-      if (o.v === ingr.insumoId) opt.selected = true;
-      insSel.appendChild(opt);
-    });
+    // Autocomplete insumo
+    var insWrapper = el('div', { style: { position: 'relative' } });
+    var insSearch = el('input', { class: 'form-input', type: 'text', id: 'fti-search-' + idx, placeholder: 'Buscar insumo...', autocomplete: 'off', style: { fontSize: '12px', padding: '4px 6px' } });
+    if (ingr.insumoNome) insSearch.value = ingr.insumoNome;
+    var insDrop = el('div', { id: 'fti-drop-' + idx, style: { display: 'none', position: 'absolute', top: '100%', left: '0', right: '0', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', zIndex: '9999', maxHeight: '180px', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,.25)' } });
     (function(i) {
-      insSel.onchange = function(e) {
-        _ftIngredientes[i].insumoId = e.target.value;
-        var ins = itens.filter(function(x) { return x.id === e.target.value; })[0];
-        if (ins) {
-          _ftIngredientes[i].insumoNome = ins.nome;
-          _ftIngredientes[i].custoUnit  = ins.custoMedio || 0;
-          _ftIngredientes[i].unidade    = ins.unidade || 'un';
-          _ftIngredientes[i].custoTotal = _ftIngredientes[i].quantidade * _ftIngredientes[i].custoUnit;
-          // Atualiza campos da linha
-          var puEl  = document.getElementById('fti-pu-' + i);
-          var totEl = document.getElementById('fti-tot-' + i);
-          if (puEl)  puEl.value  = _ftIngredientes[i].custoUnit.toFixed(4);
-          if (totEl) totEl.value = _ftIngredientes[i].custoTotal.toFixed(2);
-        }
+      var hiIdx = -1;
+      var filtered = [];
+      function renderDrop(q) {
+        while (insDrop.firstChild) insDrop.removeChild(insDrop.firstChild);
+        q = (q || '').toLowerCase();
+        filtered = q ? itens.filter(function(x){ return x.nome.toLowerCase().indexOf(q) >= 0; }) : itens.slice(0, 40);
+        hiIdx = -1;
+        if (!filtered.length) { insDrop.style.display = 'none'; return; }
+        filtered.forEach(function(x, fi) {
+          var item = el('div', { style: { padding: '6px 10px', cursor: 'pointer', fontSize: '12px', borderBottom: '1px solid var(--border)' } }, x.nome + ' (' + (x.unidade || 'un') + ')');
+          item.onmouseenter = function() { hiIdx = fi; upHi(); };
+          item.onmousedown = function(e) { e.preventDefault(); pick(x); };
+          insDrop.appendChild(item);
+        });
+        insDrop.style.display = 'block';
+      }
+      function upHi() {
+        var kids = insDrop.children;
+        for (var j = 0; j < kids.length; j++) { kids[j].style.background = j === hiIdx ? 'var(--primary)' : ''; kids[j].style.color = j === hiIdx ? '#fff' : ''; }
+      }
+      function pick(x) {
+        _ftIngredientes[i].insumoId   = x.id;
+        _ftIngredientes[i].insumoNome = x.nome;
+        _ftIngredientes[i].custoUnit  = x.custoMedio || 0;
+        _ftIngredientes[i].unidade    = x.unidade || 'un';
+        _ftIngredientes[i].custoTotal = (_ftIngredientes[i].quantidade || 1) * _ftIngredientes[i].custoUnit;
+        insSearch.value = x.nome;
+        insDrop.style.display = 'none';
+        var puEl = document.getElementById('fti-pu-' + i);
+        var totEl = document.getElementById('fti-tot-' + i);
+        var undEl = document.getElementById('fti-und-' + i);
+        if (puEl)  puEl.value  = _ftIngredientes[i].custoUnit.toFixed(4);
+        if (totEl) totEl.value = _ftIngredientes[i].custoTotal.toFixed(2);
+        if (undEl) { for (var j = 0; j < undEl.options.length; j++) { if (undEl.options[j].value === x.unidade) { undEl.selectedIndex = j; break; } } }
         _ftAtualizarResumo();
+        setTimeout(function() { var q = document.getElementById('fti-qtd-' + i); if (q) { q.focus(); q.select(); } }, 50);
+      }
+      insSearch.oninput  = function() { renderDrop(insSearch.value); };
+      insSearch.onfocus  = function() { renderDrop(insSearch.value); };
+      insSearch.onblur   = function() { setTimeout(function(){ insDrop.style.display = 'none'; }, 160); };
+      insSearch.onkeydown = function(e) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); hiIdx = Math.min(hiIdx + 1, filtered.length - 1); upHi(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); hiIdx = Math.max(hiIdx - 1, 0); upHi(); }
+        else if (e.key === 'Tab' || e.key === 'Enter') {
+          if (insDrop.style.display !== 'none' && filtered.length) { e.preventDefault(); pick(filtered[hiIdx >= 0 ? hiIdx : 0]); }
+        } else if (e.key === 'Escape') { insDrop.style.display = 'none'; }
       };
     })(idx);
+    insWrapper.appendChild(insSearch);
+    insWrapper.appendChild(insDrop);
 
     // Quantidade
-    var qtdInp = el('input', { class: 'form-input', type: 'number', placeholder: '1', style: { fontSize: '12px' } });
+    var qtdInp = el('input', { class: 'form-input', type: 'number', placeholder: '1', id: 'fti-qtd-' + idx, style: { fontSize: '12px' } });
     qtdInp.value = String(ingr.quantidade || 1);
     qtdInp.setAttribute('min', '0'); qtdInp.setAttribute('step', 'any');
     (function(i) {
@@ -89,7 +120,7 @@ function _ftRenderIngredientes() {
     })(idx);
 
     // Unidade
-    var undSel = el('select', { class: 'form-input', style: { fontSize: '11px', padding: '4px 3px' } });
+    var undSel = el('select', { class: 'form-input', id: 'fti-und-' + idx, style: { fontSize: '11px', padding: '4px 3px' } });
     _EI_UNIDADES.forEach(function(u) {
       var opt = el('option', { value: u }, u);
       if (u === (ingr.unidade || 'un')) opt.selected = true;
@@ -128,7 +159,7 @@ function _ftRenderIngredientes() {
       };
     })(idx);
 
-    row.appendChild(insSel);
+    row.appendChild(insWrapper);
     row.appendChild(qtdInp);
     row.appendChild(undSel);
     row.appendChild(puInp);

@@ -553,7 +553,8 @@ function renderProdutoModal() {
     emb.salao   =emb.salao   ||{ativo:false,itens:[]};
     emb.delivery.itens=emb.delivery.itens||[];
     emb.salao.itens   =emb.salao.itens   ||[];
-    var insumos=(state.produtos||[]).filter(function(x){return x.tipo==='insumo'&&x.profile===state.profile;});
+    var insumos=(state.estoqueItens||[]).filter(function(x){return x.profile===state.profile;})
+      .concat((state.produtos||[]).filter(function(x){return x.tipo==='insumo'&&x.profile===state.profile;}));
     function refresh(){setState({produtoModal:Object.assign({},p)});}
 
     function buildChannel(ch,label,icon){

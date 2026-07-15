@@ -14,20 +14,36 @@ function _ftSomaCusto() {
 }
 
 function _ftAtualizarResumo() {
-  var rend   = parseFloat((document.getElementById('ft-rendimento') || {}).value) || 1;
-  var custo  = _ftSomaCusto();
-  var porcao = custo / rend;
-  var pv     = parseFloat((document.getElementById('ft-precoVenda') || {}).value) || 0;
-  var mg     = pv ? (pv - porcao) / pv * 100 : null;
-  var mgCor  = mg === null ? 'var(--text3)' : mg >= 40 ? '#00a86b' : mg >= 20 ? 'var(--gold)' : '#e05252';
+  var rend  = parseFloat((document.getElementById('ft-rendimento')  || {}).value) || 1;
+  var custo = _ftSomaCusto();
+  var cp    = custo / rend;
+  var pv    = parseFloat((document.getElementById('ft-precoVenda')  || {}).value) || 0;
+  var das   = parseFloat((document.getElementById('ft-das')         || {}).value) || 0;
+  var tcr   = parseFloat((document.getElementById('ft-credito')     || {}).value) || 0;
+  var tdb   = parseFloat((document.getElementById('ft-debito')      || {}).value) || 0;
 
-  var custoEl   = document.getElementById('ft-custo-total');
-  var porcaoEl  = document.getElementById('ft-custo-porcao');
-  var margemEl  = document.getElementById('ft-margem');
+  var dasRs   = pv * das  / 100;
+  var crRs    = pv * tcr  / 100;
+  var dbRs    = pv * tdb  / 100;
+  var lDin    = pv - dasRs - cp;
+  var lCred   = pv - dasRs - crRs  - cp;
+  var lDeb    = pv - dasRs - dbRs  - cp;
+  var mgDin   = pv ? lDin  / pv * 100 : null;
+  var mgCred  = pv ? lCred / pv * 100 : null;
+  var mgDeb   = pv ? lDeb  / pv * 100 : null;
 
-  if (custoEl)  custoEl.textContent  = fmtMoney(custo);
-  if (porcaoEl) porcaoEl.textContent = fmtMoney(porcao);
-  if (margemEl) { margemEl.textContent = mg !== null ? mg.toFixed(1) + '%' : '—'; margemEl.style.color = mgCor; }
+  function cor(v) { return v === null ? 'var(--text3)' : v >= 40 ? '#00a86b' : v >= 20 ? 'var(--gold)' : '#e05252'; }
+  function set(id, txt, c) { var e = document.getElementById(id); if (e) { e.textContent = txt; if (c) e.style.color = c; } }
+
+  set('ft-custo-total',      fmtMoney(custo));
+  set('ft-custo-porcao',     fmtMoney(cp));
+  set('ft-das-rs',           pv ? '−' + fmtMoney(dasRs) : '—', pv && dasRs ? '#e05252' : 'var(--text3)');
+  set('ft-lucro-dinheiro',   pv ? fmtMoney(lDin)  : '—', pv ? (lDin  >= 0 ? '#00a86b' : '#e05252') : 'var(--text3)');
+  set('ft-lucro-credito',    pv ? fmtMoney(lCred) : '—', pv ? (lCred >= 0 ? '#00a86b' : '#e05252') : 'var(--text3)');
+  set('ft-lucro-debito',     pv ? fmtMoney(lDeb)  : '—', pv ? (lDeb  >= 0 ? '#00a86b' : '#e05252') : 'var(--text3)');
+  set('ft-margem-dinheiro',  mgDin  !== null ? mgDin.toFixed(1)  + '%' : '—', cor(mgDin));
+  set('ft-margem-credito',   mgCred !== null ? mgCred.toFixed(1) + '%' : '—', cor(mgCred));
+  set('ft-margem-debito',    mgDeb  !== null ? mgDeb.toFixed(1)  + '%' : '—', cor(mgDeb));
 }
 
 function _ftRenderIngredientes() {
@@ -220,7 +236,11 @@ function renderFichaTecnicaModal() {
     var custo   = _ftSomaCusto();
     var porcao  = custo / rend;
     var pv      = parseFloat(g('precoVenda')) || 0;
-    var mg      = pv ? (pv - porcao) / pv * 100 : null;
+    var das     = parseFloat(g('das'))     || 0;
+    var tcred   = parseFloat(g('credito')) || 0;
+    var tdeb    = parseFloat(g('debito'))  || 0;
+    var lDin    = pv ? pv - pv * das / 100 - porcao : null;
+    var mg      = pv ? lDin / pv * 100 : null;
 
     var ft = {
       id:            edit.id || uid(),
@@ -233,6 +253,9 @@ function renderFichaTecnicaModal() {
       custoTotal:    custo,
       custoPorcao:   porcao,
       precoVenda:    pv,
+      pctDAS:        das,
+      pctCredito:    tcred,
+      pctDebito:     tdeb,
       margemLucro:   mg,
       obs:           g('obs').trim(),
       criadoEm:      edit.criadoEm || new Date().toISOString(),
@@ -287,18 +310,61 @@ function renderFichaTecnicaModal() {
   pvInp.setAttribute('min', '0'); pvInp.setAttribute('step', '0.01');
   pvInp.oninput = _ftAtualizarResumo;
 
-  var resumoBox = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', padding: '12px', borderRadius: '8px', background: 'var(--bg3)', border: '1px solid var(--border)', marginTop: '8px' } }, [
-    el('div', { style: { textAlign: 'center' } }, [
-      el('div', { style: { fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '4px' } }, 'Custo Total Receita'),
-      el('span', { id: 'ft-custo-total', style: { fontSize: '18px', fontWeight: '800', color: 'var(--text)' } }, '—'),
+  var dasInp = mkInp('das', 'number', '0,00', edit.pctDAS || '');
+  dasInp.setAttribute('min', '0'); dasInp.setAttribute('max', '100'); dasInp.setAttribute('step', '0.1');
+  dasInp.oninput = _ftAtualizarResumo;
+
+  var credInp = mkInp('credito', 'number', '0,00', edit.pctCredito || '');
+  credInp.setAttribute('min', '0'); credInp.setAttribute('max', '100'); credInp.setAttribute('step', '0.1');
+  credInp.oninput = _ftAtualizarResumo;
+
+  var debInp = mkInp('debito', 'number', '0,00', edit.pctDebito || '');
+  debInp.setAttribute('min', '0'); debInp.setAttribute('max', '100'); debInp.setAttribute('step', '0.1');
+  debInp.oninput = _ftAtualizarResumo;
+
+  function _mkResumoCell(label, id, big) {
+    return el('div', { style: { textAlign: 'center', padding: '6px 4px' } }, [
+      el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px', letterSpacing: '.5px' } }, label),
+      el('span', { id: id, style: { fontSize: big ? '16px' : '13px', fontWeight: '800', color: 'var(--text3)' } }, '—'),
+    ]);
+  }
+
+  var resumoBox = el('div', { style: { borderRadius: '8px', background: 'var(--bg3)', border: '1px solid var(--border)', marginTop: '8px', overflow: 'hidden' } }, [
+    // Linha 1: Custo total | Custo/porção | DAS R$
+    el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1px', background: 'var(--border)', borderBottom: '1px solid var(--border)' } }, [
+      el('div', { style: { background: 'var(--bg3)', padding: '8px 4px', textAlign: 'center' } }, [
+        el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, 'Custo Total'),
+        el('span', { id: 'ft-custo-total', style: { fontSize: '15px', fontWeight: '800', color: 'var(--text)' } }, '—'),
+      ]),
+      el('div', { style: { background: 'var(--bg3)', padding: '8px 4px', textAlign: 'center' } }, [
+        el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, 'Custo / Porção'),
+        el('span', { id: 'ft-custo-porcao', style: { fontSize: '15px', fontWeight: '800', color: 'var(--gold)' } }, '—'),
+      ]),
+      el('div', { style: { background: 'var(--bg3)', padding: '8px 4px', textAlign: 'center' } }, [
+        el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, 'DAS (imposto)'),
+        el('span', { id: 'ft-das-rs', style: { fontSize: '15px', fontWeight: '800', color: 'var(--text3)' } }, '—'),
+      ]),
     ]),
-    el('div', { style: { textAlign: 'center' } }, [
-      el('div', { style: { fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '4px' } }, 'Custo / Porção'),
-      el('span', { id: 'ft-custo-porcao', style: { fontSize: '18px', fontWeight: '800', color: 'var(--gold)' } }, '—'),
+    // Linha 2: header das formas de pagamento
+    el('div', { style: { display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr', background: 'var(--bg2)', padding: '6px 8px', alignItems: 'center' } }, [
+      el('span', {}),
+      el('div', { style: { textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text2)' } }, '💵 Dinheiro/PIX'),
+      el('div', { style: { textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text2)' } }, '💳 Crédito'),
+      el('div', { style: { textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text2)' } }, '💳 Débito'),
     ]),
-    el('div', { style: { textAlign: 'center' } }, [
-      el('div', { style: { fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '4px' } }, 'Margem de Lucro'),
-      el('span', { id: 'ft-margem', style: { fontSize: '18px', fontWeight: '800', color: 'var(--text3)' } }, '—'),
+    // Linha 3: Lucro R$
+    el('div', { style: { display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr', background: 'var(--bg3)', padding: '6px 8px', alignItems: 'center', borderTop: '1px solid var(--border)' } }, [
+      el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase' } }, 'Lucro R$'),
+      el('div', { style: { textAlign: 'center', fontSize: '15px', fontWeight: '800' } }, [el('span', { id: 'ft-lucro-dinheiro' }, '—')]),
+      el('div', { style: { textAlign: 'center', fontSize: '15px', fontWeight: '800' } }, [el('span', { id: 'ft-lucro-credito'  }, '—')]),
+      el('div', { style: { textAlign: 'center', fontSize: '15px', fontWeight: '800' } }, [el('span', { id: 'ft-lucro-debito'   }, '—')]),
+    ]),
+    // Linha 4: Margem %
+    el('div', { style: { display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr', background: 'var(--bg3)', padding: '6px 8px', alignItems: 'center', borderTop: '1px solid var(--border)' } }, [
+      el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase' } }, 'Margem'),
+      el('div', { style: { textAlign: 'center', fontSize: '18px', fontWeight: '800' } }, [el('span', { id: 'ft-margem-dinheiro' }, '—')]),
+      el('div', { style: { textAlign: 'center', fontSize: '18px', fontWeight: '800' } }, [el('span', { id: 'ft-margem-credito'  }, '—')]),
+      el('div', { style: { textAlign: 'center', fontSize: '18px', fontWeight: '800' } }, [el('span', { id: 'ft-margem-debito'   }, '—')]),
     ]),
   ]);
 
@@ -358,10 +424,13 @@ function renderFichaTecnicaModal() {
       // Precificação
       el('div', {}, [
         el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '8px' } }, '💰 Precificação'),
-        el('div', { style: { display: 'flex', gap: '8px' } }, [
-          el('div', { style: { flex: '1' } }, [el('label', { class: 'form-label' }, 'Preço de venda (R$) / porção'), pvInp]),
-          el('div', { style: { flex: '1' } }, [el('label', { class: 'form-label' }, 'Observações'), mkInp('obs', 'text', 'Rendimento, alergênicos...', edit.obs || '')]),
+        el('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '8px', marginBottom: '8px' } }, [
+          el('div', {}, [el('label', { class: 'form-label' }, 'Preço de venda (R$) / porção'), pvInp]),
+          el('div', {}, [el('label', { class: 'form-label' }, '% DAS (Simples)'), dasInp]),
+          el('div', {}, [el('label', { class: 'form-label' }, '% Taxa Crédito'), credInp]),
+          el('div', {}, [el('label', { class: 'form-label' }, '% Taxa Débito'), debInp]),
         ]),
+        div('form-group', [el('label', { class: 'form-label' }, 'Observações'), mkInp('obs', 'text', 'Rendimento, alergênicos...', edit.obs || '')]),
       ]),
     ]),
     div('modal-actions', [

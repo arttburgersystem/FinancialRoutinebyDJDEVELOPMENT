@@ -642,88 +642,204 @@ function renderCardapio() {
 
   // ── ABA EMBALAGENS ───────────────────────────────────────────────────────────
   function renderEmbalagemTab() {
+    var embConf = state.embConfig || {};
+    if (!embConf.delivery) embConf.delivery = {itens:[]};
+    if (!embConf.salao)    embConf.salao    = {itens:[]};
+    state.embConfig = embConf;
+
     var prods = todosProd.filter(function(p){
       if(_crdBusca) return (p.nome||'').toLowerCase().includes(_crdBusca.toLowerCase());
       return true;
     });
-    var insumos=(state.produtos||[]).filter(function(x){return x.tipo==='insumo'&&x.profile===perfil;});
+    var todosIns = (state.estoqueItens||[]).filter(function(x){return x.profile===perfil;})
+      .concat((state.produtos||[]).filter(function(x){return x.tipo==='insumo'&&x.profile===perfil;}));
+
+    function saveConf(){ lsSet('embConfig',embConf); scheduleSave(); }
+    function saveProds(lista){ lsSet('produtos',lista); setState({produtos:lista}); scheduleSave(); }
 
     function renderChannelColumn(ch, label, icon, cor) {
-      var prodsConf=prods.filter(function(p){
-        return p.embalagens&&p.embalagens.ativo&&p.embalagens[ch]&&p.embalagens[ch].ativo;
-      });
+      var defaults = embConf[ch];
+      var ativoCount = prods.filter(function(p){
+        return p.embalagens && p.embalagens.ativo && p.embalagens[ch] && p.embalagens[ch].ativo;
+      }).length;
 
-      var cards=prodsConf.map(function(p){
-        var itens=(p.embalagens[ch].itens||[]).filter(function(i){return i.nome||i.estoqueId;});
-        var itemEls=itens.map(function(item){
-          var ins=insumos.find(function(x){return x.id===item.estoqueId;});
-          var nome=ins?ins.nome:(item.nome||'—');
-          var unid=ins?ins.unidade:(item.unidade||'un');
-          var row=el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid var(--border)',fontSize:'12px',color:'var(--text2)'}});
-          row.appendChild(el('span',{},nome));
-          var badge=el('span',{style:{fontWeight:'700',color:cor,background:'rgba(0,0,0,.06)',padding:'2px 8px',borderRadius:'10px',fontSize:'11px'}});
-          badge.textContent='× '+item.qtd+' '+unid;
-          row.appendChild(badge);
-          return row;
-        });
-        if(!itemEls.length){
-          itemEls=[el('div',{style:{fontSize:'11px',color:'var(--text3)',padding:'4px 0'}},'Nenhum insumo configurado.')];
-        }
-        var configBtn=el('button',{style:{fontSize:'11px',padding:'4px 10px',background:'none',border:'1px solid var(--border)',borderRadius:'5px',cursor:'pointer',color:'var(--text3)',marginTop:'8px'}});
-        configBtn.textContent='✏️ Editar produto';
-        configBtn.onclick=function(){setState({produtoModal:Object.assign({},p)});};
+      var col = el('div',{style:{flex:'1',minWidth:'260px'}});
 
-        var card=el('div',{style:{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'8px',padding:'12px',marginBottom:'10px'}});
-        card.appendChild(el('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'8px',color:'var(--text)'}},p.nome));
-        itemEls.forEach(function(r){card.appendChild(r);});
-        card.appendChild(configBtn);
-        return card;
-      });
-
-      // Produtos sem config para este canal
-      var semConf=prods.filter(function(p){
-        return !(p.embalagens&&p.embalagens.ativo&&p.embalagens[ch]&&p.embalagens[ch].ativo);
-      });
-      var semConfRows=semConf.map(function(p){
-        var row=el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'12px',color:'var(--text3)'}});
-        row.appendChild(el('span',{},p.nome));
-        var cfg=el('button',{style:{fontSize:'11px',padding:'3px 8px',background:'none',border:'1px solid var(--border)',borderRadius:'4px',cursor:'pointer',color:'var(--text3)'}});
-        cfg.textContent='+ Configurar';
-        cfg.onclick=function(){setState({produtoModal:Object.assign({},p)});};
-        row.appendChild(cfg);
-        return row;
-      });
-
-      var col=el('div',{style:{flex:'1',minWidth:'0'}});
-      var hdr=el('div',{style:{display:'flex',alignItems:'center',gap:'10px',padding:'14px 16px',background:cor,borderRadius:'8px 8px 0 0'}});
-      hdr.appendChild(el('span',{style:{fontSize:'20px'}},icon));
+      var hdr = el('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'12px 16px',background:cor,borderRadius:'8px 8px 0 0'}});
+      hdr.appendChild(el('span',{style:{fontSize:'18px'}},icon));
       hdr.appendChild(el('span',{style:{fontWeight:'700',fontSize:'14px',color:'#fff'}},label));
-      hdr.appendChild(el('span',{style:{fontSize:'11px',color:'rgba(255,255,255,.8)',marginLeft:'auto'}},(prodsConf.length)+' configurado(s)'));
+      hdr.appendChild(el('span',{style:{fontSize:'11px',color:'rgba(255,255,255,.8)',marginLeft:'auto'}},ativoCount+' ativo(s)'));
+      var padraoBtn = el('button',{style:{fontSize:'11px',padding:'3px 9px',background:'rgba(255,255,255,.2)',border:'1px solid rgba(255,255,255,.5)',borderRadius:'5px',cursor:'pointer',color:'#fff',flexShrink:'0'}});
+      padraoBtn.textContent = defaults.itens.length ? '✏️ Padrão' : '+ Padrão';
+      hdr.appendChild(padraoBtn);
       col.appendChild(hdr);
 
-      var body=el('div',{style:{border:'1px solid var(--border)',borderTop:'none',borderRadius:'0 0 8px 8px',overflow:'hidden'}});
-      if(prodsConf.length>0){
-        var confArea=el('div',{style:{padding:'14px',background:'var(--bg2)'}});
-        cards.forEach(function(c){confArea.appendChild(c);});
-        body.appendChild(confArea);
+      var body = el('div',{style:{border:'1px solid var(--border)',borderTop:'none',borderRadius:'0 0 8px 8px',overflow:'hidden'}});
+
+      // Summary bar — sempre visível, mostra embalagem padrão atual
+      var defSummary = el('div',{style:{padding:'8px 14px',background:'var(--bg3)',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--text3)'}});
+      function refreshSummary(){
+        while(defSummary.firstChild) defSummary.removeChild(defSummary.firstChild);
+        if(!defaults.itens.length){
+          defSummary.appendChild(document.createTextNode('📦 Padrão: não configurado — clique em "+ Padrão"'));
+        } else {
+          var txt=defaults.itens.map(function(i){
+            var ins=todosIns.find(function(x){return x.id===i.estoqueId;});
+            return (ins?ins.nome:(i.nome||'?'))+' ×'+i.qtd;
+          }).join(' + ');
+          defSummary.appendChild(document.createTextNode('📦 Padrão: '+txt));
+        }
       }
-      if(semConf.length>0){
-        var semHdr=el('div',{style:{padding:'8px 10px',fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'.5px',color:'var(--text3)',background:'var(--bg3)',borderTop:prodsConf.length?'1px solid var(--border)':'none'}});
-        semHdr.textContent='Sem embalagem '+(label)+' configurada';
-        body.appendChild(semHdr);
-        semConfRows.forEach(function(r){body.appendChild(r);});
+      refreshSummary();
+      body.appendChild(defSummary);
+
+      // Painel expansível para editar a embalagem padrão do canal
+      var defPanel = el('div',{style:{display:'none',padding:'12px 14px',background:'var(--bg3)',borderBottom:'2px solid '+cor}});
+
+      function renderEditorRows(){
+        while(defPanel.firstChild) defPanel.removeChild(defPanel.firstChild);
+        var title=el('div',{style:{fontSize:'11px',fontWeight:'700',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:'8px'}});
+        title.textContent='📦 Embalagem padrão — '+label;
+        defPanel.appendChild(title);
+
+        defaults.itens.forEach(function(item,i){
+          !function(item,idx){
+            var wrapper=el('div',{style:{position:'relative',flex:'1'}});
+            var srch=el('input',{type:'text',autocomplete:'off',placeholder:'Buscar insumo...',
+              style:{width:'100%',boxSizing:'border-box',padding:'5px 8px',fontSize:'12px',
+                border:'1px solid var(--border)',borderRadius:'5px',background:'var(--bg)',color:'var(--text)'}});
+            var ins=todosIns.find(function(x){return x.id===item.estoqueId;});
+            srch.value=ins?ins.nome:(item.nome||'');
+            var drop=el('div',{style:{display:'none',position:'absolute',top:'100%',left:'0',right:'0',
+              background:'var(--bg)',border:'1px solid var(--border)',borderRadius:'6px',
+              zIndex:'9999',maxHeight:'150px',overflowY:'auto',boxShadow:'0 4px 12px rgba(0,0,0,.25)'}});
+            var hiIdx=-1,filtered=[];
+            function renderDrop(q){
+              while(drop.firstChild) drop.removeChild(drop.firstChild);
+              q=(q||'').toLowerCase();
+              filtered=q?todosIns.filter(function(x){return x.nome.toLowerCase().indexOf(q)>=0;}):todosIns.slice(0,30);
+              hiIdx=-1;
+              if(!filtered.length){drop.style.display='none';return;}
+              filtered.forEach(function(x,fi){
+                var itm=el('div',{style:{padding:'6px 10px',cursor:'pointer',fontSize:'12px',borderBottom:'1px solid var(--border)'}});
+                itm.textContent=x.nome+' ('+(x.unidade||'un')+')';
+                itm.onmouseenter=function(){hiIdx=fi;upHi();};
+                itm.onmousedown=function(e){e.preventDefault();pick(x);};
+                drop.appendChild(itm);
+              });
+              drop.style.display='block';
+            }
+            function upHi(){var k=drop.children;for(var j=0;j<k.length;j++){k[j].style.background=j===hiIdx?'var(--primary)':'';k[j].style.color=j===hiIdx?'#fff':'';}}
+            function pick(x){item.estoqueId=x.id;item.nome=x.nome;item.unidade=x.unidade||'un';srch.value=x.nome;drop.style.display='none';saveConf();refreshSummary();}
+            srch.oninput=function(){renderDrop(srch.value);};
+            srch.onfocus=function(){renderDrop(srch.value);};
+            srch.onblur=function(){setTimeout(function(){drop.style.display='none';},160);};
+            srch.onkeydown=function(e){
+              if(e.key==='ArrowDown'){e.preventDefault();hiIdx=Math.min(hiIdx+1,filtered.length-1);upHi();}
+              else if(e.key==='ArrowUp'){e.preventDefault();hiIdx=Math.max(hiIdx-1,0);upHi();}
+              else if((e.key==='Tab'||e.key==='Enter')&&drop.style.display!=='none'&&filtered.length){e.preventDefault();pick(filtered[hiIdx>=0?hiIdx:0]);}
+              else if(e.key==='Escape'){drop.style.display='none';}
+            };
+            wrapper.appendChild(srch);wrapper.appendChild(drop);
+
+            var qtdInp=el('input',{type:'number',placeholder:'Qtd',
+              style:{width:'64px',padding:'5px 6px',fontSize:'12px',border:'1px solid var(--border)',borderRadius:'5px',background:'var(--bg)',color:'var(--text)'}});
+            qtdInp.value=String(item.qtd||1);
+            qtdInp.setAttribute('min','0.001');qtdInp.setAttribute('step','0.001');
+            qtdInp.oninput=function(){item.qtd=parseFloat(qtdInp.value)||1;saveConf();};
+
+            var rmBtn=el('button',{},'×');
+            rmBtn.style.cssText='background:none;border:1px solid var(--border);border-radius:4px;color:#e05252;cursor:pointer;font-size:16px;padding:1px 5px;width:28px;flex-shrink:0;line-height:1;';
+            rmBtn.onclick=function(){defaults.itens.splice(idx,1);saveConf();refreshSummary();renderEditorRows();};
+
+            var row=el('div',{style:{display:'flex',gap:'4px',alignItems:'center',marginBottom:'6px'}});
+            row.appendChild(wrapper);row.appendChild(qtdInp);row.appendChild(rmBtn);
+            defPanel.appendChild(row);
+          }(item,i);
+        });
+
+        var addBtn=el('button',{style:{background:'none',border:'1px dashed var(--primary)',color:'var(--primary)',
+          borderRadius:'6px',cursor:'pointer',padding:'5px 10px',fontSize:'11px',width:'100%',marginTop:'2px'}});
+        addBtn.textContent='+ Adicionar item à embalagem padrão';
+        addBtn.onclick=function(){defaults.itens.push({estoqueId:'',nome:'',qtd:1,unidade:'un'});saveConf();renderEditorRows();};
+        defPanel.appendChild(addBtn);
       }
-      if(!prodsConf.length&&!semConf.length){
-        body.appendChild(el('div',{style:{padding:'40px',textAlign:'center',color:'var(--text3)',fontSize:'13px'}},'Nenhum produto. Use a busca acima ou cadastre produtos.'));
+
+      padraoBtn.onclick=function(){
+        var open=defPanel.style.display!=='none';
+        defPanel.style.display=open?'none':'block';
+        padraoBtn.textContent=open?(defaults.itens.length?'✏️ Padrão':'+ Padrão'):'✕ Fechar';
+        if(!open) renderEditorRows();
+      };
+      body.appendChild(defPanel);
+
+      // Lista de produtos com toggle por produto
+      if(!prods.length){
+        body.appendChild(el('div',{style:{padding:'40px',textAlign:'center',color:'var(--text3)',fontSize:'13px'}},'Nenhum produto cadastrado.'));
+      } else {
+        prods.forEach(function(p){
+          if(!p.embalagens) p.embalagens={ativo:false,delivery:{ativo:false,itens:[]},salao:{ativo:false,itens:[]}};
+          if(!p.embalagens[ch]) p.embalagens[ch]={ativo:false,itens:[]};
+          var chData=p.embalagens[ch];
+          var isAtivo=!!(p.embalagens.ativo&&chData.ativo);
+
+          var row=el('div',{style:{display:'flex',alignItems:'center',gap:'10px',padding:'8px 14px',
+            borderBottom:'1px solid var(--border)',background:isAtivo?'rgba(34,197,94,.05)':''}});
+
+          var tog=el('div',{style:{display:'inline-flex',alignItems:'center',width:'36px',height:'20px',
+            borderRadius:'10px',background:isAtivo?'#22c55e':'var(--border)',
+            padding:'2px',cursor:'pointer',transition:'background .2s',flexShrink:'0'}});
+          tog.appendChild(el('div',{style:{width:'16px',height:'16px',borderRadius:'50%',
+            background:'#fff',boxShadow:'0 1px 3px rgba(0,0,0,.3)',transition:'transform .2s',
+            transform:'translateX('+(isAtivo?'16px':'0px')+')'}}));
+          (function(prod,channel,chd){
+            tog.onclick=function(){
+              var nowAtivo=!!(prod.embalagens.ativo&&chd.ativo);
+              prod.embalagens.ativo=true;
+              chd.ativo=!nowAtivo;
+              // Ao ativar sem itens customizados, copia o padrão do canal
+              if(!nowAtivo&&(!chd.itens||!chd.itens.length)&&embConf[channel].itens.length){
+                chd.itens=embConf[channel].itens.map(function(x){return Object.assign({},x);});
+              }
+              var lista=state.produtos.map(function(x){return x.id===prod.id?prod:x;});
+              saveProds(lista);
+            };
+          })(p,ch,chData);
+          row.appendChild(tog);
+
+          row.appendChild(el('div',{style:{flex:'1',fontSize:'13px',fontWeight:isAtivo?'600':'400',
+            color:isAtivo?'var(--text)':'var(--text3)'}},p.nome));
+
+          if(isAtivo){
+            var itensAtivos=(chData.itens&&chData.itens.length)?chData.itens:defaults.itens;
+            var badgeText=itensAtivos.map(function(i){
+              var ins=todosIns.find(function(x){return x.id===i.estoqueId;});
+              return (ins?ins.nome:(i.nome||'?'))+' ×'+i.qtd;
+            }).join(' + ');
+            if(badgeText) row.appendChild(el('span',{style:{fontSize:'10px',color:cor,
+              background:'rgba(0,0,0,.06)',padding:'2px 8px',borderRadius:'10px',
+              maxWidth:'130px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flexShrink:'0'}},badgeText));
+          }
+
+          var editBtn=el('button',{style:{fontSize:'11px',padding:'2px 7px',background:'none',
+            border:'1px solid var(--border)',borderRadius:'4px',cursor:'pointer',color:'var(--text3)',flexShrink:'0'}});
+          editBtn.title='Personalizar embalagem deste produto';
+          editBtn.textContent='✏️';
+          editBtn.onclick=function(){setState({produtoModal:Object.assign({},p)});};
+          row.appendChild(editBtn);
+
+          body.appendChild(row);
+        });
       }
+
       col.appendChild(body);
       return col;
     }
 
     var infoBar=el('div',{style:{padding:'10px 16px',borderBottom:'1px solid var(--border)',background:'var(--bg3)',fontSize:'12px',color:'var(--text3)'}});
-    infoBar.textContent='Configure quais insumos de embalagem são baixados automaticamente do estoque ao registrar uma venda. Edite cada produto para ativar.';
+    infoBar.textContent='Configure a embalagem padrão de cada canal (+ Padrão) e ative por produto com o toggle. Use ✏️ para personalizar individualmente.';
 
-    var cols=el('div',{style:{display:'flex',gap:'16px',padding:'16px'}});
+    var cols=el('div',{style:{display:'flex',gap:'16px',padding:'16px',flexWrap:'wrap'}});
     cols.appendChild(renderChannelColumn('delivery','DELIVERY','🛵','#ea580c'));
     cols.appendChild(renderChannelColumn('salao','SALÃO','🍽️','#0284c7'));
 

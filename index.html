@@ -461,6 +461,7 @@ var state={
   estoqueItens: lsGet('estoqueItens',[]),
   estoqueMovs: lsGet('estoqueMovs',[]),
   fichaTecnicas: lsGet('fichaTecnicas',[]),
+  embConfig: lsGet('embConfig',{delivery:{itens:[]},salao:{itens:[]}}),
   estoqueItemModal: null,
   estoqueMovModal: null,
   fichaTecnicaModal: null,
@@ -843,6 +844,7 @@ function scheduleSave(){
       fbPut('/fechamentosCaixa',arrToObj(state.fechamentosCaixa||[])),
       fbPut('/caixaVals',state.caixaVals||{}),
       fbPut('/patrimonios',arrToObj(state.patrimonios||[])),
+      fbPut('/embConfig',state.embConfig||{}),
     ]).then(function(){_updateSyncDOM('ok');})
       .catch(function(e){console.error(e);_updateSyncDOM('error');showToast('Erro ao salvar no Firebase','error');});
   },1500);

@@ -207,6 +207,8 @@ function renderFichaTecnicaModal() {
       criadoEm:      edit.criadoEm || new Date().toISOString(),
     };
 
+    ft.produtoId = g('produtoId') || edit.produtoId || '';
+
     var lista = state.fichaTecnicas || [];
     if (isEdit) {
       lista = lista.map(function(x) { return x.id === ft.id ? ft : x; });
@@ -279,9 +281,34 @@ function renderFichaTecnicaModal() {
       // Identificação
       el('div', { style: { borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '12px' } }, [
         el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '8px' } }, '📋 Identificação'),
+        (function() {
+          var pf = state.profile;
+          var prods = (state.produtos || []).filter(function(p) { return p.profile === pf && p.ativo !== false && p.tipo !== 'insumo'; });
+          var prodSel = el('select', { class: 'form-input', id: 'ft-produtoId' });
+          [{ v: '', l: '— Vincular produto do Cardápio (opcional) —' }].concat(
+            prods.map(function(p) { return { v: p.id, l: p.nome + (p.categoria ? ' · ' + p.categoria : '') }; })
+          ).forEach(function(o) {
+            var opt = el('option', { value: o.v }, o.l);
+            if (o.v === (edit.produtoId || '')) opt.selected = true;
+            prodSel.appendChild(opt);
+          });
+          prodSel.onchange = function() {
+            var pid = prodSel.value;
+            var prod = prods.filter(function(p) { return p.id === pid; })[0];
+            if (!prod) return;
+            var nomeEl = document.getElementById('ft-nome');
+            var catEl  = document.getElementById('ft-categoria');
+            var pvEl   = document.getElementById('ft-precoVenda');
+            if (nomeEl) nomeEl.value = prod.nome;
+            if (catEl) { for (var i = 0; i < catEl.options.length; i++) { if (catEl.options[i].value === (prod.categoria || '')) { catEl.selectedIndex = i; break; } } }
+            if (pvEl)  pvEl.value = prod.precoVenda || prod.preco || '';
+            _ftAtualizarResumo();
+          };
+          return div('form-group', [el('label', { class: 'form-label' }, 'Produto do Cardápio'), prodSel]);
+        })(),
         div('form-group', [el('label', { class: 'form-label' }, 'Nome da receita / prato *'), mkInp('nome', 'text', 'Ex: Hambúrguer Artesanal 180g', edit.nome || '')]),
         el('div', { style: { display: 'flex', gap: '8px' } }, [
-          el('div', { style: { flex: '2' } }, [el('label', { class: 'form-label' }, 'Categoria'), mkSel('categoria', ['— Categoria —'].concat(_EI_CATS), edit.categoria || '')]),
+          el('div', { style: { flex: '2' } }, [el('label', { class: 'form-label' }, 'Categoria'), mkSel('categoria', ['— Categoria —'].concat((state.estCategorias || []).map(function(c){ return typeof c === 'string' ? c : (c && c.nome ? c.nome : ''); }).filter(Boolean)), edit.categoria || '')]),
           el('div', { style: { flex: '1' } }, [el('label', { class: 'form-label' }, 'Rendimento'), rendInp]),
           el('div', { style: { flex: '1' } }, [el('label', { class: 'form-label' }, 'Unidade'), mkSel('unidadeRend', ['porção','un','kg','g','L','mL'], edit.unidadeRend || 'porção')]),
         ]),

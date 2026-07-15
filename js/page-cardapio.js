@@ -18,7 +18,10 @@ function _syncCategoriasProdutos() {
   var comps  = (state.complementos|| []).filter(function(c){ return c.profile === perfil; });
   var cats   = (state.estCategorias || []);
   var existentes = {};
-  cats.forEach(function(c){ existentes[c.nome.toLowerCase()] = true; });
+  cats.forEach(function(c){
+    var nm = typeof c === 'string' ? c : (c && c.nome ? c.nome : '');
+    if(nm) existentes[nm.toLowerCase()] = true;
+  });
 
   var novas = [];
   var vistas = {};
@@ -376,7 +379,7 @@ function renderCardapio() {
       var nome=((nomeInpCat&&nomeInpCat.value)||cm.nome||'').trim();
       cm.nome=nome;
       if(!nome){_fldErr(nomeInpCat,'Nome da categoria é obrigatório');showToast('Preencha os campos em vermelho','error');return;}
-      var arr=state.estCategorias||[];
+      var arr=(state.estCategorias||[]).filter(function(c){return typeof c!=='string'&&c&&c.nome;});
       var dup=arr.find(function(c){return c.nome.toLowerCase()===nome.toLowerCase()&&c.id!==cm.id;});
       if(dup){showToast('Já existe uma categoria com este nome','error');return;}
       var item={id:isEditCat?cm.id:('cat_'+Date.now()),nome:nome,imagem:cm.imagem||''};
@@ -729,6 +732,16 @@ function renderCardapio() {
 
   // ── ABA CATEGORIAS ────────────────────────────────────────────────────────────
   function renderCategoriasTab() {
+    // Migração: converte strings legadas para objetos {id,nome,imagem}
+    var _rawCats = state.estCategorias || [];
+    if (_rawCats.some(function(c){ return typeof c === 'string'; })) {
+      var _migrated = _rawCats.map(function(c, i){
+        return typeof c === 'string' ? {id:'cat_mig_'+Date.now()+'_'+i, nome:c, imagem:''} : c;
+      }).filter(function(c){ return c && c.nome; });
+      state.estCategorias = _migrated;
+      lsSet('estCategorias', _migrated);
+      scheduleSave();
+    }
     var catsData = state.estCategorias || [];
     var todosProdAll = (state.produtos||[]).filter(function(p){return p.profile===perfil;});
     var todosCompAll = (state.complementos||[]).filter(function(c){return c.profile===perfil;});

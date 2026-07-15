@@ -208,8 +208,13 @@ function renderEstoqueItemModal() {
               opt2.selected = true;
               catSel.appendChild(opt2);
               var cats = (state.estCategorias || []);
-              if (cats.indexOf(nome) === -1) {
-                cats = cats.concat([nome]);
+              var exists = cats.some(function(c){
+                var nm = typeof c === 'string' ? c : (c && c.nome ? c.nome : '');
+                return nm.toLowerCase() === nome.toLowerCase();
+              });
+              if (!exists) {
+                var novaCatEI = {id:'cat_'+Date.now(), nome:nome, imagem:''};
+                cats = cats.concat([novaCatEI]);
                 state.estCategorias = cats;
                 lsSet('estCategorias', cats);
                 scheduleSave();

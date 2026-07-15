@@ -400,7 +400,7 @@ function renderProdutoModal() {
     var nome=(novaCatInp.value||'').trim();
     if(!nome){novaCatInp.style.borderColor='var(--red)';return;}
     novaCatInp.style.borderColor='';
-    var arr=state.estCategorias||[];
+    var arr=(state.estCategorias||[]).filter(function(c){return typeof c!=='string'&&c&&c.nome;});
     if(arr.find(function(c){return c.nome.toLowerCase()===nome.toLowerCase();})){showToast('Categoria já existe','error');return;}
     var nova={id:'cat_'+Date.now(),nome:nome};
     var novas=arr.concat([nova]);

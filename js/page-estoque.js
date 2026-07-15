@@ -431,7 +431,12 @@ function renderProdutoModal() {
   var vendaInp = el('input',{class:'form-input',type:'number',min:'0',step:'0.01',value:p.precoVenda||'',placeholder:'0,00',oninput:function(){p.precoVenda=parseFloat(this.value)||0;}});
   var estAInp  = el('input',{class:'form-input',type:'number',min:'0',step:'0.001',value:p.estoqueAtual||'',placeholder:'0',oninput:function(){p.estoqueAtual=parseFloat(this.value)||0;}});
   var estMInp  = el('input',{class:'form-input',type:'number',min:'0',step:'0.001',value:p.estoqueMinimo||'',placeholder:'0',oninput:function(){p.estoqueMinimo=parseFloat(this.value)||0;}});
-  var fornCombo = buildFornecedorCombo(state.fornecedores||[], p.fornecedor_id||'', function(id){p.fornecedor_id=id;});
+  var _fornsModal=(state.fornecedores||[]).filter(function(f){return f.profile===state.profile;});
+  var fornSel=el('select',{class:'form-input',onchange:function(){p.fornecedor_id=this.value;}},
+    [{id:'',nome:'— Nenhum —'}].concat(_fornsModal).map(function(f){
+      return el('option',{value:f.id,selected:(p.fornecedor_id||'')===f.id},f.nome);
+    })
+  );
   var obsInp    = el('input',{class:'form-input',value:p.obs||'',placeholder:'Observações...',oninput:function(){p.obs=this.value;}});
 
   // SKU com botão auto-gerar
@@ -634,7 +639,7 @@ function renderProdutoModal() {
   }
 
   // ── LAYOUT ────────────────────────────────────────────────────────────────
-  return el('div',{class:'modal-overlay',onclick:function(e){if(e.target===this)setState({produtoModal:null});}},
+  return el('div',{class:'modal-overlay'},
     el('div',{class:'modal',style:{maxWidth:'600px',maxHeight:'90vh',overflowY:'auto'}},[
       el('div',{class:'modal-header'},[
         el('h3',{class:'modal-title'},(isEdit?'✏️ Editar':'➕ Novo')+' Produto / Insumo'),
@@ -689,7 +694,7 @@ function renderProdutoModal() {
           fld('Estoque máximo',estMaxInp),
           el('div',{style:{gridColumn:'1/-1'}},ctrlVencEl),
           p.controleVencimento ? el('div',{style:{gridColumn:'1/-1'}},fld('Aviso de vencimento (dias antes)',diasAvisoInp)) : null,
-          el('div',{style:{gridColumn:'1/-1'}},fld('Fornecedor principal',fornCombo)),
+          el('div',{style:{gridColumn:'1/-1'}},fld('Fornecedor principal',fornSel)),
         ].filter(Boolean)),
 
         // CARDÁPIO (só produto)
@@ -916,7 +921,7 @@ function renderMovModal() {
     }
   }
 
-  return el('div',{class:'modal-overlay',onclick:function(e){if(e.target===this)setState({movModal:null});}},
+  return el('div',{class:'modal-overlay'},
     el('div',{class:'modal',style:{maxWidth:'500px'}},[
       el('div',{class:'modal-header'},[
         el('h3',{class:'modal-title'},'📦 Nova Movimentação de Estoque'),
@@ -1711,7 +1716,7 @@ function renderNFModal() {
     scheduleSave();
   }
 
-  var modalEl = el('div',{class:'modal-overlay',onclick:function(e){if(e.target===this)setState({nfModal:null});}},[
+  var modalEl = el('div',{class:'modal-overlay'},[
     el('div',{class:'modal-box',style:{maxWidth:'820px',width:'96vw',maxHeight:'92vh',overflow:'auto'}},[
 
       // Cabeçalho

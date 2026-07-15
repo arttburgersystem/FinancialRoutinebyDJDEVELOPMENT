@@ -284,7 +284,6 @@ function renderEstoqueMovModal() {
   modal.style.maxWidth = '560px';
 
   var ov = div('modal-overlay', [modal]);
-  ov.onclick = function(e) { if (e.target === ov) setState({ estoqueMovModal: null }); };
   setTimeout(atualizarPreview, 0);
   return ov;
 }

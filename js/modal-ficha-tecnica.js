@@ -315,7 +315,6 @@ function renderFichaTecnicaModal() {
   modal.style.maxWidth = '680px';
 
   var ov = div('modal-overlay', [modal]);
-  ov.onclick = function(e) { if (e.target === ov) setState({ fichaTecnicaModal: null }); };
   setTimeout(function() { _ftRenderIngredientes(); }, 0);
   return ov;
 }

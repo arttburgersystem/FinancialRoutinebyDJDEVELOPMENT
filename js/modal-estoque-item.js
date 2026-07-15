@@ -115,7 +115,9 @@ function renderEstoqueItemModal() {
 
     lsSet('estoqueItens', lista);
     lsSet('estoqueMovs', movs);
-    setState({ estoqueItens: lista, estoqueMovs: movs, estoqueItemModal: null });
+    var patch = { estoqueItens: lista, estoqueMovs: movs, estoqueItemModal: null };
+    if (!isEdit) { patch.estoqueCat = ''; patch.estoqueFiltro = 'todos'; patch.estoqueBusca = ''; }
+    setState(patch);
     scheduleSave();
     showToast(isEdit ? 'Produto atualizado!' : 'Produto cadastrado!');
   }
@@ -266,7 +268,6 @@ function renderEstoqueItemModal() {
   modal.style.maxWidth = '560px';
 
   var ov = div('modal-overlay', [modal]);
-  ov.onclick = function(e) { if (e.target === ov) setState({ estoqueItemModal: null }); };
   setTimeout(atualizarMargem, 0);
   return ov;
 }

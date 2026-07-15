@@ -303,10 +303,10 @@ function _renderEiMovs(movs, itens) {
 
 function _renderEiFichas(fichas) {
   var wrap = el('div', { class: 'card', style: { padding: '0', overflow: 'hidden' } });
-  var cols = '2fr 110px 100px 110px 110px 80px 80px';
+  var cols = '2fr 100px 90px 110px 110px 70px 70px 80px';
   var hdr = el('div', { style: { display: 'grid', gridTemplateColumns: cols, gap: '6px', padding: '8px 14px', background: 'var(--bg2)', borderBottom: '2px solid var(--border)' } });
-  ['Nome / Categoria', 'Rendimento', 'Ingredientes', 'Custo/Porção', 'Preço Venda', 'Margem', 'Ações'].forEach(function(h, i) {
-    hdr.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', textAlign: i >= 3 ? 'right' : i === 6 ? 'center' : 'left' } }, h));
+  ['Nome / Categoria', 'Rendimento', 'Ingredientes', 'Custo/Porção', 'Preço Venda', 'CMV%', 'Margem', 'Ações'].forEach(function(h, i) {
+    hdr.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', textAlign: i >= 3 ? 'right' : i === 7 ? 'center' : 'left' } }, h));
   });
   wrap.appendChild(hdr);
 
@@ -320,8 +320,14 @@ function _renderEiFichas(fichas) {
   }
 
   fichas.forEach(function(ft) {
-    var mg    = ft.precoVenda && ft.custoPorcao ? (ft.precoVenda - ft.custoPorcao) / ft.precoVenda * 100 : null;
-    var mgCor = mg === null ? 'var(--text3)' : mg >= 40 ? '#00a86b' : mg >= 20 ? 'var(--gold)' : '#e05252';
+    var pv    = ft.precoVenda || 0;
+    var cp    = ft.custoPorcao || 0;
+    var das   = ft.pctDAS || 0;
+    var lDin  = pv ? pv - pv * das / 100 - cp : null;
+    var mg    = pv && lDin !== null ? lDin / pv * 100 : null;
+    var cmv   = pv && cp ? cp / pv * 100 : null;
+    var mgCor  = mg  === null ? 'var(--text3)' : mg  >= 40 ? '#00a86b' : mg  >= 20 ? 'var(--gold)' : '#e05252';
+    var cmvCor = cmv === null ? 'var(--text3)' : cmv <= 30 ? '#00a86b' : cmv <= 40 ? 'var(--gold)' : '#e05252';
     var nIngr = ft.ingredientes ? ft.ingredientes.length : 0;
 
     var row = el('div', { style: {
@@ -338,9 +344,10 @@ function _renderEiFichas(fichas) {
 
     row.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text3)', textAlign: 'right' } }, (ft.rendimento || 1) + ' ' + (ft.unidadeRend || 'porção')));
     row.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text3)', textAlign: 'right' } }, nIngr + ' ingrediente(s)'));
-    row.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--gold)', textAlign: 'right' } }, ft.custoPorcao ? fmtMoney(ft.custoPorcao) : '—'));
-    row.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', textAlign: 'right' } }, ft.precoVenda ? fmtMoney(ft.precoVenda) : '—'));
-    row.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: mgCor, textAlign: 'right' } }, mg !== null ? mg.toFixed(1) + '%' : '—'));
+    row.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--gold)', textAlign: 'right' } }, cp ? fmtMoney(cp) : '—'));
+    row.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', textAlign: 'right' } }, pv ? fmtMoney(pv) : '—'));
+    row.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700', color: cmvCor, textAlign: 'right' } }, cmv !== null ? cmv.toFixed(1) + '%' : '—'));
+    row.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: mgCor, textAlign: 'right' } }, mg !== null ? mg.toFixed(1) + '%' : (das ? '—' : (pv && cp ? ((pv-cp)/pv*100).toFixed(1)+'%' : '—'))));
 
     var actCol = el('div', { style: { display: 'flex', gap: '4px', justifyContent: 'center' } });
     var fCopy = ft;

@@ -31,13 +31,27 @@ function _ftAtualizarResumo() {
   var mgDin   = pv ? lDin  / pv * 100 : null;
   var mgCred  = pv ? lCred / pv * 100 : null;
   var mgDeb   = pv ? lDeb  / pv * 100 : null;
+  var cmv     = pv && cp ? cp / pv * 100 : null;
+
+  // Preço mínimo (break-even por forma de pagamento)
+  var denDin  = 1 - das / 100;
+  var denCred = 1 - das / 100 - tcr / 100;
+  var denDeb  = 1 - das / 100 - tdb / 100;
+  var pmDin   = cp && denDin  > 0 ? cp / denDin  : null;
+  var pmCred  = cp && denCred > 0 ? cp / denCred : null;
+  var pmDeb   = cp && denDeb  > 0 ? cp / denDeb  : null;
 
   function cor(v) { return v === null ? 'var(--text3)' : v >= 40 ? '#00a86b' : v >= 20 ? 'var(--gold)' : '#e05252'; }
-  function set(id, txt, c) { var e = document.getElementById(id); if (e) { e.textContent = txt; if (c) e.style.color = c; } }
+  function corCmv(v) { return v === null ? 'var(--text3)' : v <= 30 ? '#00a86b' : v <= 40 ? 'var(--gold)' : '#e05252'; }
+  function set(id, txt, c) { var e = document.getElementById(id); if (e) { e.textContent = txt; if (c !== undefined) e.style.color = c; } }
 
   set('ft-custo-total',      fmtMoney(custo));
   set('ft-custo-porcao',     fmtMoney(cp));
   set('ft-das-rs',           pv ? '−' + fmtMoney(dasRs) : '—', pv && dasRs ? '#e05252' : 'var(--text3)');
+  set('ft-cmv',              cmv !== null ? cmv.toFixed(1) + '%' : '—', corCmv(cmv));
+  set('ft-pmin-dinheiro',    pmDin  ? fmtMoney(pmDin)  : '—', 'var(--text2)');
+  set('ft-pmin-credito',     pmCred ? fmtMoney(pmCred) : '—', 'var(--text2)');
+  set('ft-pmin-debito',      pmDeb  ? fmtMoney(pmDeb)  : '—', 'var(--text2)');
   set('ft-lucro-dinheiro',   pv ? fmtMoney(lDin)  : '—', pv ? (lDin  >= 0 ? '#00a86b' : '#e05252') : 'var(--text3)');
   set('ft-lucro-credito',    pv ? fmtMoney(lCred) : '—', pv ? (lCred >= 0 ? '#00a86b' : '#e05252') : 'var(--text3)');
   set('ft-lucro-debito',     pv ? fmtMoney(lDeb)  : '—', pv ? (lDeb  >= 0 ? '#00a86b' : '#e05252') : 'var(--text3)');
@@ -329,43 +343,44 @@ function renderFichaTecnicaModal() {
     ]);
   }
 
+  function _rsCell(lbl, id, color) {
+    return el('div', { style: { background: 'var(--bg3)', padding: '8px 4px', textAlign: 'center' } }, [
+      el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px', letterSpacing: '.4px' } }, lbl),
+      el('span', { id: id, style: { fontSize: '15px', fontWeight: '800', color: color || 'var(--text3)' } }, '—'),
+    ]);
+  }
+  function _pgRow(lbl, idSuf, big) {
+    var fs = big ? '18px' : '14px';
+    return el('div', { style: { display: 'grid', gridTemplateColumns: '90px 1fr 1fr 1fr', background: 'var(--bg3)', padding: '6px 8px', alignItems: 'center', borderTop: '1px solid var(--border)' } }, [
+      el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase', lineHeight: '1.2' } }, lbl),
+      el('div', { style: { textAlign: 'center', fontSize: fs, fontWeight: '800' } }, [el('span', { id: 'ft-' + idSuf + '-dinheiro' }, '—')]),
+      el('div', { style: { textAlign: 'center', fontSize: fs, fontWeight: '800' } }, [el('span', { id: 'ft-' + idSuf + '-credito'  }, '—')]),
+      el('div', { style: { textAlign: 'center', fontSize: fs, fontWeight: '800' } }, [el('span', { id: 'ft-' + idSuf + '-debito'   }, '—')]),
+    ]);
+  }
+
   var resumoBox = el('div', { style: { borderRadius: '8px', background: 'var(--bg3)', border: '1px solid var(--border)', marginTop: '8px', overflow: 'hidden' } }, [
-    // Linha 1: Custo total | Custo/porção | DAS R$
-    el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1px', background: 'var(--border)', borderBottom: '1px solid var(--border)' } }, [
+    // Linha 1: Custo total | Custo/porção | DAS R$ | CMV%
+    el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1px', background: 'var(--border)', borderBottom: '1px solid var(--border)' } }, [
+      _rsCell('Custo Total',    'ft-custo-total',  'var(--text)'),
+      _rsCell('Custo / Porção', 'ft-custo-porcao', 'var(--gold)'),
+      _rsCell('DAS (imposto)',  'ft-das-rs',        'var(--text3)'),
       el('div', { style: { background: 'var(--bg3)', padding: '8px 4px', textAlign: 'center' } }, [
-        el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, 'Custo Total'),
-        el('span', { id: 'ft-custo-total', style: { fontSize: '15px', fontWeight: '800', color: 'var(--text)' } }, '—'),
-      ]),
-      el('div', { style: { background: 'var(--bg3)', padding: '8px 4px', textAlign: 'center' } }, [
-        el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, 'Custo / Porção'),
-        el('span', { id: 'ft-custo-porcao', style: { fontSize: '15px', fontWeight: '800', color: 'var(--gold)' } }, '—'),
-      ]),
-      el('div', { style: { background: 'var(--bg3)', padding: '8px 4px', textAlign: 'center' } }, [
-        el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, 'DAS (imposto)'),
-        el('span', { id: 'ft-das-rs', style: { fontSize: '15px', fontWeight: '800', color: 'var(--text3)' } }, '—'),
+        el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, 'CMV%'),
+        el('div', { style: { fontSize: '8px', color: 'var(--text3)', marginBottom: '2px' } }, '(custo/preço)'),
+        el('span', { id: 'ft-cmv', style: { fontSize: '15px', fontWeight: '800', color: 'var(--text3)' } }, '—'),
       ]),
     ]),
-    // Linha 2: header das formas de pagamento
-    el('div', { style: { display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr', background: 'var(--bg2)', padding: '6px 8px', alignItems: 'center' } }, [
+    // Header pagamentos
+    el('div', { style: { display: 'grid', gridTemplateColumns: '90px 1fr 1fr 1fr', background: 'var(--bg2)', padding: '6px 8px', alignItems: 'center', borderBottom: '1px solid var(--border)' } }, [
       el('span', {}),
       el('div', { style: { textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text2)' } }, '💵 Dinheiro/PIX'),
       el('div', { style: { textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text2)' } }, '💳 Crédito'),
       el('div', { style: { textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text2)' } }, '💳 Débito'),
     ]),
-    // Linha 3: Lucro R$
-    el('div', { style: { display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr', background: 'var(--bg3)', padding: '6px 8px', alignItems: 'center', borderTop: '1px solid var(--border)' } }, [
-      el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase' } }, 'Lucro R$'),
-      el('div', { style: { textAlign: 'center', fontSize: '15px', fontWeight: '800' } }, [el('span', { id: 'ft-lucro-dinheiro' }, '—')]),
-      el('div', { style: { textAlign: 'center', fontSize: '15px', fontWeight: '800' } }, [el('span', { id: 'ft-lucro-credito'  }, '—')]),
-      el('div', { style: { textAlign: 'center', fontSize: '15px', fontWeight: '800' } }, [el('span', { id: 'ft-lucro-debito'   }, '—')]),
-    ]),
-    // Linha 4: Margem %
-    el('div', { style: { display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr', background: 'var(--bg3)', padding: '6px 8px', alignItems: 'center', borderTop: '1px solid var(--border)' } }, [
-      el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase' } }, 'Margem'),
-      el('div', { style: { textAlign: 'center', fontSize: '18px', fontWeight: '800' } }, [el('span', { id: 'ft-margem-dinheiro' }, '—')]),
-      el('div', { style: { textAlign: 'center', fontSize: '18px', fontWeight: '800' } }, [el('span', { id: 'ft-margem-credito'  }, '—')]),
-      el('div', { style: { textAlign: 'center', fontSize: '18px', fontWeight: '800' } }, [el('span', { id: 'ft-margem-debito'   }, '—')]),
-    ]),
+    _pgRow('Preço Mínimo', 'pmin', false),
+    _pgRow('Lucro R$',     'lucro', false),
+    _pgRow('Margem',       'margem', true),
   ]);
 
   var modal = div('modal', [

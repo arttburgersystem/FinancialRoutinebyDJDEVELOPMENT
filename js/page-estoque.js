@@ -399,13 +399,23 @@ function renderProdutoModal() {
   function _adicionarCatInline(){
     var nome=(novaCatInp.value||'').trim();
     if(!nome){novaCatInp.style.borderColor='var(--red)';return;}
+    novaCatInp.style.borderColor='';
     var arr=state.estCategorias||[];
     if(arr.find(function(c){return c.nome.toLowerCase()===nome.toLowerCase();})){showToast('Categoria já existe','error');return;}
     var nova={id:'cat_'+Date.now(),nome:nome};
     var novas=arr.concat([nova]);
+    // Salva SEM re-render para não perder o formulário
     lsSet('estCategorias',novas);
+    state.estCategorias=novas;
+    // Adiciona opção diretamente no <select> e seleciona
+    var opt=document.createElement('option');
+    opt.value=nome;opt.textContent=nome;opt.selected=true;
+    catSel.appendChild(opt);
+    catSel.value=nome;
     p.categoria=nome;
-    setState({estCategorias:novas,produtoModal:Object.assign({},state.produtoModal,{categoria:nome})});
+    // Limpa e fecha o campo inline
+    novaCatInp.value='';
+    novaCatWrap.style.display='none';
     scheduleSave();
     showToast('Categoria "'+nome+'" criada!','success');
   }

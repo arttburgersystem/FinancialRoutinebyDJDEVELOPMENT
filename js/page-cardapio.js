@@ -1009,6 +1009,9 @@ function renderCardapio() {
           :'Nenhum item corresponde aos filtros.'),
     ]);
 
+    var _fichaIds = {};
+    (state.fichaTecnicas || []).forEach(function(ft) { if (ft.produtoId) _fichaIds[ft.produtoId] = true; });
+
     var rows=visivel.map(function(p){
       var isChecked=!!_crdSel[p.id];
       var isDisp=p.disponivel!==false;
@@ -1051,7 +1054,10 @@ function renderCardapio() {
 
       var td0=tdCell('width:36px;');td0.appendChild(chk);tr.appendChild(td0);
       var td1=tdCell('max-width:200px;');
-      td1.appendChild(el('div',{style:{fontWeight:'600',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},p.nome||''));
+      var _nomeDiv=el('div',{style:{fontWeight:'600',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:'4px'}});
+      _nomeDiv.appendChild(document.createTextNode(p.nome||''));
+      if(_fichaIds[p.id]) _nomeDiv.appendChild(el('span',{title:'Ficha Técnica cadastrada',style:{fontSize:'11px',opacity:'.8',flexShrink:'0'}},'📋'));
+      td1.appendChild(_nomeDiv);
       if(!isComp&&setor){
         var setBadge=el('span',{style:{fontSize:'10px',color:setor.cor||'var(--blue)',marginTop:'2px',display:'block'}});
         setBadge.textContent='🖨️ '+setor.nome;

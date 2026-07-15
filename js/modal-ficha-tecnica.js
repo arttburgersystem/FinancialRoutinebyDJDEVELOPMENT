@@ -45,10 +45,16 @@ function _ftAtualizarResumo() {
   function corCmv(v) { return v === null ? 'var(--text3)' : v <= 30 ? '#00a86b' : v <= 40 ? 'var(--gold)' : '#e05252'; }
   function set(id, txt, c) { var e = document.getElementById(id); if (e) { e.textContent = txt; if (c !== undefined) e.style.color = c; } }
 
+  var markup3     = cp ? cp * 3 : null;
+  var markupAtual = cp && pv ? pv / cp : null;
+
   set('ft-custo-total',      fmtMoney(custo));
   set('ft-custo-porcao',     fmtMoney(cp));
   set('ft-das-rs',           pv ? '−' + fmtMoney(dasRs) : '—', pv && dasRs ? '#e05252' : 'var(--text3)');
   set('ft-cmv',              cmv !== null ? cmv.toFixed(1) + '%' : '—', corCmv(cmv));
+  set('ft-markup3',          markup3 ? fmtMoney(markup3) : '—', 'var(--text2)');
+  set('ft-markup-atual',     markupAtual ? markupAtual.toFixed(2) + '×' : '—',
+    markupAtual === null ? 'var(--text3)' : markupAtual >= 3 ? '#00a86b' : markupAtual >= 2 ? 'var(--gold)' : '#e05252');
   set('ft-pmin-dinheiro',    pmDin  ? fmtMoney(pmDin)  : '—', 'var(--text2)');
   set('ft-pmin-credito',     pmCred ? fmtMoney(pmCred) : '—', 'var(--text2)');
   set('ft-pmin-debito',      pmDeb  ? fmtMoney(pmDeb)  : '—', 'var(--text2)');
@@ -369,6 +375,18 @@ function renderFichaTecnicaModal() {
         el('div', { style: { fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700', marginBottom: '3px' } }, 'CMV%'),
         el('div', { style: { fontSize: '8px', color: 'var(--text3)', marginBottom: '2px' } }, '(custo/preço)'),
         el('span', { id: 'ft-cmv', style: { fontSize: '15px', fontWeight: '800', color: 'var(--text3)' } }, '—'),
+      ]),
+    ]),
+    // Linha markup
+    el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 14px', background: 'var(--bg2)', borderBottom: '1px solid var(--border)', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: '8px' } }, [
+      el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+        el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase' } }, '💡 Preço sugerido (markup 3×):'),
+        el('span', { id: 'ft-markup3', style: { fontSize: '14px', fontWeight: '800', color: 'var(--text2)' } }, '—'),
+        el('span', { style: { fontSize: '10px', color: 'var(--text3)' } }, '(custo × 3)'),
+      ]),
+      el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+        el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textTransform: 'uppercase' } }, 'Markup atual:'),
+        el('span', { id: 'ft-markup-atual', style: { fontSize: '14px', fontWeight: '800', color: 'var(--text3)' } }, '—'),
       ]),
     ]),
     // Header pagamentos

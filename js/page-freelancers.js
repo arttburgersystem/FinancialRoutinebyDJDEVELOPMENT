@@ -29,6 +29,8 @@ function renderFreelancers() {
     function saveFreelancer() {
       var nome = (gfl('nome') || '').trim();
       if (!nome) { showToast('Informe o nome', 'error'); return; }
+      var recChk = document.getElementById('fl-recorrente');
+      var isRec  = recChk ? recChk.checked : false;
       var item = {
         id:              isEdit ? efl.id : ('fl_' + Date.now()),
         nome:            nome,
@@ -42,6 +44,10 @@ function renderFreelancers() {
         valorHora:       parseFloat(gfl('valorHora')) || 0,
         status:          gfl('status') || 'ativo',
         notas:           (gfl('notas') || '').trim(),
+        recorrente:      isRec,
+        valorFixo:       isRec ? (parseFloat(gfl('valorFixo')) || 0) : 0,
+        diaVencimento:   isRec ? (parseInt(gfl('diaVencimento')) || 5) : 5,
+        descricaoFixa:   isRec ? (gfl('descricaoFixa') || '').trim() : '',
         profile:         pf,
         criadoEm:        isEdit ? (efl.criadoEm || hj) : hj,
       };
@@ -214,6 +220,37 @@ function renderFreelancers() {
       secBox([secTitle('💳', 'Dados para pagamento'),
         grid2(fg('Chave Pix', fli('chavePix', 'text', 'CPF, e-mail, telefone ou chave aleatória', efl.chavePix || '')), fg('Banco', fli('banco', 'text', 'Ex: Nubank, Itaú, Bradesco...', efl.banco || ''))),
       ]),
+      (function(){
+        var recChkEl = el('input', { type: 'checkbox', id: 'fl-recorrente', style: { width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)' } });
+        if (efl.recorrente) recChkEl.checked = true;
+        var recPanel = el('div', { id: 'fl-rec-panel', style: { display: efl.recorrente ? 'grid' : 'none', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' } }, [
+          el('div', { class: 'form-group', style: { marginBottom: '0' } }, [
+            el('label', { class: 'form-label' }, 'Valor fixo mensal (R$)'),
+            fli('valorFixo', 'number', '0,00', efl.valorFixo || ''),
+          ]),
+          el('div', { class: 'form-group', style: { marginBottom: '0' } }, [
+            el('label', { class: 'form-label' }, 'Dia de vencimento'),
+            fli('diaVencimento', 'number', 'Ex: 5', efl.diaVencimento || '5'),
+          ]),
+          el('div', { class: 'form-group', style: { marginBottom: '0', gridColumn: '1 / -1' } }, [
+            el('label', { class: 'form-label' }, 'Descrição padrão do serviço'),
+            fli('descricaoFixa', 'text', 'Ex: Serviço mensal de entregas', efl.descricaoFixa || ''),
+          ]),
+        ]);
+        recChkEl.onchange = function() {
+          recPanel.style.display = recChkEl.checked ? 'grid' : 'none';
+        };
+        return el('div', { style: { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '12px 14px', marginBottom: '14px' } }, [
+          el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } }, [
+            recChkEl,
+            el('div', {}, [
+              el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, '🔄 Freelancer fixo / recorrente'),
+              el('div', { style: { fontSize: '11px', color: 'var(--text3)', marginTop: '2px' } }, 'Gera alerta mensal automático quando não houver lançamento'),
+            ]),
+          ]),
+          recPanel,
+        ]);
+      })(),
       div('form-group', [
         el('label', { class: 'form-label' }, 'Observações'),
         el('textarea', { class: 'form-input', id: 'fl-notas', rows: '2', placeholder: 'Portfólio, contrato, acordos gerais...', style: { resize: 'vertical' } }, efl.notas || ''),
@@ -645,8 +682,12 @@ function renderFreelancers() {
         onmouseleave: function(e){ e.currentTarget.style.background = ''; },
       }, [
         el('td', { style: { padding: '10px 14px' } }, [
-          el('div', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--text)' } }, f.nome),
+          el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+            el('span', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--text)' } }, f.nome),
+            f.recorrente ? el('span', { style: { fontSize: '9px', fontWeight: '700', padding: '1px 6px', borderRadius: '8px', background: 'rgba(96,165,250,.15)', color: 'var(--blue)', border: '1px solid rgba(96,165,250,.3)', whiteSpace: 'nowrap' } }, '🔄 Fixo') : null,
+          ].filter(Boolean)),
           f.especialidade ? el('div', { style: { fontSize: '11px', color: 'var(--text3)', marginTop: '2px' } }, f.especialidade) : null,
+          f.recorrente && f.valorFixo ? el('div', { style: { fontSize: '10px', color: 'var(--blue)', marginTop: '2px' } }, fmtMoney(f.valorFixo) + '/mês · dia ' + (f.diaVencimento || 5)) : null,
           f.tipo ? el('div', { style: { fontSize: '10px', color: 'var(--text3)', marginTop: '2px' } }, f.tipo === 'pj' ? '🏢 PJ' : '👤 PF') : null,
         ].filter(Boolean)),
         el('td', { style: { padding: '10px 14px' } }, [
@@ -730,24 +771,100 @@ function renderFreelancers() {
       cancelado: { label: '❌ Cancelado', cor: 'var(--text3)', bg: 'var(--bg3)' },
     };
 
-    var pendAlerta = svSorted.filter(function(s){ return s.status === 'pendente'; });
-    var alertaPainel = pendAlerta.length > 0 ? el('div', { style: { background: '#c9a84c11', border: '1px solid var(--gold)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' } }, [
-      el('div', { style: { fontSize: '12px', fontWeight: '700', color: 'var(--gold)', marginBottom: '10px' } }, '💰 Serviços pendentes de pagamento'),
+    var pendAlerta   = svSorted.filter(function(s){ return s.status === 'pendente'; });
+    var svAtrasados  = pendAlerta.filter(function(s){ return (s.data || '') < hj; });
+    var svNoPrazo    = pendAlerta.filter(function(s){ return (s.data || '') >= hj; });
+
+    // Recorrentes sem lançamento no mês atual
+    var flsRecorr = fls.filter(function(f){ return f.recorrente && f.status === 'ativo'; });
+    var recorrSemMes = flsRecorr.filter(function(f){
+      return !servicos.some(function(s){ return s.freelancerId === f.id && (s.data || '').slice(0,7) === mesStr; });
+    });
+
+    function svRow(sv, corValor) {
+      var diasAt = sv.data < hj ? Math.round((new Date(hj) - new Date(sv.data)) / 86400000) : 0;
+      return el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg)', borderRadius: '6px', padding: '8px 12px' } }, [
+        el('div', { style: { flex: '1' } }, [
+          el('div', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--text)' } }, flNomePorId(sv.freelancerId)),
+          el('div', { style: { fontSize: '11px', color: 'var(--text3)', marginTop: '2px' } }, [
+            sv.descricao + ' · ' + fmtDate(sv.data),
+            diasAt > 0 ? el('span', { style: { color: 'var(--red)', fontWeight: '700', marginLeft: '6px' } }, '⚠ ' + diasAt + 'd atrasado') : null,
+          ].filter(Boolean)),
+        ]),
+        el('div', { style: { fontWeight: '700', fontSize: '14px', color: corValor || 'var(--gold)' } }, fmtMoney(sv.valor || 0)),
+        (function(s2){ return el('button', { class: 'btn-ghost', style: { fontSize: '11px', padding: '4px 10px', whiteSpace: 'nowrap' },
+          onclick: function(){ setState({ flPagarModal: { servico: s2 } }); },
+        }, '✅ Pagar'); })(sv),
+      ]);
+    }
+
+    // Painel vermelho — atrasados
+    var painelAtrasados = svAtrasados.length > 0 ? el('div', { style: {
+      background: 'rgba(239,68,68,.06)', border: '1.5px solid rgba(239,68,68,.4)',
+      borderRadius: '8px', padding: '12px 16px', marginBottom: '12px',
+    }}, [
+      el('div', { style: { fontSize: '12px', fontWeight: '700', color: 'var(--red)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' } }, [
+        el('span', {}, '🚨 Pagamentos em atraso'),
+        el('span', { style: { background: 'var(--red)', color: '#fff', borderRadius: '10px', fontSize: '10px', padding: '1px 7px' } }, String(svAtrasados.length)),
+      ]),
+      el('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } }, svAtrasados.map(function(sv){ return svRow(sv, 'var(--red)'); })),
+    ]) : null;
+
+    // Painel dourado — pendentes no prazo
+    var painelPendentes = svNoPrazo.length > 0 ? el('div', { style: {
+      background: '#c9a84c11', border: '1px solid var(--gold)',
+      borderRadius: '8px', padding: '12px 16px', marginBottom: '12px',
+    }}, [
+      el('div', { style: { fontSize: '12px', fontWeight: '700', color: 'var(--gold)', marginBottom: '10px' } }, '💰 Pendentes de pagamento'),
+      el('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } }, svNoPrazo.map(function(sv){ return svRow(sv, 'var(--gold)'); })),
+    ]) : null;
+
+    // Painel azul — recorrentes sem lançamento este mês
+    var painelRecorr = recorrSemMes.length > 0 ? el('div', { style: {
+      background: 'rgba(96,165,250,.06)', border: '1.5px solid rgba(96,165,250,.35)',
+      borderRadius: '8px', padding: '12px 16px', marginBottom: '12px',
+    }}, [
+      el('div', { style: { fontSize: '12px', fontWeight: '700', color: 'var(--blue)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' } }, [
+        el('span', {}, '🔄 Freelancers fixos sem lançamento em ' + MESES[parseInt(mesStr.split('-')[1])-1]),
+        el('span', { style: { background: 'var(--blue)', color: '#fff', borderRadius: '10px', fontSize: '10px', padding: '1px 7px' } }, String(recorrSemMes.length)),
+      ]),
       el('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        pendAlerta.map(function(sv){
+        recorrSemMes.map(function(f){
+          var diaVenc = f.diaVencimento || 5;
+          var dataGerada = mesStr + '-' + String(diaVenc).padStart(2, '0');
           return el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg)', borderRadius: '6px', padding: '8px 12px' } }, [
             el('div', { style: { flex: '1' } }, [
-              el('div', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--text)' } }, flNomePorId(sv.freelancerId)),
-              el('div', { style: { fontSize: '11px', color: 'var(--text3)', marginTop: '2px' } }, sv.descricao + ' · ' + fmtDate(sv.data)),
+              el('div', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--text)' } }, f.nome),
+              el('div', { style: { fontSize: '11px', color: 'var(--text3)', marginTop: '2px' } }, (f.descricaoFixa || 'Serviço mensal') + ' · vence dia ' + diaVenc),
             ]),
-            el('div', { style: { fontWeight: '700', fontSize: '14px', color: 'var(--gold)' } }, fmtMoney(sv.valor || 0)),
-            (function(s2){ return el('button', { class: 'btn-ghost', style: { fontSize: '11px', padding: '4px 10px', whiteSpace: 'nowrap' },
-              onclick: function(){ setState({ flPagarModal: { servico: s2 } }); },
-            }, '✅ Marcar pago'); })(sv),
+            el('div', { style: { fontWeight: '700', fontSize: '14px', color: 'var(--blue)' } }, fmtMoney(f.valorFixo || 0)),
+            (function(ff, dg){ return el('button', { class: 'btn-primary', style: { fontSize: '11px', padding: '4px 12px', whiteSpace: 'nowrap' },
+              onclick: function(){
+                var novoSv = {
+                  id: 'sv_' + Date.now() + '_' + ff.id,
+                  freelancerId: ff.id,
+                  descricao: ff.descricaoFixa || 'Serviço mensal',
+                  data: dg,
+                  valor: ff.valorFixo || 0,
+                  status: 'pendente',
+                  dataPagamento: '',
+                  notas: 'Gerado automaticamente',
+                  profile: pf,
+                  criadoEm: hj,
+                };
+                var arr2 = (state.servicosFreelancer || []).concat([novoSv]);
+                lsSet('servicosFreelancer', arr2);
+                setState({ servicosFreelancer: arr2 });
+                scheduleSave();
+                showToast('Lançamento gerado para ' + ff.nome + '!');
+              },
+            }, '+ Gerar lançamento'); })(f, dataGerada),
           ]);
         })
       ),
     ]) : null;
+
+    var alertaPainel = el('div', {}, [painelAtrasados, painelPendentes, painelRecorr].filter(Boolean));
 
     var svRows = svSorted.map(function(sv){
       var stSv = SV_ST[sv.status] || SV_ST.pendente;

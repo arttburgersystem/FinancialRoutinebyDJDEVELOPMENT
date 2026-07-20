@@ -1915,6 +1915,141 @@ function renderPagar(){
       return tr;
     });
 
+  // ── TERMÔMETRO DE REPUTAÇÃO ───────────────────────────────────────────────
+  var _termCard = (function(){
+    var hoje = today();
+    var d30  = new Date(hoje); d30.setDate(d30.getDate()-30);
+    var d30s = d30.toISOString().slice(0,10);
+
+    // Contas dos últimos 30 dias (por vencimento)
+    var base = items.filter(function(c){
+      return c.vencimento && c.vencimento >= d30s && c.vencimento <= hoje;
+    });
+    var total = base.length;
+
+    var nPrazo=0, nAtrasado=0, nVencido=0, nPendente=0;
+    base.forEach(function(c){
+      if(c.status==='pago'){
+        var juros = c.jurosAtraso && c.jurosAtraso > 0;
+        var atrasado = c.dataPagamento && c.dataPagamento > c.vencimento;
+        if(juros||atrasado) nAtrasado++; else nPrazo++;
+      } else {
+        if(c.vencimento < hoje) nVencido++; else nPendente++;
+      }
+    });
+
+    // Score 0-100
+    var score = total === 0 ? 100
+      : Math.round((nPrazo*100 + nAtrasado*50 + nPendente*60 + nVencido*0) / total);
+    score = Math.max(0, Math.min(100, score));
+
+    var nivel, cor, corBg, emoji, descricao;
+    if(score >= 85){
+      nivel='Excelente Pagador'; cor='#22c55e'; corBg='rgba(34,197,94,.09)'; emoji='🏆';
+      descricao='Você paga em dia! Continue assim.';
+    } else if(score >= 65){
+      nivel='Bom Pagador'; cor='#84cc16'; corBg='rgba(132,204,22,.09)'; emoji='✅';
+      descricao='Quase perfeito — alguns atrasos pontuais.';
+    } else if(score >= 45){
+      nivel='Pagador Regular'; cor='#f59e0b'; corBg='rgba(245,158,11,.09)'; emoji='⚠️';
+      descricao='Atenção: há contas pagas com atraso ou vencidas.';
+    } else if(score >= 25){
+      nivel='Pagador Irregular'; cor='#f97316'; corBg='rgba(249,115,22,.09)'; emoji='❗';
+      descricao='Muitos atrasos detectados. Organize os vencimentos.';
+    } else {
+      nivel='Mau Pagador'; cor='#ef4444'; corBg='rgba(239,68,68,.09)'; emoji='🚨';
+      descricao='Situação crítica: várias contas vencidas sem pagamento.';
+    }
+
+    // Termômetro SVG vertical
+    var termH = 90, termW = 28, bulbR = 12, tubeW = 10;
+    var fillH = Math.round((score/100)*(termH-bulbR));
+    var fillY  = termH - fillH;
+
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgNS,'svg');
+    svg.setAttribute('width', String(termW));
+    svg.setAttribute('height', String(termH + bulbR + 4));
+    svg.setAttribute('viewBox','0 0 '+termW+' '+(termH+bulbR+4));
+
+    function mkEl(tag,attrs){
+      var e=document.createElementNS(svgNS,tag);
+      Object.keys(attrs).forEach(function(k){e.setAttribute(k,attrs[k]);});
+      return e;
+    }
+
+    var cx = termW/2;
+    // Tubo fundo
+    svg.appendChild(mkEl('rect',{x:String(cx-tubeW/2),y:'0',width:String(tubeW),height:String(termH),rx:'5',ry:'5',fill:'var(--bg3)',stroke:'var(--border)','stroke-width':'1'}));
+    // Preenchimento
+    if(fillH>0) svg.appendChild(mkEl('rect',{x:String(cx-tubeW/2+1),y:String(fillY),width:String(tubeW-2),height:String(fillH),rx:'4',ry:'4',fill:cor}));
+    // Bolbo fundo
+    svg.appendChild(mkEl('circle',{cx:String(cx),cy:String(termH+bulbR),r:String(bulbR),fill:'var(--bg3)',stroke:'var(--border)','stroke-width':'1'}));
+    // Bolbo preenchido
+    svg.appendChild(mkEl('circle',{cx:String(cx),cy:String(termH+bulbR),r:String(bulbR-2),fill:cor}));
+    // Linha de score (indicador)
+    if(score>0&&score<100) svg.appendChild(mkEl('line',{x1:String(cx-tubeW/2-3),y1:String(fillY),x2:String(cx+tubeW/2+3),y2:String(fillY),stroke:cor,'stroke-width':'2'}));
+
+    // Marcadores de escala
+    [0,25,50,75,100].forEach(function(v){
+      var y = termH - Math.round((v/100)*(termH-bulbR));
+      svg.appendChild(mkEl('line',{x1:String(cx+tubeW/2),y1:String(y),x2:String(cx+tubeW/2+4),y2:String(y),stroke:'var(--text3)','stroke-width':'1'}));
+    });
+
+    // Barra de detalhes
+    function statLine(label, n, c2){
+      return el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'11px',padding:'3px 0',borderBottom:'1px solid var(--border)'}}, [
+        el('span',{style:{color:'var(--text3)'}}, label),
+        el('span',{style:{fontWeight:'700',color:c2}}, String(n) + ' conta'+(n!==1?'s':'')),
+      ]);
+    }
+
+    var pctBar = el('div',{style:{height:'6px',borderRadius:'3px',background:'var(--bg3)',overflow:'hidden',marginTop:'8px'}});
+    var fill   = el('div',{style:{height:'100%',width:score+'%',background:cor,borderRadius:'3px',transition:'width .6s ease'}});
+    pctBar.appendChild(fill);
+
+    var card = el('div',{style:{
+      display:'flex',alignItems:'stretch',gap:'16px',
+      background:corBg,
+      border:'1.5px solid '+cor+'55',
+      borderRadius:'10px',padding:'16px',marginBottom:'14px',
+    }});
+
+    // Coluna termômetro
+    var colTherm = el('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',flexShrink:'0'}});
+    colTherm.appendChild(svg);
+    var pctLbl = el('div',{style:{fontSize:'11px',fontWeight:'800',color:cor,marginTop:'2px'}}); pctLbl.textContent=score+'%';
+    colTherm.appendChild(pctLbl);
+    card.appendChild(colTherm);
+
+    // Coluna central — score e label
+    var colMain = el('div',{style:{flex:'1',minWidth:'0'}});
+    var titleRow = el('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}});
+    var emojiEl = el('span',{style:{fontSize:'22px'}}); emojiEl.textContent=emoji;
+    var nivelEl = el('div',{style:{fontSize:'14px',fontWeight:'800',color:cor}}); nivelEl.textContent=nivel;
+    titleRow.appendChild(emojiEl); titleRow.appendChild(nivelEl);
+    colMain.appendChild(titleRow);
+
+    var descEl = el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'8px',lineHeight:'1.5'}}); descEl.textContent=descricao;
+    colMain.appendChild(descEl);
+    colMain.appendChild(pctBar);
+
+    var periodoEl = el('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'6px',fontStyle:'italic'}});
+    periodoEl.textContent='Baseado nos últimos 30 dias · '+total+' conta'+(total!==1?'s':'');
+    colMain.appendChild(periodoEl);
+    card.appendChild(colMain);
+
+    // Coluna direita — breakdown
+    var colStats = el('div',{style:{flexShrink:'0',minWidth:'160px',display:'flex',flexDirection:'column',justifyContent:'center',gap:'0'}});
+    colStats.appendChild(statLine('✅ Pago no prazo',   nPrazo,    '#22c55e'));
+    colStats.appendChild(statLine('⏰ Pago com atraso', nAtrasado, '#f59e0b'));
+    colStats.appendChild(statLine('🕐 Pendente',        nPendente, 'var(--text3)'));
+    colStats.appendChild(statLine('🔴 Vencido s/ pagar',nVencido,  '#ef4444'));
+    card.appendChild(colStats);
+
+    return card;
+  })();
+
   return div('',[
     div('page-header',[el('h1',{},'Despesas'),el('p',{},'Gerencie seus compromissos e vencimentos')]),
     div('action-row',[
@@ -1925,6 +2060,7 @@ function renderPagar(){
       ]),
     ]),
     kpiBar,
+    _termCard,
     massBar,
     div('card',[div('table-wrap',[el('table',{},[
       el('thead',{},[el('tr',{},[

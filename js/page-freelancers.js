@@ -332,6 +332,105 @@ function renderFreelancers() {
     return ovSv;
   }
 
+  // ── MODAL PAGAR SERVIÇO ───────────────────────────────────────────────────
+  if (state.flPagarModal) {
+    var mp  = state.flPagarModal;
+    var svp = mp.servico || {};
+    var flp = fls.find(function(f){ return f.id === svp.freelancerId; }) || {};
+    var bancosPag = (state.bancos || []).filter(function(b){ return b.profile === pf; });
+
+    var datInpP = el('input', { class: 'form-input', type: 'date', id: 'flp-data' });
+    datInpP.value = hj;
+
+    var bancSelP = el('select', { class: 'form-input', id: 'flp-banco' });
+    [el('option', { value: '' }, '— Selecione o banco —')].concat(
+      bancosPag.map(function(b){
+        var op = el('option', { value: b.id }, b.nome + (b.saldo != null ? '  (' + fmtMoney(b.saldo) + ')' : ''));
+        return op;
+      })
+    ).forEach(function(op){ bancSelP.appendChild(op); });
+    // pré-seleciona se só tiver um
+    if (bancosPag.length === 1) bancSelP.value = bancosPag[0].id;
+
+    var formaSelP = el('select', { class: 'form-input', id: 'flp-forma' });
+    ['Pix', 'Dinheiro', 'Transferência', 'Cartão de Débito'].forEach(function(f){
+      formaSelP.appendChild(el('option', { value: f }, f));
+    });
+
+    function confirmarPagamento() {
+      var dataPgto = document.getElementById('flp-data').value || hj;
+      var banco    = document.getElementById('flp-banco').value;
+      var forma    = document.getElementById('flp-forma').value;
+
+      // Atualiza serviço
+      var arr2 = (state.servicosFreelancer || []).map(function(x){
+        return x.id === svp.id
+          ? Object.assign({}, x, { status: 'pago', dataPagamento: dataPgto, banco: banco, formaPgto: forma })
+          : x;
+      });
+
+      // Lança saída financeira
+      var novasConta = (state.contas || []).concat([{
+        id:        'sv_pgt_' + svp.id,
+        tipo:      'pagar',
+        profile:   pf,
+        descricao: 'Freelancer — ' + flp.nome + (svp.descricao ? ': ' + svp.descricao : ''),
+        valor:     svp.valor || 0,
+        categoria: 'Pessoal / RH',
+        vencimento: dataPgto,
+        status:    'pago',
+        formaPgto: forma,
+        banco:     banco,
+        fornecedor: flp.nome || '',
+        notas:     'Pagamento de serviço freelancer',
+      }]);
+
+      // Desconta saldo do banco
+      var novosBancos = (state.bancos || []).map(function(b){
+        if (!banco || b.id !== banco) return b;
+        return Object.assign({}, b, { saldo: Math.round(((b.saldo || 0) - (svp.valor || 0)) * 100) / 100 });
+      });
+
+      lsSet('servicosFreelancer', arr2);
+      lsSet('contas', novasConta);
+      lsSet('bancos', novosBancos);
+      setState({ servicosFreelancer: arr2, contas: novasConta, bancos: novosBancos, flPagarModal: null });
+      scheduleSave();
+      showToast('Pagamento de ' + fmtMoney(svp.valor || 0) + ' registrado!');
+    }
+
+    var mpEl = div('modal', [
+      div('modal-title', [
+        el('span', {}, '💳 Confirmar Pagamento'),
+        el('button', { class: 'modal-close', onclick: function(){ setState({ flPagarModal: null }); } }, '×'),
+      ]),
+
+      // Resumo do serviço
+      el('div', { style: {
+        background: 'var(--bg3)', border: '1px solid var(--border)',
+        borderRadius: '8px', padding: '12px 16px', marginBottom: '16px',
+      }}, [
+        el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text)', marginBottom: '4px' } }, flp.nome || '—'),
+        el('div', { style: { fontSize: '12px', color: 'var(--text3)' } }, svp.descricao || ''),
+        el('div', { style: { fontSize: '12px', color: 'var(--text3)', marginTop: '2px' } }, 'Serviço: ' + fmtDate(svp.data)),
+        el('div', { style: { fontSize: '18px', fontWeight: '800', color: 'var(--gold)', marginTop: '8px' } }, fmtMoney(svp.valor || 0)),
+      ]),
+
+      div('form-group', [el('label', { class: 'form-label' }, 'Data do pagamento'), datInpP]),
+      div('form-group', [el('label', { class: 'form-label' }, 'Conta debitada'), bancSelP]),
+      div('form-group', [el('label', { class: 'form-label' }, 'Forma de pagamento'), formaSelP]),
+
+      div('modal-actions', [
+        btn('btn-ghost', 'Cancelar', function(){ setState({ flPagarModal: null }); }),
+        btn('btn-primary', '✅ Confirmar pagamento', confirmarPagamento),
+      ]),
+    ]);
+    mpEl.style.maxWidth = '420px';
+    var ovMp = div('modal-overlay', [mpEl]);
+    ovMp.onclick = function(e){ if (e.target === ovMp) setState({ flPagarModal: null }); };
+    return ovMp;
+  }
+
   // ── MODAL CALENDÁRIO ─────────────────────────────────────────────────────
   if (state.flCalendarModal) {
     var mc  = state.flCalendarModal;
@@ -643,14 +742,7 @@ function renderFreelancers() {
             ]),
             el('div', { style: { fontWeight: '700', fontSize: '14px', color: 'var(--gold)' } }, fmtMoney(sv.valor || 0)),
             (function(s2){ return el('button', { class: 'btn-ghost', style: { fontSize: '11px', padding: '4px 10px', whiteSpace: 'nowrap' },
-              onclick: function(){
-                var arr2 = (state.servicosFreelancer || []).map(function(x){
-                  return x.id === s2.id ? Object.assign({}, x, { status: 'pago', dataPagamento: hj }) : x;
-                });
-                lsSet('servicosFreelancer', arr2);
-                setState({ servicosFreelancer: arr2 });
-                scheduleSave(); showToast('Serviço marcado como pago!');
-              },
+              onclick: function(){ setState({ flPagarModal: { servico: s2 } }); },
             }, '✅ Marcar pago'); })(sv),
           ]);
         })
@@ -677,12 +769,9 @@ function renderFreelancers() {
         sv.notas ? el('td', { style: { padding: '10px 14px', fontSize: '11px', color: 'var(--text3)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, sv.notas) : el('td', {}, ''),
         el('td', { style: { padding: '8px 10px', textAlign: 'right' } }, [
           el('div', { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } }, [
-            sv.status === 'pendente' ? (function(s2){ return el('button', { class: 'btn-icon', title: 'Marcar como pago', style: { fontSize: '14px' }, onclick: function(){
-              var arr2 = (state.servicosFreelancer || []).map(function(x){
-                return x.id === s2.id ? Object.assign({}, x, { status: 'pago', dataPagamento: hj }) : x;
-              });
-              lsSet('servicosFreelancer', arr2); setState({ servicosFreelancer: arr2 }); scheduleSave(); showToast('Pago!');
-            } }, '✅'); })(sv) : null,
+            sv.status === 'pendente' ? (function(s2){ return el('button', { class: 'btn-icon', title: 'Marcar como pago', style: { fontSize: '14px' },
+              onclick: function(){ setState({ flPagarModal: { servico: s2 } }); }
+            }, '✅'); })(sv) : null,
             el('button', { class: 'btn-icon edit', title: 'Editar', onclick: (function(s2){ return function(){ setState({ servicoFreelancerModal: { editItem: s2 } }); }; })(sv) }, '✏️'),
             el('button', { class: 'btn-icon delete', title: 'Excluir', onclick: (function(s2){ return function(){
               if (!window.confirm('Excluir serviço "' + s2.descricao + '"?')) return;

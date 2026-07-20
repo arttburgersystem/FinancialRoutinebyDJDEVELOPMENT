@@ -220,6 +220,122 @@ function renderCompras() {
     });
   }
 
+  // ── LEMBRETES DE COMPRA ──────────────────────────────────────────────────────
+  var lembretes = (state.comprasLembretes || []).filter(function(l) {
+    return l.profile === pf && l.ativo !== false;
+  }).sort(function(a, b) {
+    return (a.proximaData || '').localeCompare(b.proximaData || '');
+  });
+
+  var lembretesSection = null;
+  if (lembretes.length > 0) {
+    var hoje = today();
+    var cards = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '14px' } });
+
+    lembretes.forEach(function(l) {
+      var vencido = l.proximaData && l.proximaData < hoje;
+      var hoje2   = l.proximaData === hoje;
+      var dias    = l.proximaData ? diasRestantes(l.proximaData) : null;
+
+      var corBorda = vencido ? '#e05252' : hoje2 ? 'var(--gold)' : 'var(--border)';
+      var card = el('div', { style: {
+        border: '1.5px solid ' + corBorda,
+        borderRadius: '10px',
+        padding: '12px 14px',
+        minWidth: '220px',
+        maxWidth: '280px',
+        flex: '1',
+        background: vencido ? '#e0525208' : hoje2 ? '#c9a84c0a' : 'var(--bg2)',
+        position: 'relative',
+      }});
+
+      // Badge de urgência
+      if (vencido || hoje2 || (dias !== null && dias <= 3)) {
+        var urgLabel = vencido ? 'VENCIDO' : hoje2 ? 'HOJE' : 'em ' + dias + 'd';
+        var urgCor   = vencido ? '#e05252' : 'var(--gold)';
+        card.appendChild(el('span', { style: {
+          position: 'absolute', top: '8px', right: '10px',
+          fontSize: '10px', fontWeight: '700', color: urgCor,
+          background: vencido ? '#e0525218' : '#c9a84c18',
+          padding: '2px 8px', borderRadius: '20px',
+        }}, urgLabel));
+      }
+
+      // Ícone + fornecedor
+      var fornEl = el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text)', marginBottom: '4px', paddingRight: '60px' } });
+      fornEl.textContent = '🔔 ' + (l.fornecedor || 'Fornecedor');
+      card.appendChild(fornEl);
+
+      // Itens
+      var itensText = (l.itens || []).map(function(i) {
+        return (i.item || '') + (i.quantidade ? ' × ' + i.quantidade + ' ' + (i.unidade || '') : '');
+      }).join(', ');
+      if (itensText) {
+        card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text2)', marginBottom: '4px' } }, itensText));
+      }
+
+      // Periodicidade + próxima data
+      var perLabel = { semanal: 'Semanal', quinzenal: 'Quinzenal', mensal: 'Mensal', bimestral: 'Bimestral', trimestral: 'Trimestral', avulso: 'Avulso' };
+      var metaLine = el('div', { style: { fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' } });
+      metaLine.textContent = (perLabel[l.periodicidade] || l.periodicidade || '') +
+        (l.proximaData ? ' · ' + fmtDate(l.proximaData) : '');
+      card.appendChild(metaLine);
+
+      if (l.obs) {
+        card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text3)', fontStyle: 'italic', marginBottom: '8px' } }, l.obs));
+      }
+
+      // Ações
+      var actions = el('div', { style: { display: 'flex', gap: '6px', marginTop: '6px' } });
+
+      // Registrar compra (pré-preenche o modal de compra)
+      var regBtn = el('button', { style: {
+        flex: '1', fontSize: '11px', padding: '5px 8px',
+        background: 'var(--primary)', color: '#fff',
+        border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: '600',
+      }});
+      regBtn.textContent = '✅ Registrar compra';
+      (function(lem) {
+        regBtn.onclick = function() {
+          setState({ compraModal: { editItem: {
+            itens:         lem.itens ? lem.itens.map(function(x) { return Object.assign({}, x, { precoUnit: 0, valorTotal: 0 }); }) : [],
+            fornecedorId:  lem.fornecedorId || '',
+            fornecedor:    lem.fornecedor   || '',
+            categoria:     lem.categoria    || '',
+            dataCompra:    hoje,
+            obs:           lem.obs ? '[Lembrete] ' + lem.obs : '',
+          }}});
+        };
+      })(l);
+      actions.appendChild(regBtn);
+
+      // Editar lembrete
+      var editBtn = el('button', { style: {
+        fontSize: '11px', padding: '5px 8px',
+        background: 'none', border: '1px solid var(--border)',
+        borderRadius: '5px', cursor: 'pointer', color: 'var(--text3)',
+      }});
+      editBtn.textContent = '✏️';
+      editBtn.title = 'Editar lembrete';
+      (function(lem) {
+        editBtn.onclick = function() { setState({ compraLembreteModal: { editItem: lem } }); };
+      })(l);
+      actions.appendChild(editBtn);
+
+      card.appendChild(actions);
+      cards.appendChild(card);
+    });
+
+    lembretesSection = el('div', { class: 'card', style: { padding: '0', marginBottom: '16px', overflow: 'hidden' } });
+    var lHdr = el('div', { style: {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '10px 14px', background: 'var(--bg2)', borderBottom: '1px solid var(--border)',
+    }});
+    lHdr.appendChild(el('span', { style: { fontSize: '12px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' } }, '🔔 Lembretes de Compra (' + lembretes.length + ')'));
+    lembretesSection.appendChild(lHdr);
+    lembretesSection.appendChild(cards);
+  }
+
   // Montar página
   var wrap = div('', []);
   wrap.appendChild(div('page-header', [
@@ -230,9 +346,13 @@ function renderCompras() {
     el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' } }, [
       mesNav, chipsEl, buscaInp,
     ]),
-    btn('btn-primary', '+ Nova compra', function() { setState({ compraModal: { editItem: null } }); }),
+    el('div', { style: { display: 'flex', gap: '8px' } }, [
+      btn('btn-ghost', '🔔 Lembrete', function() { setState({ compraLembreteModal: { editItem: null } }); }),
+      btn('btn-primary', '+ Nova compra', function() { setState({ compraModal: { editItem: null } }); }),
+    ]),
   ]));
   wrap.appendChild(kpiGrid);
+  if (lembretesSection) wrap.appendChild(lembretesSection);
   wrap.appendChild(listaWrap);
   return wrap;
 }

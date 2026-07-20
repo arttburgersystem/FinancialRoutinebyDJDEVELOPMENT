@@ -453,7 +453,9 @@ var state={
   taxas: lsGet('taxas',TAXAS_DEFAULT),
   emprestimos: lsGet('emprestimos',[]),
   compras: lsGet('compras',[]),
+  comprasLembretes: lsGet('comprasLembretes',[]),
   compraModal: null,
+  compraLembreteModal: null,
   comprasMes: null,
   comprasFiltro: 'todos',
   comprasBusca: '',
@@ -845,6 +847,7 @@ function scheduleSave(){
       fbPut('/caixaVals',state.caixaVals||{}),
       fbPut('/patrimonios',arrToObj(state.patrimonios||[])),
       fbPut('/embConfig',state.embConfig||{}),
+      fbPut('/comprasLembretes',arrToObj(state.comprasLembretes||[])),
     ]).then(function(){_updateSyncDOM('ok');})
       .catch(function(e){console.error(e);_updateSyncDOM('error');showToast('Erro ao salvar no Firebase','error');});
   },1500);
@@ -2882,6 +2885,7 @@ function render(){
   if(typeof renderImportarExtratoModal==='function'){var impExtM=renderImportarExtratoModal();if(impExtM)app.appendChild(impExtM);}
   if(typeof renderCedulasModal==='function'){var cedM=renderCedulasModal();if(cedM)app.appendChild(cedM);}
   if(typeof renderCompraModal==='function'){var compraM=renderCompraModal();if(compraM)app.appendChild(compraM);}
+  if(typeof renderLembreteCompraModal==='function'){var lcM=renderLembreteCompraModal();if(lcM)app.appendChild(lcM);}
   if(typeof renderShopListModal==='function'){var slM=renderShopListModal();if(slM)app.appendChild(slM);}
   if(typeof renderShopItemModal==='function'){var siM=renderShopItemModal();if(siM)app.appendChild(siM);}
   if(typeof renderEstoqueItemModal==='function'){var eiM=renderEstoqueItemModal();if(eiM)app.appendChild(eiM);}
@@ -2916,6 +2920,7 @@ function render(){
 <script src="js/modal-cedulas.js"></script>
 <script src="js/page-compras.js"></script>
 <script src="js/modal-compra.js"></script>
+<script src="js/modal-lembrete-compra.js"></script>
 <script src="js/page-lista-compras.js"></script>
 <script src="js/page-estoque-insumos.js"></script>
 <script src="js/modal-estoque-item.js"></script>

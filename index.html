@@ -3099,6 +3099,16 @@ function render(){
     return;
   }
 
+  // Requisição de estoque (tablet kiosk mode)
+  if (state.reqMode && typeof renderRequisicao === 'function') {
+    root.appendChild(renderRequisicao());
+    if(state.toast){
+      var tReq=el('div',{class:'toast '+state.toast.type},[el('span',{},state.toast.type==='success'?'✓':state.toast.type==='error'?'✕':'ℹ'),el('span',{},state.toast.msg)]);
+      root.appendChild(tReq);
+    }
+    return;
+  }
+
   // KDS mode: tela cheia, sem sidebar
   if (state.kdsMode && typeof renderKDSViewer === 'function') {
     root.appendChild(renderKDSViewer(state.kdsMode));
@@ -3205,6 +3215,7 @@ function render(){
 <script src="js/modal-lembrete-compra.js"></script>
 <script src="js/page-lista-compras.js"></script>
 <script src="js/page-estoque-insumos.js"></script>
+<script src="js/page-requisicao.js"></script>
 <script src="js/modal-estoque-item.js"></script>
 <script src="js/modal-estoque-mov.js"></script>
 <script src="js/modal-ficha-tecnica.js"></script>

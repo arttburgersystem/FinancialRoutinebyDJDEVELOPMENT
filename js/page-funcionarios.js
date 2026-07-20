@@ -84,6 +84,7 @@ function renderFuncionarios() {
     function saveFunc(){
       var nome=(gf('nome')||'').trim();
       if(!nome){showToast('Informe o nome','error');return;}
+      var pinRaw=(gf('senhaRequisicao')||'').replace(/\D/g,'').slice(0,4);
       var item={
         id:isEdit?ed.id:('func_'+Date.now()),
         nome:nome,cargo:(gf('cargo')||'').trim(),status:gf('status')||'ativo',
@@ -96,6 +97,7 @@ function renderFuncionarios() {
         complemento:(gf('complemento')||'').trim(),bairro:(gf('bairro')||'').trim(),
         cidade:(gf('cidade')||'').trim(),estado:(gf('estado')||'').trim(),
         notas:(gf('notas')||'').trim(),profile:state.profile,
+        senhaRequisicao:pinRaw||null,
       };
       var arr=isEdit
         ?(state.funcionarios||[]).map(function(x){return x.id===item.id?item:x;})
@@ -138,6 +140,18 @@ function renderFuncionarios() {
       ]),
       secBox([secTitle('💳','Dados para pagamento'),
         grid2(fg('Chave Pix',inp2('chavePix','text','CPF, e-mail, telefone ou chave aleatória',ed.chavePix||'')),fg('Banco',inp2('banco','text','Ex: Nubank, Itaú, Bradesco...',ed.banco||''))),
+      ]),
+      secBox([secTitle('📱','Acesso ao Tablet — Requisição de Estoque'),
+        el('div',{style:{display:'grid',gridTemplateColumns:'180px 1fr',gap:'12px',alignItems:'start'}},[
+          fg('PIN de 4 dígitos',(function(){
+            var pinInp=inp2('senhaRequisicao','text','ex: 1234',ed.senhaRequisicao||'',{maxlength:'4',inputmode:'numeric',pattern:'[0-9]*',autocomplete:'off'});
+            pinInp.style.letterSpacing='6px';pinInp.style.fontSize='18px';pinInp.style.fontWeight='700';
+            pinInp.oninput=function(){this.value=this.value.replace(/\D/g,'').slice(0,4);};
+            return pinInp;
+          })()),
+          el('div',{style:{paddingTop:'28px',fontSize:'11px',color:'var(--text3)',lineHeight:'1.7'}},
+            'O funcionário usa este PIN para se identificar na tela de requisição no tablet do estoque. Deixe em branco para não permitir acesso.'),
+        ]),
       ]),
       secBox([secTitle('📞','Contato'),
         grid2(fg('Telefone',inp2('telefone','tel','(00) 00000-0000',ed.telefone||'')),fg('E-mail',inp2('email','email','funcionario@email.com',ed.email||''))),

@@ -109,6 +109,7 @@ function renderEstoqueInsumos() {
     catSel.onchange = function(e) { setState({ estoqueCat: e.target.value }); };
     leftFilters.appendChild(catSel);
 
+    rightBtns.appendChild(btn('btn-ghost', '📱 Tablet de Requisição', function() { setState({ reqMode: true, reqSession: null, reqCarrinho: [], reqPin: null, reqBusca: '' }); }));
     rightBtns.appendChild(btn('btn-ghost', '🔄 Movimentar', function() { setState({ estoqueMovModal: { insumoId: null, tipo: 'entrada' } }); }));
     rightBtns.appendChild(btn('btn-primary', '+ Produto', function() { setState({ estoqueItemModal: { editItem: null } }); }));
 

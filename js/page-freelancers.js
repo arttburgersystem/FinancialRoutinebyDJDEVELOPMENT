@@ -314,7 +314,7 @@ function renderFreelancers() {
       fgv('Freelancer *', flSel),
       fgv('Descrição do serviço *', svi('descricao', 'text', 'Ex: Criação de arte para Instagram, Ensaio fotográfico...', esv.descricao || '')),
       el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' } }, [
-        fgv('Data do serviço *', svi('data', 'date', '', esv.data || hj)),
+        fgv('Data do serviço *', svi('data', 'date', '', esv.data || msv.preData || hj)),
         fgv('Valor (R$) *', svi('valor', 'number', '0,00', esv.valor || '')),
         fgv('Status', svStSel),
       ]),
@@ -330,6 +330,161 @@ function renderFreelancers() {
     ovSv.onclick = function(e){ if (e.target === ovSv) setState({ servicoFreelancerModal: null }); };
     setTimeout(function(){ var i = document.getElementById('sv-descricao'); if (i) i.focus(); }, 50);
     return ovSv;
+  }
+
+  // ── MODAL CALENDÁRIO ─────────────────────────────────────────────────────
+  if (state.flCalendarModal) {
+    var mc  = state.flCalendarModal;
+    var flc = fls.find(function(f){ return f.id === mc.freelancerId; }) || {};
+    var calMes = mc.mes || hj.slice(0, 7);
+
+    function navCalMes(delta) {
+      var p = calMes.split('-'); var y = parseInt(p[0]); var mo = parseInt(p[1]) - 1 + delta;
+      y += Math.floor(mo / 12); mo = ((mo % 12) + 12) % 12;
+      setState({ flCalendarModal: Object.assign({}, mc, { mes: y + '-' + String(mo + 1).padStart(2, '0') }) });
+    }
+
+    var calYear  = parseInt(calMes.split('-')[0]);
+    var calMonth = parseInt(calMes.split('-')[1]) - 1; // 0-indexed
+    var DIAS_SEM = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+    // Serviços deste freelancer neste mês, indexados por dia
+    var svsMes = servicos.filter(function(s){
+      return s.freelancerId === mc.freelancerId && (s.data || '').slice(0, 7) === calMes;
+    });
+    var svsPorDia = {}; // dia(1-31) → [sv,...]
+    svsMes.forEach(function(s){
+      var d = parseInt((s.data || '').slice(8, 10));
+      if (!svsPorDia[d]) svsPorDia[d] = [];
+      svsPorDia[d].push(s);
+    });
+
+    var diasNoMes = new Date(calYear, calMonth + 1, 0).getDate();
+    var primeiroDia = new Date(calYear, calMonth, 1).getDay(); // 0=Dom
+
+    // Totais do mês
+    var totalMesFl  = svsMes.reduce(function(s, sv){ return s + (sv.valor || 0); }, 0);
+    var totalDiasFL = Object.keys(svsPorDia).length;
+
+    // Grid de células do calendário
+    var cells = [];
+    for (var ci = 0; ci < primeiroDia; ci++) cells.push(null); // vazios antes
+    for (var cd = 1; cd <= diasNoMes; cd++) cells.push(cd);
+
+    var calGrid = el('div', { style: {
+      display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)',
+      gap: '4px', padding: '0 2px',
+    }});
+
+    // Cabeçalho dias semana
+    DIAS_SEM.forEach(function(d, i){
+      calGrid.appendChild(el('div', { style: {
+        textAlign: 'center', fontSize: '10px', fontWeight: '700',
+        color: (i === 0 || i === 6) ? 'var(--red)' : 'var(--text3)',
+        padding: '4px 0', textTransform: 'uppercase',
+      }}, d));
+    });
+
+    // Células dos dias
+    cells.forEach(function(dia){
+      if (dia === null) { calGrid.appendChild(el('div', {})); return; }
+
+      var svsDia  = svsPorDia[dia] || [];
+      var temSv   = svsDia.length > 0;
+      var totalDia = svsDia.reduce(function(s, sv){ return s + (sv.valor || 0); }, 0);
+      var eHj     = calMes + '-' + String(dia).padStart(2, '0') === hj;
+      var isFut   = calMes + '-' + String(dia).padStart(2, '0') > hj;
+
+      var cell = el('div', { style: {
+        minHeight: '54px', borderRadius: '8px', padding: '4px',
+        cursor: 'pointer',
+        border: eHj ? '2px solid var(--primary)' : '1px solid var(--border)',
+        background: temSv ? 'rgba(0,168,107,.10)' : isFut ? 'var(--bg3)' : 'var(--bg)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+        transition: 'background .12s',
+        opacity: isFut ? '0.5' : '1',
+      }});
+      cell.onmouseenter = function(){ if (!isFut) cell.style.background = temSv ? 'rgba(0,168,107,.22)' : 'var(--bg3)'; };
+      cell.onmouseleave = function(){ cell.style.background = temSv ? 'rgba(0,168,107,.10)' : isFut ? 'var(--bg3)' : 'var(--bg)'; };
+
+      var diaEl = el('div', { style: {
+        fontSize: '13px', fontWeight: eHj ? '800' : temSv ? '700' : '500',
+        color: eHj ? 'var(--primary)' : temSv ? '#00a86b' : 'var(--text)',
+      }}, String(dia));
+      cell.appendChild(diaEl);
+
+      if (temSv) {
+        cell.appendChild(el('div', { style: { fontSize: '9px', fontWeight: '700', color: '#00a86b' } }, fmtMoney(totalDia)));
+        cell.appendChild(el('div', { style: {
+          fontSize: '9px', background: '#00a86b', color: '#fff',
+          borderRadius: '8px', padding: '1px 5px', fontWeight: '700',
+        }}, svsDia.length + ' serv.'));
+      }
+
+      (function(d2, svsDia2){
+        cell.onclick = function(){
+          // Se tem serviço, abre edição do primeiro; senão abre novo serviço pré-preenchido
+          if (svsDia2.length === 1) {
+            setState({ flCalendarModal: null, servicoFreelancerModal: { editItem: svsDia2[0] } });
+          } else if (svsDia2.length > 1) {
+            // múltiplos: abre novo mas pré-preenche data
+            setState({ flCalendarModal: null, servicoFreelancerModal: { freelancerId: mc.freelancerId, preData: calMes + '-' + String(d2).padStart(2, '0') } });
+          } else {
+            setState({ flCalendarModal: null, servicoFreelancerModal: { freelancerId: mc.freelancerId, preData: calMes + '-' + String(d2).padStart(2, '0') } });
+          }
+        };
+      })(dia, svsDia);
+
+      calGrid.appendChild(cell);
+    });
+
+    var calModal = div('modal', [
+      div('modal-title', [
+        el('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px' } }, [
+          el('span', { style: { fontSize: '15px', fontWeight: '800' } }, '📅 ' + (flc.nome || '—')),
+          el('span', { style: { fontSize: '11px', color: 'var(--text3)', fontWeight: '400' } }, flc.especialidade || 'Freelancer'),
+        ]),
+        el('button', { class: 'modal-close', onclick: function(){ setState({ flCalendarModal: null }); } }, '×'),
+      ]),
+
+      // Navegação de mês
+      el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0 14px' } }, [
+        el('button', { style: { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text2)', cursor: 'pointer', padding: '5px 12px', fontSize: '16px', lineHeight: '1' }, onclick: function(){ navCalMes(-1); } }, '‹'),
+        el('div', { style: { fontWeight: '700', fontSize: '15px', color: 'var(--text)' } }, MESES[calMonth] + ' ' + calYear),
+        el('button', { style: { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text2)', cursor: 'pointer', padding: '5px 12px', fontSize: '16px', lineHeight: '1' }, onclick: function(){ navCalMes(1); } }, '›'),
+      ]),
+
+      // Totais do mês
+      el('div', { style: { display: 'flex', gap: '12px', marginBottom: '14px' } }, [
+        el('div', { style: { flex: '1', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', textAlign: 'center' } }, [
+          el('div', { style: { fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700' } }, 'Dias trabalhados'),
+          el('div', { style: { fontSize: '20px', fontWeight: '800', color: 'var(--text)' } }, String(totalDiasFL)),
+        ]),
+        el('div', { style: { flex: '1', background: 'rgba(0,168,107,.08)', border: '1px solid rgba(0,168,107,.3)', borderRadius: '8px', padding: '8px 14px', textAlign: 'center' } }, [
+          el('div', { style: { fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700' } }, 'Total do mês'),
+          el('div', { style: { fontSize: '20px', fontWeight: '800', color: '#00a86b' } }, fmtMoney(totalMesFl)),
+        ]),
+        el('div', { style: { flex: '1', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', textAlign: 'center' } }, [
+          el('div', { style: { fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: '700' } }, 'Serviços'),
+          el('div', { style: { fontSize: '20px', fontWeight: '800', color: 'var(--text)' } }, String(svsMes.length)),
+        ]),
+      ]),
+
+      calGrid,
+
+      el('div', { style: { marginTop: '12px', fontSize: '11px', color: 'var(--text3)', display: 'flex', gap: '16px' } }, [
+        el('span', {}, '🟢 Dia com serviço · Clique em qualquer dia para registrar'),
+      ]),
+
+      div('modal-actions', [
+        btn('btn-ghost', 'Fechar', function(){ setState({ flCalendarModal: null }); }),
+        btn('btn-primary', '+ Novo serviço', function(){ setState({ flCalendarModal: null, servicoFreelancerModal: { freelancerId: mc.freelancerId } }); }),
+      ]),
+    ]);
+    calModal.style.maxWidth = '520px';
+    var ovCal = div('modal-overlay', [calModal]);
+    ovCal.onclick = function(e){ if (e.target === ovCal) setState({ flCalendarModal: null }); };
+    return ovCal;
   }
 
   // ── KPIs GERAIS ───────────────────────────────────────────────────────────
@@ -414,6 +569,7 @@ function renderFreelancers() {
         ]),
         el('td', { style: { padding: '8px 10px', textAlign: 'right' } }, [
           el('div', { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } }, [
+            el('button', { class: 'btn-icon', title: 'Ver calendário', style: { fontSize: '14px' }, onclick: (function(ff){ return function(){ setState({ flCalendarModal: { freelancerId: ff.id, mes: hj.slice(0,7) } }); }; })(f) }, '📅'),
             el('button', { class: 'btn-icon', title: 'Novo serviço', style: { fontSize: '14px' }, onclick: (function(ff){ return function(){ setState({ servicoFreelancerModal: { freelancerId: ff.id } }); }; })(f) }, '📋'),
             el('button', { class: 'btn-icon edit', title: 'Editar', onclick: (function(ff){ return function(){ setState({ freelancerModal: { editItem: ff } }); }; })(f) }, '✏️'),
             el('button', { class: 'btn-icon delete', title: 'Excluir', onclick: (function(ff){ return function(){

@@ -577,7 +577,7 @@ function renderDailyCalModal(){
   function navM(d){
     var y=calYear,mo=calMonth+d;
     y+=Math.floor(mo/12);mo=((mo%12)+12)%12;
-    setState({dailyCalModal:{mes:y+'-'+String(mo+1).padStart(2,'0')}});
+    setState({dailyCalModal:{mes:y+'-'+String(mo+1).padStart(2,'0'),selectedDate:null}});
   }
 
   var DIAS_SEM=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -663,16 +663,95 @@ function renderDailyCalModal(){
       cell.appendChild(el('div',{style:{fontSize:'8px',fontWeight:'700',color:'var(--blue)',lineHeight:'1'}},futuras.length+'fut'));
     }
 
-    cell.onclick=function(){
-      if(ehFuturo){
-        // Cria tarefa futura para esse dia
-        setState({dailyCalModal:null,dailyModal:{oneOff:true,_dataFutura:dateStr}});
+    !function(ds,futuro){
+      cell.onclick=function(){
+        setState({dailyCalModal:{mes:calMes,selectedDate:ds,_futuro:futuro}});
+      };
+    }(dateStr,ehFuturo);
+    grid.appendChild(cell);
+  });
+
+  var selDate=state.dailyCalModal.selectedDate||null;
+  var selFuturo=state.dailyCalModal._futuro||false;
+
+  // Painel de ações do dia selecionado
+  var painelDia=null;
+  if(selDate){
+    var selDtParts=selDate.split('-');
+    var selLabel=selDtParts[2]+'/'+selDtParts[1]+'/'+selDtParts[0];
+    var selDow=new Date(selDate+'T12:00:00').getDay();
+    var defsParaDia=defs.filter(function(d){return !d.dias||!d.dias.length||d.dias.indexOf(selDow)>=0;});
+    var defsLinhas=defsParaDia.map(function(def){
+      var corD=corMap[def.cor]||'var(--gold)';
+      var row=el('div',{style:{
+        display:'flex',alignItems:'center',gap:'8px',padding:'7px 10px',
+        borderRadius:'7px',border:'1px solid var(--border)',cursor:'pointer',
+        background:'var(--bg)',marginBottom:'4px',transition:'background .12s',
+      }});
+      row.onmouseenter=function(){row.style.background='var(--bg3)';};
+      row.onmouseleave=function(){row.style.background='var(--bg)';};
+      row.appendChild(el('div',{style:{width:'8px',height:'8px',borderRadius:'50%',flexShrink:'0',background:corD}},''));
+      var nomeTxt=def.nome+(def.horario?' · '+def.horario:'');
+      row.appendChild(el('span',{style:{flex:'1',fontSize:'12px',color:'var(--text)'}},nomeTxt));
+      row.appendChild(el('span',{style:{fontSize:'10px',color:'var(--text3)',flexShrink:'0'}},'Ativar'));
+      !function(d,ds,isFut){
+        row.onclick=function(){
+          // Verifica se já existe instância dessa rotina nessa data
+          var jaExiste=(state.dailyOps||[]).some(function(op){
+            return op.defId===d.id&&op.data===ds&&op.status!=='cancelada';
+          });
+          if(jaExiste){alert('Esta rotina já está ativa para '+ds);return;}
+          var novaOp={
+            id:uid(),defId:d.id,profile:pf,nome:d.nome,
+            descricao:d.descricao||'',horario:d.horario||'',
+            data:ds,status:isFut?'futura':'hoje',
+            cor:d.cor||'gold',criadoEm:new Date().toISOString(),
+          };
+          var ops2=(state.dailyOps||[]).slice();
+          ops2.push(novaOp);
+          setState({dailyCalModal:null,dailyOps:ops2});
+          scheduleSave();
+        };
+      }(def,selDate,selFuturo);
+      return row;
+    });
+
+    painelDia=el('div',{style:{
+      marginTop:'12px',padding:'12px',borderRadius:'9px',
+      border:'1px solid var(--primary)',background:'rgba(96,165,250,.06)',
+    }});
+    painelDia.appendChild(el('div',{style:{
+      fontWeight:'700',fontSize:'12px',color:'var(--primary)',marginBottom:'10px',
+      display:'flex',alignItems:'center',justifyContent:'space-between',
+    }},[
+      '📅 '+selLabel,
+      el('button',{style:{background:'none',border:'none',cursor:'pointer',fontSize:'13px',color:'var(--text3)'},
+        onclick:function(){setState({dailyCalModal:{mes:calMes,selectedDate:null}});}
+      },'✕'),
+    ]));
+
+    // Botão nova tarefa única
+    var btnTarefa=el('button',{style:{
+      width:'100%',padding:'8px',borderRadius:'7px',cursor:'pointer',
+      background:'var(--primary)',color:'#fff',border:'none',
+      fontWeight:'700',fontSize:'12px',marginBottom:'10px',
+    }},'📋 Nova tarefa única para este dia');
+    btnTarefa.onclick=function(){
+      if(selFuturo){
+        setState({dailyCalModal:null,dailyModal:{oneOff:true,_dataFutura:selDate}});
       } else {
         setState({dailyCalModal:null,dailyModal:{oneOff:true}});
       }
     };
-    grid.appendChild(cell);
-  });
+    painelDia.appendChild(btnTarefa);
+
+    if(defsLinhas.length){
+      painelDia.appendChild(el('div',{style:{fontSize:'11px',fontWeight:'700',color:'var(--text3)',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'.05em'}},'🔄 Ativar recorrência neste dia'));
+      defsLinhas.forEach(function(r){painelDia.appendChild(r);});
+    } else {
+      painelDia.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)',textAlign:'center',padding:'8px 0'}},'Nenhuma rotina ativa para este dia da semana'));
+    }
+  }
 
   var legenda=el('div',{style:{display:'flex',gap:'14px',flexWrap:'wrap',marginTop:'10px',fontSize:'11px',color:'var(--text3)'}},[
     el('span',{},[el('span',{style:{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',background:'var(--gold)',marginRight:'4px'}},''),'Rotina ativa']),
@@ -693,7 +772,8 @@ function renderDailyCalModal(){
   ]));
   modal.appendChild(grid);
   modal.appendChild(legenda);
-  modal.appendChild(el('div',{style:{marginTop:'12px',fontSize:'11px',color:'var(--text3)'}},'Clique em um dia futuro para agendar uma tarefa · Clique em hoje para adicionar ao dia'));
+  if(painelDia)modal.appendChild(painelDia);
+  if(!painelDia)modal.appendChild(el('div',{style:{marginTop:'12px',fontSize:'11px',color:'var(--text3)'}},'Clique em um dia para agendar tarefa ou ativar rotina'));
 
   var ov=el('div',{class:'modal-overlay',onclick:function(e){if(e.target===ov)setState({dailyCalModal:null});}});
   ov.appendChild(modal);

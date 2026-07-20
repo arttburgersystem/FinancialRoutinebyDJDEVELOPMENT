@@ -423,6 +423,7 @@ function renderFuncionarios() {
     {id:'ferias',       label:'🏖 Férias',       badge:feriasNecessarias.length, badgeColor:'var(--gold)'},
     {id:'exames',       label:'🩺 Exames',       badge:examesVencidos+examesAVencer, badgeColor:examesVencidos>0?'#e05252':'var(--gold)'},
     {id:'folha',        label:'💰 Folha',         badge:0},
+    {id:'provisao',     label:'📊 Provisão',      badge:0},
   ];
   var tabsEl=el('div',{style:{display:'flex',gap:'0',borderBottom:'2px solid var(--border)',marginBottom:'20px'}},
     tabDefs.map(function(t){
@@ -773,6 +774,208 @@ function renderFuncionarios() {
             ]),
           ]),
       ]),
+    ]);
+  } else if (funcTab === 'provisao') {
+
+  // ── CONTEÚDO: PROVISÃO ────────────────────────────────────────────────────
+    var provAno = state.provAno || parseInt(today().slice(0, 4));
+    var mesAtualNum = parseInt(today().slice(5, 7));
+    var ehAnoAtual = provAno === parseInt(today().slice(0, 4));
+
+    function navPA(delta) { setState({provAno: provAno + delta}); }
+
+    var MN_P = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+    // Por funcionário: calcula provisão mês a mês no ano
+    var provFuncs = ativos.map(function(f) {
+      var sal = f.salario || 0;
+      var adm = f.dataAdmissao || '';
+      var admAno = adm ? parseInt(adm.slice(0,4)) : provAno;
+      var admMes = adm ? parseInt(adm.slice(5,7)) : 1;
+      // Primeiro mês em que contribui no provAno (13=ainda não começou neste ano)
+      var mesIni = admAno < provAno ? 1 : admAno === provAno ? admMes : 13;
+      var nMeses = Math.max(0, 13 - mesIni);
+      // Provisão mensal quando ativo:
+      // 13º: salário / 12
+      // Férias: salário × (4/3) / 12  (inclui 1/3 constitucional)
+      var p13m = sal / 12;
+      var pFrm = sal * 4 / 3 / 12;
+      var meses = [];
+      for (var _m = 1; _m <= 12; _m++) {
+        var _at = mesIni <= 12 && _m >= mesIni;
+        meses.push({ at: _at, p13: _at ? p13m : 0, pFr: _at ? pFrm : 0 });
+      }
+      return {
+        f: f,
+        mesIni: mesIni,
+        nMeses: nMeses,
+        total13: Math.round(sal * nMeses / 12 * 100) / 100,
+        totalFr: Math.round(sal * 4/3 * nMeses / 12 * 100) / 100,
+        meses: meses,
+      };
+    });
+
+    // Totais mensais
+    var mesTotP = [];
+    var _acumP = 0;
+    for (var _mi = 0; _mi < 12; _mi++) {
+      var _t13 = 0, _tFr = 0, _nF = 0;
+      provFuncs.forEach(function(pi) {
+        if (pi.meses[_mi].at) { _t13 += pi.meses[_mi].p13; _tFr += pi.meses[_mi].pFr; _nF++; }
+      });
+      _t13 = Math.round(_t13 * 100) / 100;
+      _tFr = Math.round(_tFr * 100) / 100;
+      _acumP += _t13 + _tFr;
+      mesTotP.push({ m: _mi+1, t13: _t13, tFr: _tFr, tot: _t13+_tFr, acum: Math.round(_acumP*100)/100, nF: _nF });
+    }
+
+    var gT13P = Math.round(mesTotP.reduce(function(s,m){return s+m.t13;},0)*100)/100;
+    var gTFrP = Math.round(mesTotP.reduce(function(s,m){return s+m.tFr;},0)*100)/100;
+    var gTotP = Math.round((gT13P + gTFrP)*100)/100;
+    var gMediaP = Math.round(gTotP / 12 * 100) / 100;
+
+    // Navegação de ano
+    var anoNavP = el('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'20px'}});
+    var _prevAP = el('button',{style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',cursor:'pointer',padding:'5px 12px',fontSize:'14px'}},'‹');
+    _prevAP.onclick = function(){navPA(-1);};
+    var _anoLab = el('div',{style:{padding:'6px 20px',borderRadius:'6px',fontSize:'14px',fontWeight:'700',background:'var(--bg3)',border:'1px solid var(--border)',color:'var(--primary)',minWidth:'100px',textAlign:'center'}},String(provAno));
+    var _nextAP = el('button',{style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',cursor:'pointer',padding:'5px 12px',fontSize:'14px'}},'›');
+    _nextAP.onclick = function(){navPA(1);};
+    anoNavP.appendChild(_prevAP); anoNavP.appendChild(_anoLab); anoNavP.appendChild(_nextAP);
+
+    // KPIs
+    var kpiProvEl = el('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(148px,1fr))',gap:'12px',marginBottom:'20px'}},[
+      el('div',{class:'kpi-card'},[el('div',{class:'kpi-label'},'Funcionários ativos'),el('div',{class:'kpi-value'},String(ativos.length)),el('div',{class:'kpi-sub'},'incluídos na provisão')]),
+      el('div',{class:'kpi-card red'},[el('div',{class:'kpi-label'},'Total 13º'),el('div',{class:'kpi-value red'},fmtMoney(gT13P)),el('div',{class:'kpi-sub'},'previsão proporcional')]),
+      el('div',{class:'kpi-card gold'},[el('div',{class:'kpi-label'},'Total Férias'),el('div',{class:'kpi-value gold'},fmtMoney(gTFrP)),el('div',{class:'kpi-sub'},'salário + 1/3 constitucional')]),
+      el('div',{class:'kpi-card green'},[el('div',{class:'kpi-label'},'Total Geral'),el('div',{class:'kpi-value green'},fmtMoney(gTotP)),el('div',{class:'kpi-sub'},'13º + férias')]),
+      el('div',{class:'kpi-card'},[el('div',{class:'kpi-label'},'Provisão mensal'),el('div',{class:'kpi-value'},fmtMoney(gMediaP)),el('div',{class:'kpi-sub'},'média por mês')]),
+    ]);
+
+    // Tabela mensal
+    var _mesRows = mesTotP.map(function(mt) {
+      var _past = ehAnoAtual && mt.m < mesAtualNum;
+      var _curr = ehAnoAtual && mt.m === mesAtualNum;
+      var _bgRow = _curr ? 'rgba(96,165,250,.09)' : '';
+      var _op = _past ? '.55' : '1';
+      return el('tr',{style:{borderBottom:'1px solid var(--border)',background:_bgRow,opacity:_op}},[
+        el('td',{style:{padding:'9px 14px',fontWeight:_curr?'800':'500',color:_curr?'var(--primary)':'var(--text)'}},[
+          MN_P[mt.m-1],
+          _curr ? el('span',{style:{fontSize:'10px',fontWeight:'700',marginLeft:'6px',padding:'1px 6px',borderRadius:'8px',background:'var(--primary)',color:'#fff'}},'Atual') : null,
+          _past ? el('span',{style:{fontSize:'10px',color:'var(--text3)',marginLeft:'6px'}},'realizado') : null,
+        ].filter(Boolean)),
+        el('td',{style:{padding:'9px 14px',textAlign:'center',fontSize:'12px',color:'var(--text3)'}},mt.nF > 0 ? String(mt.nF) : '—'),
+        el('td',{style:{padding:'9px 14px',textAlign:'right',fontWeight:'600',color:'var(--red)'}},mt.t13>0?fmtMoney(mt.t13):'—'),
+        el('td',{style:{padding:'9px 14px',textAlign:'right',fontWeight:'600',color:'var(--gold)'}},mt.tFr>0?fmtMoney(mt.tFr):'—'),
+        el('td',{style:{padding:'9px 14px',textAlign:'right',fontWeight:'700',color:'var(--text)',fontSize:'13px'}},mt.tot>0?fmtMoney(mt.tot):'—'),
+        el('td',{style:{padding:'9px 14px',textAlign:'right',fontWeight:'700',color:'var(--primary)',fontSize:'13px'}},mt.acum>0?fmtMoney(mt.acum):'—'),
+      ]);
+    });
+
+    var _mesFoot = el('tr',{style:{borderTop:'2px solid var(--border)',fontWeight:'700',background:'var(--bg3)'}},[
+      el('td',{style:{padding:'9px 14px',fontWeight:'700'}},'TOTAL ANUAL'),
+      el('td',{style:{padding:'9px 14px',textAlign:'center',fontSize:'12px',color:'var(--text3)'}},String(ativos.length)),
+      el('td',{style:{padding:'9px 14px',textAlign:'right',color:'var(--red)',fontWeight:'800'}},fmtMoney(gT13P)),
+      el('td',{style:{padding:'9px 14px',textAlign:'right',color:'var(--gold)',fontWeight:'800'}},fmtMoney(gTFrP)),
+      el('td',{style:{padding:'9px 14px',textAlign:'right',fontWeight:'800',color:'var(--text)'}},fmtMoney(gTotP)),
+      el('td',{style:{padding:'9px 14px',textAlign:'right',color:'var(--primary)',fontWeight:'800'}},fmtMoney(gTotP)),
+    ]);
+
+    var _mesTable = el('div',{style:{overflowX:'auto',marginBottom:'24px'}},[
+      el('table',{style:{width:'100%',borderCollapse:'collapse'}},[
+        el('thead',{},[el('tr',{style:{borderBottom:'2px solid var(--border)'}},
+          ['Mês','Funcionários','Provisão 13º','Provisão Férias (+ 1/3)','Total do Mês','Acumulado no Ano'].map(function(h,i){
+            return el('th',{style:{padding:'8px 14px',textAlign:i<2?'left':'right',fontSize:'11px',color:'var(--text3)',fontWeight:'700',textTransform:'uppercase'}},h);
+          })
+        )]),
+        el('tbody',{},_mesRows),
+        el('tfoot',{},[_mesFoot]),
+      ]),
+    ]);
+
+    // Tabela por funcionário
+    var _fRows = provFuncs.map(function(pi) {
+      var _f = pi.f;
+      var _ehFut = pi.mesIni > 12;
+      var _admLbl = _f.dataAdmissao ? fmtDate(_f.dataAdmissao) : '—';
+      var _mesIniLbl = _ehFut ? 'Não iniciado' : (MN_P[pi.mesIni-1]||'Jan');
+      return el('tr',{
+        style:{borderBottom:'1px solid var(--border)'},
+        onmouseenter:function(e){e.currentTarget.style.background='var(--bg3)';},
+        onmouseleave:function(e){e.currentTarget.style.background='';},
+      },[
+        el('td',{style:{padding:'9px 14px'}},[
+          el('div',{style:{fontWeight:'600',fontSize:'13px',color:'var(--text)'}},_f.nome),
+          _f.cargo?el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}},_f.cargo):null,
+        ].filter(Boolean)),
+        el('td',{style:{padding:'9px 14px',fontSize:'12px',color:'var(--text3)'}},_admLbl),
+        el('td',{style:{padding:'9px 14px',textAlign:'right',fontWeight:'600',color:'var(--text)'}},fmtMoney(_f.salario||0)),
+        el('td',{style:{padding:'9px 14px',textAlign:'center'}},[
+          el('span',{style:{
+            padding:'2px 8px',borderRadius:'10px',fontSize:'11px',fontWeight:'700',
+            background:_ehFut?'var(--bg3)':'rgba(96,165,250,.1)',
+            color:_ehFut?'var(--text3)':'var(--primary)',
+          }},_ehFut?'Não iniciado':(pi.nMeses+' meses — a partir de '+_mesIniLbl)),
+        ]),
+        el('td',{style:{padding:'9px 14px',textAlign:'right',fontWeight:'600',color:'var(--red)'}},pi.total13>0?fmtMoney(pi.total13):'—'),
+        el('td',{style:{padding:'9px 14px',textAlign:'right',fontWeight:'600',color:'var(--gold)'}},pi.totalFr>0?fmtMoney(pi.totalFr):'—'),
+        el('td',{style:{padding:'9px 14px',textAlign:'right',fontWeight:'700',color:'var(--text)',fontSize:'13px'}},
+          (pi.total13+pi.totalFr)>0?fmtMoney(Math.round((pi.total13+pi.totalFr)*100)/100):'—'),
+      ]);
+    });
+
+    var _fFoot = el('tr',{style:{borderTop:'2px solid var(--border)',fontWeight:'700',background:'var(--bg3)'}},[
+      el('td',{style:{padding:'9px 14px',fontWeight:'700'}},'TOTAIS'),
+      el('td',{},''),
+      el('td',{style:{padding:'9px 14px',textAlign:'right',fontWeight:'700'}},fmtMoney(ativos.reduce(function(s,f){return s+(f.salario||0);},0))),
+      el('td',{},''),
+      el('td',{style:{padding:'9px 14px',textAlign:'right',color:'var(--red)',fontWeight:'800'}},fmtMoney(gT13P)),
+      el('td',{style:{padding:'9px 14px',textAlign:'right',color:'var(--gold)',fontWeight:'800'}},fmtMoney(gTFrP)),
+      el('td',{style:{padding:'9px 14px',textAlign:'right',fontWeight:'800',color:'var(--text)'}},fmtMoney(gTotP)),
+    ]);
+
+    var _fTable = ativos.length > 0 ? el('div',{style:{overflowX:'auto',marginBottom:'16px'}},[
+      el('div',{style:{fontSize:'12px',fontWeight:'700',color:'var(--text2)',marginBottom:'8px',textTransform:'uppercase',letterSpacing:'.05em'}},'Detalhe por funcionário — '+provAno),
+      el('table',{style:{width:'100%',borderCollapse:'collapse'}},[
+        el('thead',{},[el('tr',{style:{borderBottom:'2px solid var(--border)'}},
+          ['Funcionário','Admissão','Salário Base','Período ativo em '+provAno,'13º Proporcional','Férias Proporcional','Total'].map(function(h,i){
+            return el('th',{style:{padding:'8px 14px',textAlign:i<4?'left':'right',fontSize:'11px',color:'var(--text3)',fontWeight:'700',textTransform:'uppercase'}},h);
+          })
+        )]),
+        el('tbody',{},_fRows),
+        el('tfoot',{},[_fFoot]),
+      ]),
+    ]) : null;
+
+    var _avisoP = el('div',{style:{
+      background:'rgba(96,165,250,.06)',border:'1px solid rgba(96,165,250,.2)',
+      borderRadius:'8px',padding:'10px 14px',fontSize:'12px',color:'var(--text2)',lineHeight:'1.7',
+    }},[
+      el('strong',{},'📌 Como são calculados: '),
+      '13º Salário = Salário ÷ 12 × meses trabalhados no ano · ',
+      'Férias = (Salário × 1,3333) ÷ 12 × meses (já inclui o 1/3 constitucional). ',
+      'Funcionários admitidos no ano corrente entram a partir do mês de admissão com proporcionalidade exata. ',
+      el('br',{},''),
+      'Valores estimados — consulte seu contador para confirmação final com adicionais, benefícios e horas extras.',
+    ]);
+
+    contentEl = div('',[
+      anoNavP,
+      kpiProvEl,
+      ativos.length === 0
+        ? div('card',[
+            div('empty',[
+              div('empty-icon','📊'),
+              div('empty-title','Nenhum funcionário ativo'),
+              el('p',{style:{fontSize:'13px',color:'var(--text3)',marginBottom:'16px'}},'Cadastre e ative funcionários para visualizar as provisões de 13º e férias.'),
+            ]),
+          ])
+        : div('card',[
+            el('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--text2)',marginBottom:'12px'}},'Previsão de Provisão Mensal — '+provAno),
+            _mesTable,
+            _fTable,
+            _avisoP,
+          ]),
     ]);
   }
 

@@ -1814,6 +1814,21 @@ function renderPagar(){
       lsSet('contas',cs); setState({contas:cs,_pagarSel:{}}); scheduleSave();
     };
 
+    // Banco
+    var bancosSel = (state.bancos||[]).filter(function(b){return b.profile===state.profile;});
+    var bancSel = el('select',{style:{padding:'5px 8px',fontSize:'12px',border:'1px solid var(--border)',borderRadius:'6px',background:'var(--bg)',color:'var(--text)'}});
+    [['','— Banco —']].concat(bancosSel.map(function(b){return[b.id, b.nome];})).forEach(function(o){
+      var op=el('option',{value:o[0]},o[1]); if(!o[0])op.disabled=true; bancSel.appendChild(op);
+    });
+    bancSel.onchange = function(){
+      var v = bancSel.value; if(!v) return;
+      var cs = (state.contas||[]).map(function(c){
+        if(!_pagarSel[c.id]) return c;
+        return Object.assign({},c,{banco:v});
+      });
+      lsSet('contas',cs); setState({contas:cs,_pagarSel:{}}); scheduleSave();
+    };
+
     // Excluir
     var delBtn = el('button',{style:{
       padding:'5px 12px',fontSize:'12px',fontWeight:'700',
@@ -1838,6 +1853,7 @@ function renderPagar(){
     bar.appendChild(el('span',{style:{fontSize:'11px',color:'var(--text3)',flexShrink:'0'}},'Alterar:'));
     bar.appendChild(stSel);
     bar.appendChild(catSel);
+    bar.appendChild(bancSel);
     bar.appendChild(el('span',{style:{fontSize:'11px',color:'var(--text3)',flexShrink:'0'}},'Vencto:'));
     bar.appendChild(datInp);
     bar.appendChild(delBtn);

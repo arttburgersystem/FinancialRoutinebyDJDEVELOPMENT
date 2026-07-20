@@ -115,6 +115,26 @@ function renderEstoqueInsumos() {
   } else if (tab === 'movs') {
     rightBtns.appendChild(btn('btn-primary', '+ Movimento', function() { setState({ estoqueMovModal: { insumoId: null, tipo: 'entrada' } }); }));
   } else {
+    // Filtros da aba Fichas Técnicas
+    var fBuscaInp = el('input', { class: 'form-input', placeholder: 'Buscar ficha técnica...', style: { fontSize: '12px', padding: '5px 10px', maxWidth: '200px' } });
+    fBuscaInp.value = busca;
+    fBuscaInp.oninput = function(e) { setState({ estoqueBusca: e.target.value }); };
+    leftFilters.appendChild(fBuscaInp);
+
+    // Categorias disponíveis nas fichas
+    var fichasCats = [];
+    fichas.forEach(function(ft) { if (ft.categoria && fichasCats.indexOf(ft.categoria) === -1) fichasCats.push(ft.categoria); });
+    fichasCats.sort();
+    var fCatSel = el('select', { class: 'form-input', style: { fontSize: '12px', padding: '5px 8px' } });
+    fCatSel.appendChild(el('option', { value: '' }, 'Todas categorias'));
+    fichasCats.forEach(function(c) {
+      var opt = el('option', { value: c }, c);
+      if (c === catFilt) opt.selected = true;
+      fCatSel.appendChild(opt);
+    });
+    fCatSel.onchange = function(e) { setState({ estoqueCat: e.target.value }); };
+    leftFilters.appendChild(fCatSel);
+
     rightBtns.appendChild(btn('btn-primary', '+ Ficha Técnica', function() { setState({ fichaTecnicaModal: { editItem: null } }); }));
   }
 
@@ -125,7 +145,7 @@ function renderEstoqueInsumos() {
   var content;
   if (tab === 'itens')       content = _renderEiItens(itens, busca, filtro, catFilt);
   else if (tab === 'movs')   content = _renderEiMovs(movs, itens);
-  else                       content = _renderEiFichas(fichas);
+  else                       content = _renderEiFichas(fichas, busca, catFilt);
 
   var wrap = div('', []);
   wrap.appendChild(div('page-header', [
@@ -301,7 +321,18 @@ function _renderEiMovs(movs, itens) {
 
 // ── Tab Fichas Técnicas ───────────────────────────────────────────────────────
 
-function _renderEiFichas(fichas) {
+function _renderEiFichas(fichas, busca, catFilt) {
+  // Aplicar filtros
+  var filtradas = fichas.filter(function(ft) {
+    if (catFilt && ft.categoria !== catFilt) return false;
+    if (busca) {
+      var b = busca.toLowerCase();
+      if ((ft.nome || '').toLowerCase().indexOf(b) === -1 &&
+          (ft.categoria || '').toLowerCase().indexOf(b) === -1) return false;
+    }
+    return true;
+  });
+
   var wrap = el('div', { class: 'card', style: { padding: '0', overflow: 'hidden' } });
   var cols = '2fr 100px 90px 110px 110px 70px 70px 80px';
   var hdr = el('div', { style: { display: 'grid', gridTemplateColumns: cols, gap: '6px', padding: '8px 14px', background: 'var(--bg2)', borderBottom: '2px solid var(--border)' } });
@@ -319,7 +350,16 @@ function _renderEiFichas(fichas) {
     return wrap;
   }
 
-  fichas.forEach(function(ft) {
+  if (filtradas.length === 0) {
+    wrap.appendChild(div('empty', [
+      div('empty-icon', '🔍'),
+      div('empty-title', 'Nenhuma ficha encontrada'),
+      div('empty-sub', 'Ajuste os filtros de busca ou categoria'),
+    ]));
+    return wrap;
+  }
+
+  filtradas.forEach(function(ft) {
     var pv    = ft.precoVenda || 0;
     var cp    = ft.custoPorcao || 0;
     var das   = ft.pctDAS || 0;

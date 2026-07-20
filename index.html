@@ -454,6 +454,8 @@ var state={
   emprestimos: lsGet('emprestimos',[]),
   compras: lsGet('compras',[]),
   comprasLembretes: lsGet('comprasLembretes',[]),
+  adiantamentos: lsGet('adiantamentos',[]),
+  adiantamentoModal: null,
   compraModal: null,
   compraLembreteModal: null,
   comprasMes: null,
@@ -848,6 +850,7 @@ function scheduleSave(){
       fbPut('/patrimonios',arrToObj(state.patrimonios||[])),
       fbPut('/embConfig',state.embConfig||{}),
       fbPut('/comprasLembretes',arrToObj(state.comprasLembretes||[])),
+      fbPut('/adiantamentos',arrToObj(state.adiantamentos||[])),
     ]).then(function(){_updateSyncDOM('ok');})
       .catch(function(e){console.error(e);_updateSyncDOM('error');showToast('Erro ao salvar no Firebase','error');});
   },1500);
@@ -2886,6 +2889,7 @@ function render(){
   if(typeof renderCedulasModal==='function'){var cedM=renderCedulasModal();if(cedM)app.appendChild(cedM);}
   if(typeof renderCompraModal==='function'){var compraM=renderCompraModal();if(compraM)app.appendChild(compraM);}
   if(typeof renderLembreteCompraModal==='function'){var lcM=renderLembreteCompraModal();if(lcM)app.appendChild(lcM);}
+  if(typeof renderAdiantamentoModal==='function'){var adM=renderAdiantamentoModal();if(adM)app.appendChild(adM);}
   if(typeof renderShopListModal==='function'){var slM=renderShopListModal();if(slM)app.appendChild(slM);}
   if(typeof renderShopItemModal==='function'){var siM=renderShopItemModal();if(siM)app.appendChild(siM);}
   if(typeof renderEstoqueItemModal==='function'){var eiM=renderEstoqueItemModal();if(eiM)app.appendChild(eiM);}
@@ -2937,6 +2941,7 @@ function render(){
 <script src="js/page-emprestimos.js"></script>
 <script src="js/page-fornecedores.js"></script>
 <script src="js/page-funcionarios.js"></script>
+<script src="js/modal-adiantamento.js"></script>
 <script src="js/page-freelancers.js"></script>
 <script src="js/page-administrador.js"></script>
 <script src="js/page-cartoes.js"></script>

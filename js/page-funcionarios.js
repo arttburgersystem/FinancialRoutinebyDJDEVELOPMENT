@@ -456,7 +456,11 @@ function renderFuncionarios() {
   } else if(funcTab==='exames'){
     actionBtn=btn('btn-primary','🩺 Novo exame',function(){setState({exameModal:{}});});
   } else if(funcTab==='folha'){
-    actionBtn=btn('btn-ghost','🖨 Exportar PDF',function(){_exportFolhaPDF(ativos,state.folhaMes||(today().slice(0,7)));});
+    var _folhaMesBtn = state.folhaMes || today().slice(0,7);
+    actionBtn = el('div',{style:{display:'flex',gap:'8px'}},[
+      btn('btn-ghost','🖨 Exportar PDF',function(){_exportFolhaPDF(ativos,state.folhaMes||(today().slice(0,7)));}),
+      btn('btn-primary','💵 Adiantamentos',function(){setState({adiantamentoModal:{mes:state.folhaMes||today().slice(0,7)}});}),
+    ]);
   }
 
   // ── CONTEÚDO: FUNCIONÁRIOS ────────────────────────────────────────────────
@@ -788,6 +792,12 @@ function renderFuncionarios() {
     var labelFolha = MESES_F[fMes] + ' ' + fAno;
 
     // Calcula encargos simplificados para cada funcionário ativo
+    var adiantMes = (state.adiantamentos||[]).filter(function(a){
+      return a.profile===pf && a.mes===folhaMesSel;
+    });
+    var adiantMap = {};
+    adiantMes.forEach(function(a){ adiantMap[a.funcionarioId]=a; });
+
     var folhaItens = ativos.map(function(f){
       var sal = f.salario || 0;
       // INSS tabela simplificada 2025
@@ -807,7 +817,9 @@ function renderFuncionarios() {
       irrf = Math.max(0, Math.round(irrf*100)/100);
       var liquido = Math.round((sal - inss - irrf)*100)/100;
       var fgts = Math.round(sal*0.08*100)/100;
-      return {f:f, sal:sal, inss:inss, irrf:irrf, liquido:liquido, fgts:fgts};
+      var adiant = adiantMap[f.id] ? adiantMap[f.id].valorAdiantamento : 0;
+      var saldo  = Math.round((liquido - adiant)*100)/100;
+      return {f:f, sal:sal, inss:inss, irrf:irrf, liquido:liquido, fgts:fgts, adiant:adiant, saldo:saldo};
     });
 
     var totalSal     = folhaItens.reduce(function(s,i){return s+i.sal;},0);
@@ -815,6 +827,8 @@ function renderFuncionarios() {
     var totalIrrf    = folhaItens.reduce(function(s,i){return s+i.irrf;},0);
     var totalLiquido = folhaItens.reduce(function(s,i){return s+i.liquido;},0);
     var totalFgts    = folhaItens.reduce(function(s,i){return s+i.fgts;},0);
+    var totalAdiant  = folhaItens.reduce(function(s,i){return s+i.adiant;},0);
+    var totalSaldo   = folhaItens.reduce(function(s,i){return s+i.saldo;},0);
 
     var mesNav2 = el('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'20px'}});
     var prevBtn2 = el('button',{style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',cursor:'pointer',padding:'5px 12px',fontSize:'14px'}},'‹');
@@ -832,14 +846,17 @@ function renderFuncionarios() {
       el('div',{class:'kpi-card'},[el('div',{class:'kpi-label'},'IRRF desconto'),el('div',{class:'kpi-value'},fmtMoney(totalIrrf)),el('div',{class:'kpi-sub'},'retido funcionários')]),
       el('div',{class:'kpi-card green'},[el('div',{class:'kpi-label'},'Total líquido'),el('div',{class:'kpi-value green'},fmtMoney(totalLiquido)),el('div',{class:'kpi-sub'},'a pagar')]),
       el('div',{class:'kpi-card gold'},[el('div',{class:'kpi-label'},'FGTS empresa'),el('div',{class:'kpi-value gold'},fmtMoney(totalFgts)),el('div',{class:'kpi-sub'},'8% sobre salários')]),
-    ]);
+      totalAdiant>0?el('div',{class:'kpi-card gold'},[el('div',{class:'kpi-label'},'Adiantado (dia 20)'),el('div',{class:'kpi-value gold'},fmtMoney(totalAdiant)),el('div',{class:'kpi-sub'},'já pago')]):null,
+      totalAdiant>0?el('div',{class:'kpi-card green'},[el('div',{class:'kpi-label'},'Saldo a pagar'),el('div',{class:'kpi-value green'},fmtMoney(totalSaldo)),el('div',{class:'kpi-sub'},'no fechamento')]):null,
+    ].filter(Boolean));
 
     var aviso = el('div',{style:{background:'rgba(201,168,76,.1)',border:'1px solid rgba(201,168,76,.3)',borderRadius:'8px',padding:'10px 14px',marginBottom:'16px',fontSize:'12px',color:'var(--text2)',lineHeight:'1.5'}});
     aviso.textContent='⚠ Cálculos estimados com base na tabela INSS/IRRF 2025. Consulte seu contador para valores oficiais com adicionais, benefícios e horas extras.';
 
-    var theadCols = ['Funcionário / Cargo','Salário Bruto','INSS (desc.)','IRRF (desc.)','Salário Líquido','FGTS (emp.)','Pix / Banco'];
+    var temAdiant = totalAdiant > 0;
+    var theadCols = ['Funcionário / Cargo','Salário Bruto','INSS (desc.)','IRRF (desc.)','Salário Líquido','FGTS (emp.)','Adiantamento','Saldo a Pagar','Pix / Banco'];
     var tbody = folhaItens.length === 0
-      ? [el('tr',{},[el('td',{colspan:'7',style:{textAlign:'center',padding:'30px',color:'var(--text3)'}},'Nenhum funcionário ativo')])]
+      ? [el('tr',{},[el('td',{colspan:'9',style:{textAlign:'center',padding:'30px',color:'var(--text3)'}},'Nenhum funcionário ativo')])]
       : folhaItens.map(function(item){
         var f = item.f;
         var pix = [f.chavePix?'Pix: '+f.chavePix:null, f.banco?f.banco:null].filter(Boolean).join('\n') || '—';
@@ -853,6 +870,8 @@ function renderFuncionarios() {
           el('td',{style:{color:'var(--red)'}},item.irrf>0?fmtMoney(item.irrf):'—'),
           el('td',{style:{fontWeight:'700',color:'var(--green)'}},fmtMoney(item.liquido)),
           el('td',{style:{color:'var(--gold)'}},fmtMoney(item.fgts)),
+          el('td',{style:{color:item.adiant?'var(--gold)':'var(--text3)',fontWeight:item.adiant?'700':'400'}},item.adiant?fmtMoney(item.adiant):'—'),
+          el('td',{style:{fontWeight:'700',color:item.adiant?'var(--green)':'var(--text3)'}},item.adiant?fmtMoney(item.saldo):'—'),
           el('td',{style:{fontSize:'11px',color:'var(--text3)',whiteSpace:'pre-line'}},pix),
         ]);
       });
@@ -864,6 +883,8 @@ function renderFuncionarios() {
       el('td',{style:{padding:'10px 14px',color:'var(--red)'}},totalIrrf>0?fmtMoney(totalIrrf):'—'),
       el('td',{style:{padding:'10px 14px',fontWeight:'800',color:'var(--green)'}},fmtMoney(totalLiquido)),
       el('td',{style:{padding:'10px 14px',color:'var(--gold)'}},fmtMoney(totalFgts)),
+      el('td',{style:{padding:'10px 14px',color:'var(--gold)',fontWeight:'800'}},temAdiant?fmtMoney(totalAdiant):'—'),
+      el('td',{style:{padding:'10px 14px',fontWeight:'800',color:'var(--green)'}},temAdiant?fmtMoney(totalSaldo):'—'),
       el('td',{},''),
     ]);
 

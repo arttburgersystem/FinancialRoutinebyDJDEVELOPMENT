@@ -125,6 +125,15 @@ function _doInit(){
     return op;
   });
 
+  // 6. Tarefas futuras cujo dia chegou → ativa
+  ops=ops.map(function(op){
+    if(op.profile===pf&&op.status==='futura'&&op.data&&op.data<=hj){
+      changed=true;
+      return Object.assign({},op,{status:hora06?'hoje':'programacao'});
+    }
+    return op;
+  });
+
   if(changed){lsSet('dailyOps',ops);state.dailyOps=ops;scheduleSave();}
 }
 
@@ -287,16 +296,18 @@ function renderDailyModal(){
     var nome=g('nome').trim();
     if(!nome){var ni=document.getElementById('do-nome');if(ni){ni.style.border='2px solid var(--red)';}showToast('Informe o nome da tarefa','error');return;}
     if(isOneOff){
+      var dataAlvo=m._dataFutura||today();
+      var ehFutura=dataAlvo>today();
       var inst={
         id:uid(),defId:null,profile:state.profile,
         nome:nome,descricao:g('descricao'),horario:g('horario'),
         cor:corSel,prioridade:g('prioridade')||'media',alertaMinutos:15,
-        data:today(),status:'hoje',criadaEm:new Date().toISOString(),
+        data:dataAlvo,status:ehFutura?'futura':'hoje',criadaEm:new Date().toISOString(),
         concluidaEm:null,canceladaEm:null,adiada:null,motivoCancelamento:'',
       };
       var ops2=(state.dailyOps||[]).concat([inst]);
       lsSet('dailyOps',ops2);setState({dailyOps:ops2,dailyModal:null});scheduleSave();
-      showToast('Tarefa adicionada ao dia!','success');
+      showToast(ehFutura?'Tarefa futura agendada para '+_doFmtData(dataAlvo)+'!':'Tarefa adicionada ao dia!','success');
     } else {
       var def={
         id:edit.id||uid(),profile:state.profile,
@@ -325,7 +336,7 @@ function renderDailyModal(){
     el('div',{class:'modal-box',style:{maxWidth:'440px',width:'96vw'}},[
       el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px'}},[
         el('h3',{style:{margin:'0',fontSize:'16px',color:'var(--text)'}},
-          isOneOff?'+ Tarefa Rápida (hoje)':isEdit?'Editar Rotina':'+ Nova Rotina Diária'),
+          isOneOff?(m._dataFutura&&m._dataFutura>today()?'📅 Tarefa Futura — '+_doFmtData(m._dataFutura):'+ Tarefa Rápida (hoje)'):isEdit?'Editar Rotina':'+ Nova Rotina Diária'),
         el('button',{class:'btn-ghost',style:{padding:'4px 10px'},onclick:function(){setState({dailyModal:null});}},'✕'),
       ]),
       div('form-group',[el('label',{class:'form-label'},'Nome da tarefa *'),inp('nome','text','Ex: Conferir caixa',edit.nome)]),
@@ -555,6 +566,140 @@ function _doColuna(titulo,icone,cor,cards){
   ]);
 }
 
+// ── modal calendário de tarefas ───────────────────────────────────────────────
+function renderDailyCalModal(){
+  if(!state.dailyCalModal)return null;
+  var pf=state.profile,hj=today();
+  var calMes=state.dailyCalModal.mes||hj.slice(0,7);
+  var calYear=parseInt(calMes.split('-')[0]);
+  var calMonth=parseInt(calMes.split('-')[1])-1;
+
+  function navM(d){
+    var y=calYear,mo=calMonth+d;
+    y+=Math.floor(mo/12);mo=((mo%12)+12)%12;
+    setState({dailyCalModal:{mes:y+'-'+String(mo+1).padStart(2,'0')}});
+  }
+
+  var DIAS_SEM=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  var MESES_NM=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var diasNoMes=new Date(calYear,calMonth+1,0).getDate();
+  var primeiroDia=new Date(calYear,calMonth,1).getDay();
+  var corMap={gold:'var(--gold)',blue:'var(--blue)',green:'var(--green)',red:'var(--red)',purple:'#9c59b6'};
+
+  var defs=(state.dailyTaskDefs||[]).filter(function(d){return d.profile===pf&&d.ativo;});
+  var ops=(state.dailyOps||[]).filter(function(op){return op.profile===pf;});
+
+  // Agrupa tarefas futuras e adiadas por data no mês
+  function opsDia(dateStr){
+    return ops.filter(function(op){
+      if(op.status==='futura')return op.data===dateStr;
+      if(op.status==='adiada')return op.adiada&&op.adiada.para===dateStr;
+      if(op.status==='hoje'||op.status==='pendente'||op.status==='concluida'||op.status==='cancelada')return op.data===dateStr;
+      return false;
+    });
+  }
+  // Rotinas ativas no weekday
+  function defsNoDia(dow){
+    return defs.filter(function(d){return !d.dias||!d.dias.length||d.dias.indexOf(dow)>=0;});
+  }
+
+  // Grid
+  var cells=[];
+  for(var ci=0;ci<primeiroDia;ci++)cells.push(null);
+  for(var cd=1;cd<=diasNoMes;cd++)cells.push(cd);
+
+  var grid=el('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'3px',marginTop:'6px'}});
+
+  DIAS_SEM.forEach(function(d,i){
+    grid.appendChild(el('div',{style:{textAlign:'center',fontSize:'10px',fontWeight:'700',
+      color:(i===0||i===6)?'var(--red)':'var(--text3)',padding:'4px 0',textTransform:'uppercase'}},d));
+  });
+
+  cells.forEach(function(dia){
+    if(dia===null){grid.appendChild(el('div',{}));return;}
+    var dateStr=calMes+'-'+String(dia).padStart(2,'0');
+    var dow=new Date(dateStr+'T12:00:00').getDay();
+    var ehHj=dateStr===hj;
+    var ehPassado=dateStr<hj;
+    var ehFuturo=dateStr>hj;
+    var rotsHoje=defsNoDia(dow);
+    var tasksDia=opsDia(dateStr);
+    var futuras=tasksDia.filter(function(op){return op.status==='futura';});
+    var conc=tasksDia.filter(function(op){return op.status==='concluida';});
+    var atrasadas=tasksDia.filter(function(op){return op.status==='pendente';});
+
+    var cell=el('div',{style:{
+      minHeight:'52px',borderRadius:'7px',padding:'4px',cursor:'pointer',
+      border:ehHj?'2px solid var(--primary)':'1px solid var(--border)',
+      background:ehPassado?'var(--bg3)':ehHj?'rgba(96,165,250,.06)':'var(--bg)',
+      display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',
+      position:'relative',transition:'background .12s',
+    }});
+    cell.onmouseenter=function(){cell.style.background=ehHj?'rgba(96,165,250,.14)':'var(--bg3)';};
+    cell.onmouseleave=function(){cell.style.background=ehPassado?'var(--bg3)':ehHj?'rgba(96,165,250,.06)':'var(--bg)';};
+
+    cell.appendChild(el('div',{style:{
+      fontSize:'13px',fontWeight:ehHj?'800':'500',
+      color:ehHj?'var(--primary)':ehPassado?'var(--text3)':'var(--text)',
+    }},String(dia)));
+
+    // Dots: rotinas (cinza/dourado), tarefas futuras (azul), concluídas (verde), atrasadas (vermelho)
+    var dotRow=el('div',{style:{display:'flex',gap:'2px',flexWrap:'wrap',justifyContent:'center'}});
+    rotsHoje.slice(0,4).forEach(function(d){
+      dotRow.appendChild(el('div',{title:d.nome,style:{
+        width:'6px',height:'6px',borderRadius:'50%',
+        background:ehPassado?(conc.length?'var(--green)':'var(--text3)'):(corMap[d.cor]||'var(--gold)'),
+      }}));
+    });
+    futuras.forEach(function(op){
+      dotRow.appendChild(el('div',{title:op.nome,style:{width:'6px',height:'6px',borderRadius:'50%',background:'var(--blue)'}}));
+    });
+    atrasadas.forEach(function(){
+      dotRow.appendChild(el('div',{style:{width:'6px',height:'6px',borderRadius:'50%',background:'var(--red)'}}));
+    });
+    if(dotRow.childNodes.length)cell.appendChild(dotRow);
+
+    if(futuras.length){
+      cell.appendChild(el('div',{style:{fontSize:'8px',fontWeight:'700',color:'var(--blue)',lineHeight:'1'}},futuras.length+'fut'));
+    }
+
+    cell.onclick=function(){
+      if(ehFuturo){
+        // Cria tarefa futura para esse dia
+        setState({dailyCalModal:null,dailyModal:{oneOff:true,_dataFutura:dateStr}});
+      } else {
+        setState({dailyCalModal:null,dailyModal:{oneOff:true}});
+      }
+    };
+    grid.appendChild(cell);
+  });
+
+  var legenda=el('div',{style:{display:'flex',gap:'14px',flexWrap:'wrap',marginTop:'10px',fontSize:'11px',color:'var(--text3)'}},[
+    el('span',{},[el('span',{style:{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',background:'var(--gold)',marginRight:'4px'}},''),'Rotina ativa']),
+    el('span',{},[el('span',{style:{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',background:'var(--blue)',marginRight:'4px'}},''),'Tarefa futura']),
+    el('span',{},[el('span',{style:{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',background:'var(--green)',marginRight:'4px'}},''),'Concluída']),
+    el('span',{},[el('span',{style:{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',background:'var(--red)',marginRight:'4px'}},''),'Atrasada']),
+  ]);
+
+  var modal=el('div',{class:'modal-box',style:{maxWidth:'520px',width:'96vw'}});
+  modal.appendChild(el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}},[
+    el('h3',{style:{margin:'0',fontSize:'16px',color:'var(--text)'}},'📅 Calendário de Tarefas'),
+    el('button',{class:'btn-ghost',style:{padding:'4px 10px'},onclick:function(){setState({dailyCalModal:null});}},'✕'),
+  ]));
+  modal.appendChild(el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}},[
+    el('button',{style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',cursor:'pointer',padding:'4px 12px',fontSize:'16px',lineHeight:'1'},onclick:function(){navM(-1);}},'‹'),
+    el('span',{style:{fontWeight:'700',fontSize:'15px',color:'var(--text)'}},MESES_NM[calMonth]+' '+calYear),
+    el('button',{style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',cursor:'pointer',padding:'4px 12px',fontSize:'16px',lineHeight:'1'},onclick:function(){navM(1);}},'›'),
+  ]));
+  modal.appendChild(grid);
+  modal.appendChild(legenda);
+  modal.appendChild(el('div',{style:{marginTop:'12px',fontSize:'11px',color:'var(--text3)'}},'Clique em um dia futuro para agendar uma tarefa · Clique em hoje para adicionar ao dia'));
+
+  var ov=el('div',{class:'modal-overlay',onclick:function(e){if(e.target===ov)setState({dailyCalModal:null});}});
+  ov.appendChild(modal);
+  return ov;
+}
+
 // ── render principal ──────────────────────────────────────────────────────────
 function renderDailyOperation(){
   if(!_doTimerRef){
@@ -595,6 +740,7 @@ function renderDailyOperation(){
   });
   var opAdiada=ops.filter(function(op){return op.status==='adiada';});
   var opCanc=ops.filter(function(op){return op.status==='cancelada';});
+  var opFutura=ops.filter(function(op){return op.status==='futura';}).sort(function(a,b){return(a.data||'').localeCompare(b.data||'');});
 
   // Data display
   var dObj=new Date(hj+'T12:00:00');
@@ -653,16 +799,18 @@ function renderDailyOperation(){
   // Action bar
   var actionBar=el('div',{style:{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}},[
     btn('btn-primary','+ Tarefa Rápida',function(){setState({dailyModal:{oneOff:true}});}),
+    btn('btn-ghost','📅 Calendário',function(){setState({dailyCalModal:{mes:hj.slice(0,7)}});}),
     btn('btn-ghost','+ Nova Rotina Diária',function(){setState({dailyModal:{}});}),
     btn('btn-ghost','⚙️ Rotinas',function(){setState({dailyTemplatesOpen:true});}),
   ]);
 
-  // Kanban: Programação → Tarefa do Dia → Concluídas → Adiadas → Canceladas
+  // Kanban: Tarefa Futura → Programação → Tarefa do Dia → Concluídas → Adiadas → Canceladas
   var board=el('div',{style:{
     display:'grid',
     gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',
     gap:'12px',alignItems:'start',
   }},[
+    _doColuna('Tarefa Futura','🔮','var(--blue)',opFutura.map(_doCard)),
     _doColuna('Programação','📅','var(--text2)',defs.map(_doDefCard)),
     _doColuna('Tarefa do Dia','📋','var(--gold)',opHoje.map(_doCard)),
     _doColuna('Concluídas','✅','var(--green)',opConc.map(_doCard)),

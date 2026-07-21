@@ -1454,6 +1454,27 @@ function renderSidebar(){
       render();
     }
   },(isLight?'🌙 Tema escuro':'☀️ Tema claro'));
+
+  // ── Slider de intensidade das cores ──────────────────────────────────────
+  var _intens=parseInt(lsGet('themeIntensity','100'))||100;
+  document.body.style.filter=_intens<100?'saturate('+_intens+'%)':'';
+  var intensInp=el('input',{type:'range',min:'0',max:'100',value:String(_intens),style:{
+    width:'100%',cursor:'pointer',accentColor:pf.color,margin:'0',display:'block',
+  }});
+  var intensLbl=el('span',{style:{fontSize:'10px',color:'var(--text3)',fontVariantNumeric:'tabular-nums',fontWeight:'600',minWidth:'30px',textAlign:'right'}},_intens+'%');
+  intensInp.oninput=function(){
+    var v=parseInt(intensInp.value);
+    intensLbl.textContent=v+'%';
+    document.body.style.filter=v<100?'saturate('+v+'%)':'';
+    lsSet('themeIntensity',String(v));
+  };
+  var intensWrap=el('div',{style:{padding:'6px 10px 4px',borderTop:'1px solid var(--border)'}},[
+    el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'5px'}},[
+      el('span',{style:{fontSize:'10px',color:'var(--text3)'}},'🎨 Intensidade das cores'),
+      intensLbl,
+    ]),
+    intensInp,
+  ]);
   var lockBtn=el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',color:'var(--text3)'},
     onclick:function(){lockApp();}
   },'🔒 Bloquear sistema');
@@ -1513,7 +1534,7 @@ function renderSidebar(){
     var c=!state.sidebarCollapsed;lsSet('sidebarCollapsed',c);setState({sidebarCollapsed:c});
   }},[el('span',{},state.sidebarCollapsed?'→':'← Recolher')]);
   var importBtn=el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'8px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',color:'var(--gold)',fontWeight:'700',borderTop:'1px solid var(--border)',marginBottom:'2px'},onclick:function(){if(typeof _importarAbrir==='function')_importarAbrir();}},'📸 Importar Extrato');
-  var footer=div('sidebar-footer',[collapseBtn,sessionEl,importBtn,themeBtn,lockBtn,renderSyncBadge()].filter(Boolean));
+  var footer=div('sidebar-footer',[collapseBtn,sessionEl,importBtn,intensWrap,themeBtn,lockBtn,renderSyncBadge()].filter(Boolean));
   var sbCls='sidebar'+(state.sidebarCollapsed?' collapsed':'')+(state.sidebarOpen?' mobile-open':'');
 
   // Busca ativa: mostra lista filtrada flat em vez das seções

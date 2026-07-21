@@ -16,7 +16,8 @@ function renderPerfilModal(){
   var SEC_ORDER=['principal','financeiro','planejamento','sistema'];
 
   // Filtra: exclui hidden, onlyAE e dashboard (sempre habilitado)
-  var navTools=(typeof nav!=='undefined'?nav:[]).filter(function(n){
+  // _navDef() é global definido em index.html — fonte única de verdade
+  var navTools=(typeof _navDef==='function'?_navDef(false):[]).filter(function(n){
     return !n.hidden&&!n.onlyAE&&n.id!=='dashboard';
   });
 

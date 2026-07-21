@@ -1241,22 +1241,21 @@ function renderFAB(){
   return fab;
 }
 
-// ── SIDEBAR ──────────────────────────────────────────────────────────────────
-function renderSidebar(){
-  var pf=PROFILES.find(function(p){return p.id===state.profile;});
-  var _ae=isAEProfile();
-  var nav=[
-    {id:'dashboard',label:_ae?'Painel de Apostas':'Visão geral',icon:_ae?'⚽':'📊',section:'principal'},
-  {id:'daily',label:'Daily Operation',icon:'📋',section:'principal'},
+// ── DEFINIÇÃO GLOBAL DO NAV (fonte única de verdade para sidebar e modais) ────
+// Ao adicionar uma nova ferramenta, adicione SOMENTE aqui.
+function _navDef(ae){
+  return [
+    {id:'dashboard',label:ae?'Painel de Apostas':'Visão geral',icon:ae?'⚽':'📊',section:'principal'},
+    {id:'daily',label:'Daily Operation',icon:'📋',section:'principal'},
     // ── apostas (só A>E) ──
     {id:'apostas',label:'Minhas Apostas',icon:'🎯',section:'apostas',onlyAE:true},
-    {id:'bancos',label:_ae?'Bancas':'Bancos',icon:'🏦',section:_ae?'apostas':'financeiro'},
-    {id:'receber',label:_ae?'Saques Previstos':'Contas a receber',icon:_ae?'💸':'💰',section:_ae?'apostas':'financeiro'},
-    {id:'pagar',label:_ae?'Depósitos / Saídas':'Despesas',icon:'💸',section:_ae?'apostas':'financeiro'},
-    {id:'planejamento',label:_ae?'Metas de ROI':'Metas',icon:'🎯',section:_ae?'apostas':'planejamento'},
-    {id:'recorrencias',label:'Recorrências',icon:'🔄',section:_ae?'apostas':'planejamento'},
-    {id:'exportar',label:'Relatórios',icon:'📊',section:_ae?'apostas':'integração'},
-    {id:'notas',label:'Bloco de Notas',icon:'📝',section:_ae?'apostas':'planejamento'},
+    {id:'bancos',label:ae?'Bancas':'Bancos',icon:'🏦',section:ae?'apostas':'financeiro'},
+    {id:'receber',label:ae?'Saques Previstos':'Contas a receber',icon:ae?'💸':'💰',section:ae?'apostas':'financeiro'},
+    {id:'pagar',label:ae?'Depósitos / Saídas':'Despesas',icon:'💸',section:ae?'apostas':'financeiro'},
+    {id:'planejamento',label:ae?'Metas de ROI':'Metas',icon:'🎯',section:ae?'apostas':'planejamento'},
+    {id:'recorrencias',label:'Recorrências',icon:'🔄',section:ae?'apostas':'planejamento'},
+    {id:'exportar',label:'Relatórios',icon:'📊',section:ae?'apostas':'integração'},
+    {id:'notas',label:'Bloco de Notas',icon:'📝',section:ae?'apostas':'planejamento'},
     // ── financeiro genérico (oculto em A>E) ──
     {id:'dre',label:'DRE',icon:'📋',section:'financeiro',hideAE:true},
     {id:'vendas',label:'Vendas do Dia',icon:'🛒',section:'financeiro',onlyProfile:'artt'},
@@ -1290,6 +1289,13 @@ function renderSidebar(){
     {id:'auditoria',label:'Histórico',icon:'🕐',section:'sistema'},
     {id:'ajuda',label:'Central de Ajuda',icon:'❓',section:'sistema'},
   ];
+}
+
+// ── SIDEBAR ──────────────────────────────────────────────────────────────────
+function renderSidebar(){
+  var pf=PROFILES.find(function(p){return p.id===state.profile;});
+  var _ae=isAEProfile();
+  var nav=_navDef(_ae);
   var pagar=state.contas.filter(function(c){return c.profile===state.profile&&c.tipo==='pagar'&&c.status!=='pago';});
   var alertCount=pagar.filter(function(c){var d=diasRestantes(c.vencimento);return d!==null&&d<=7;}).length;
 

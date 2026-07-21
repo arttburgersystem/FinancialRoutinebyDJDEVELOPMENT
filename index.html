@@ -1457,7 +1457,7 @@ function renderSidebar(){
 
   // ── Slider de brilho do fundo ────────────────────────────────────────────
   var _bright=parseInt(lsGet('bgBrightness','100'))||100;
-  document.body.style.filter=_bright<100?'brightness('+_bright+'%)':'';
+  document.documentElement.style.filter=_bright<100?'brightness('+_bright+'%)':'';
   var intensInp=el('input',{type:'range',min:'10',max:'100',value:String(_bright),style:{
     width:'100%',cursor:'pointer',accentColor:pf.color,margin:'0',display:'block',
   }});
@@ -1465,7 +1465,7 @@ function renderSidebar(){
   intensInp.oninput=function(){
     var v=parseInt(intensInp.value);
     intensLbl.textContent=v+'%';
-    document.body.style.filter=v<100?'brightness('+v+'%)':'';
+    document.documentElement.style.filter=v<100?'brightness('+v+'%)':'';
     lsSet('bgBrightness',String(v));
   };
   var intensWrap=el('div',{style:{padding:'6px 10px 4px',borderTop:'1px solid var(--border)'}},[

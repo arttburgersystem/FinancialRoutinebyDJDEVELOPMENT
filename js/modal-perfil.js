@@ -189,24 +189,48 @@ function renderPerfilModal(){
       return sWrap;
     });
 
+    var toolsListEl=el('div',{style:{
+      background:'var(--bg3)',borderRadius:'8px',padding:'12px',
+      border:'1px solid var(--border)',maxHeight:'280px',overflowY:'auto',
+      transition:'max-height .25s ease',
+    }},secBoxes);
+
     toolsSection=el('div',{style:{marginBottom:'16px'}},[
       el('label',{class:'form-label',style:{marginBottom:'8px'}},'Ferramentas habilitadas neste perfil'),
       el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'10px',lineHeight:'1.5',}},'Escolha um preset ou marque manualmente. Dashboard e Visão Geral estão sempre disponíveis.'),
       presetsRow,
-      el('div',{style:{
-        background:'var(--bg3)',borderRadius:'8px',padding:'12px',
-        border:'1px solid var(--border)',maxHeight:'280px',overflowY:'auto',
-      }},secBoxes),
+      toolsListEl,
     ]);
 
     applyPreset(PRESET_EMPRESA);
   }
 
+  var expanded=false;
+  var expandBtn=null;
+  if(!isEdit){
+    expandBtn=el('button',{type:'button',title:'Expandir',style:{
+      background:'none',border:'none',cursor:'pointer',padding:'4px 6px',
+      fontSize:'16px',color:'var(--text3)',lineHeight:'1',borderRadius:'4px',
+      transition:'color .15s',marginRight:'2px',
+    }},'⤢');
+    expandBtn.onmouseenter=function(){expandBtn.style.color='var(--text)';};
+    expandBtn.onmouseleave=function(){expandBtn.style.color='var(--text3)';};
+    expandBtn.onclick=function(){
+      expanded=!expanded;
+      expandBtn.textContent=expanded?'⤡':'⤢';
+      expandBtn.title=expanded?'Recolher':'Expandir';
+      modal.style.maxWidth=expanded?'720px':'460px';
+      toolsListEl.style.maxHeight=expanded?'calc(100vh - 420px)':'280px';
+      toolsListEl.style.overflowY='auto';
+    };
+  }
+
+  var titleChildren=[el('span',{style:{flex:'1'}},(isEdit?'Editar':'Novo')+' perfil')];
+  if(expandBtn)titleChildren.push(expandBtn);
+  titleChildren.push(el('button',{class:'modal-close',onclick:function(){setState({perfilModal:null});}},'×'));
+
   var children=[
-    div('modal-title',[
-      el('span',{},(isEdit?'Editar':'Novo')+' perfil'),
-      el('button',{class:'modal-close',onclick:function(){setState({perfilModal:null});}}, '×'),
-    ]),
+    div('modal-title',titleChildren),
     div('form-group',[el('label',{class:'form-label'},'Nome do perfil'),nameInp]),
     div('form-group',[
       el('label',{class:'form-label'},'Cor de identificação'),
@@ -230,6 +254,7 @@ function renderPerfilModal(){
 
   var modal=div('modal',children);
   modal.style.maxWidth='460px';
+  modal.style.transition='max-width .25s ease';
   var ov=div('modal-overlay',[modal]);
   ov.onclick=function(e){if(e.target===ov)setState({perfilModal:null});};
   setTimeout(function(){var i=document.getElementById('pf-label');if(i){i.focus();i.select();}},50);

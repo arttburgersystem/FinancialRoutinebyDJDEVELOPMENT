@@ -10,88 +10,50 @@ function renderPerfilModal(){
 
   function g(id){var e=document.getElementById('pf-'+id);return e?e.value:'';}
 
-  // ── Ferramentas disponíveis para seleção ──────────────────────────────────
-  var TOOLS_SECTIONS=[
-    {
-      sec:'principal',label:'Principal',
-      items:[
-        {id:'daily',icon:'📋',label:'Daily Operation'},
-      ]
-    },
-    {
-      sec:'financeiro',label:'Financeiro',
-      items:[
-        {id:'bancos',     icon:'🏦',label:'Bancos'},
-        {id:'receber',    icon:'💰',label:'Contas a Receber'},
-        {id:'pagar',      icon:'💸',label:'Despesas'},
-        {id:'dre',        icon:'📋',label:'DRE'},
-        {id:'receitas',   icon:'💵',label:'Receitas'},
-        {id:'emprestimos',icon:'🏧',label:'Empréstimos'},
-        {id:'cartoes',    icon:'💳',label:'Cartões de Crédito'},
-        {id:'fluxo',      icon:'📈',label:'Fluxo de Caixa'},
-        {id:'caixa',      icon:'🏧',label:'Fechamento de Caixa'},
-        {id:'compras',    icon:'🛒',label:'Compras'},
-        {id:'lista-compras',icon:'🛍️',label:'Lista de Compras'},
-        {id:'estoque-insumos',icon:'📦',label:'Estoque'},
-        {id:'fornecedores',icon:'🏪',label:'Fornecedores'},
-        {id:'funcionarios',icon:'👥',label:'Funcionários'},
-        {id:'freelancers', icon:'🎨',label:'Freelancers'},
-        {id:'administrador',icon:'👤',label:'Administrador'},
-        {id:'cardapio',   icon:'🍽️',label:'Cardápio'},
-      ]
-    },
-    {
-      sec:'planejamento',label:'Planejamento',
-      items:[
-        {id:'tarefas',    icon:'✅',label:'Tarefas & Agenda'},
-        {id:'orcamento',  icon:'💰',label:'Orçamento'},
-        {id:'planejamento',icon:'🎯',label:'Metas'},
-        {id:'alertas',    icon:'🔔',label:'Alertas'},
-        {id:'exportar',   icon:'📊',label:'Relatórios'},
-        {id:'recorrencias',icon:'🔄',label:'Recorrências'},
-        {id:'notas',      icon:'📝',label:'Bloco de Notas'},
-      ]
-    },
-    {
-      sec:'sistema',label:'Sistema',
-      items:[
-        {id:'empresa',    icon:'🏢',label:'Dados da Empresa'},
-        {id:'usuarios',   icon:'🔐',label:'Usuários & Permissões'},
-        {id:'patrimonio', icon:'🏛️',label:'Patrimônio'},
-        {id:'auditoria',  icon:'🕐',label:'Histórico / Auditoria'},
-        {id:'ajuda',      icon:'❓',label:'Central de Ajuda'},
-      ]
-    },
-  ];
+  // ── Derivar ferramentas do nav global (index.html) ────────────────────────
+  // Qualquer nova ferramenta adicionada ao nav aparece automaticamente aqui.
+  var SEC_LABELS={principal:'Principal',financeiro:'Financeiro',planejamento:'Planejamento',sistema:'Sistema'};
+  var SEC_ORDER=['principal','financeiro','planejamento','sistema'];
 
-  // Presets
-  var PRESET_PF=[
-    'bancos','receber','pagar','dre','receitas','emprestimos','cartoes',
-    'fluxo','tarefas','orcamento','planejamento','alertas','exportar',
-    'recorrencias','notas','empresa','usuarios','patrimonio','auditoria','ajuda',
+  // Filtra: exclui hidden, onlyAE e dashboard (sempre habilitado)
+  var navTools=(typeof nav!=='undefined'?nav:[]).filter(function(n){
+    return !n.hidden&&!n.onlyAE&&n.id!=='dashboard';
+  });
+
+  // Agrupa por seção; 'integração' entra em 'planejamento'
+  var secMap={};
+  navTools.forEach(function(n){
+    var sec=n.section==='integração'?'planejamento':n.section;
+    if(!SEC_LABELS[sec])return;
+    if(!secMap[sec])secMap[sec]=[];
+    secMap[sec].push({id:n.id,icon:n.icon,label:n.label});
+  });
+
+  var TOOLS_SECTIONS=SEC_ORDER.filter(function(s){return secMap[s]&&secMap[s].length;}).map(function(s){
+    return {sec:s,label:SEC_LABELS[s],items:secMap[s]};
+  });
+
+  // IDs de todas as ferramentas visíveis
+  var ALL_TOOL_IDS=navTools.map(function(n){return n.id;});
+
+  // Ferramentas empresariais excluídas do preset Pessoa Física.
+  // Quando uma nova ferramenta empresarial for criada, basta adicionar seu id aqui.
+  var PF_EXCLUDES=[
+    'daily','vendas','caixa','compras','lista-compras','estoque-insumos',
+    'fornecedores','funcionarios','freelancers','administrador','cardapio','dre',
   ];
-  var PRESET_EMPRESA=[
-    'daily','bancos','receber','pagar','dre','receitas','emprestimos','cartoes',
-    'fluxo','caixa','compras','lista-compras','estoque-insumos','fornecedores',
-    'funcionarios','freelancers','administrador','cardapio',
-    'tarefas','orcamento','planejamento','alertas','exportar','recorrencias','notas',
-    'empresa','usuarios','patrimonio','auditoria','ajuda',
-  ];
+  var PRESET_PF=ALL_TOOL_IDS.filter(function(id){return PF_EXCLUDES.indexOf(id)===-1;});
+  var PRESET_EMPRESA=ALL_TOOL_IDS.slice();
 
   // Estado mutável dos checkboxes (closure, sem setState)
   var selectedPages={};
-  // Inicializa com todas habilitadas (padrão empresa)
-  TOOLS_SECTIONS.forEach(function(sec){
-    sec.items.forEach(function(t){selectedPages[t.id]=true;});
-  });
+  ALL_TOOL_IDS.forEach(function(id){selectedPages[id]=true;});
 
   function applyPreset(ids){
-    TOOLS_SECTIONS.forEach(function(sec){
-      sec.items.forEach(function(t){
-        selectedPages[t.id]=ids.indexOf(t.id)>=0;
-        var chk=document.getElementById('pfchk-'+t.id);
-        if(chk)chk.checked=selectedPages[t.id];
-      });
+    ALL_TOOL_IDS.forEach(function(id){
+      selectedPages[id]=ids.indexOf(id)>=0;
+      var chk=document.getElementById('pfchk-'+id);
+      if(chk)chk.checked=selectedPages[id];
     });
     updateSecHeaders();
   }
@@ -113,14 +75,9 @@ function renderPerfilModal(){
       if(dup){showToast('Já existe um perfil com este nome','error');return;}
     }
     var cor=g('color')||corAtual;
-    // Monta array de pages habilitadas (apenas para criação)
     var pages=null;
     if(!isEdit){
-      pages=TOOLS_SECTIONS.reduce(function(arr,sec){
-        sec.items.forEach(function(t){if(selectedPages[t.id])arr.push(t.id);});
-        return arr;
-      },[]);
-      // dashboard sempre incluído
+      pages=ALL_TOOL_IDS.filter(function(id){return selectedPages[id];});
       if(pages.indexOf('dashboard')===-1)pages.unshift('dashboard');
     }
     if(isEdit){
@@ -132,7 +89,7 @@ function renderPerfilModal(){
     }
   }
 
-  // Palette de cores
+  // ── Palette de cores ──────────────────────────────────────────────────────
   var colorBtns=[];
   CORES.forEach(function(c){
     var b=el('button',{type:'button',title:c,style:{
@@ -189,7 +146,6 @@ function renderPerfilModal(){
     var secBoxes=TOOLS_SECTIONS.map(function(sec){
       var sWrap=el('div',{style:{marginBottom:'14px'}});
 
-      // Header da seção com "selecionar todos"
       var sHd=el('div',{style:{
         display:'flex',alignItems:'center',gap:'8px',
         padding:'5px 8px',background:'var(--bg3)',borderRadius:'6px',
@@ -209,14 +165,12 @@ function renderPerfilModal(){
       sHd.onclick=function(e){if(e.target!==chkAll){chkAll.click();}};
       sWrap.appendChild(sHd);
 
-      // Grid de checkboxes 2 colunas
       var grid=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 8px',paddingLeft:'4px'}});
       sec.items.forEach(function(t){
         var row=el('label',{style:{
           display:'flex',alignItems:'center',gap:'7px',
           padding:'5px 8px',borderRadius:'6px',cursor:'pointer',
-          fontSize:'12px',color:'var(--text2)',
-          transition:'background .1s',
+          fontSize:'12px',color:'var(--text2)',transition:'background .1s',
         }});
         row.onmouseenter=function(){row.style.background='var(--bg3)';};
         row.onmouseleave=function(){row.style.background='';};
@@ -237,9 +191,7 @@ function renderPerfilModal(){
 
     toolsSection=el('div',{style:{marginBottom:'16px'}},[
       el('label',{class:'form-label',style:{marginBottom:'8px'}},'Ferramentas habilitadas neste perfil'),
-      el('div',{style:{
-        fontSize:'11px',color:'var(--text3)',marginBottom:'10px',lineHeight:'1.5',
-      }},'Escolha um preset abaixo ou marque manualmente. Visão Geral e Dashboard estão sempre disponíveis.'),
+      el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'10px',lineHeight:'1.5',}},'Escolha um preset ou marque manualmente. Dashboard e Visão Geral estão sempre disponíveis.'),
       presetsRow,
       el('div',{style:{
         background:'var(--bg3)',borderRadius:'8px',padding:'12px',
@@ -247,7 +199,6 @@ function renderPerfilModal(){
       }},secBoxes),
     ]);
 
-    // Aplica preset empresa por padrão
     applyPreset(PRESET_EMPRESA);
   }
 

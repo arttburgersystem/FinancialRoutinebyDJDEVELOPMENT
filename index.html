@@ -35,8 +35,9 @@ input,select,textarea{font-family:inherit;outline:none}
 .logo-name{font-size:18px;font-weight:800;color:var(--gold);letter-spacing:-0.5px}
 .logo-sub{font-size:11px;color:var(--text3);margin-top:2px}
 .profile-switcher{padding:12px 12px 8px;border-bottom:1px solid var(--border)}
-.profile-btn{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);background:var(--bg3);border:1px solid var(--border);color:var(--text);font-size:13px;font-weight:500;transition:all .15s}
+.profile-btn{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);background:var(--bg3);border:1px solid var(--border);color:var(--text);font-size:13px;font-weight:500;transition:border-color .15s}
 .profile-btn:hover{border-color:var(--gold)}
+@keyframes djf-neon-pulse{0%,100%{box-shadow:0 0 5px 1px var(--pfneon),0 0 10px 2px var(--pfneon)}50%{box-shadow:0 0 12px 3px var(--pfneon),0 0 28px 8px var(--pfneon),0 0 4px 1px #fff inset}}
 .profile-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .profile-dropdown{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);margin-top:4px;overflow:hidden}
 .profile-option{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;font-size:12px;color:var(--text2);transition:background .1s}
@@ -1312,6 +1313,9 @@ function renderSidebar(){
      el('span',{style:{flex:'1',textAlign:'left'}},pf.label),
      el('span',{style:{color:'var(--text3)',fontSize:'10px'}},state.showProfiles?'▲':'▼')]
   );
+  profBtn.style.setProperty('--pfneon', pf.color);
+  profBtn.style.borderColor=pf.color;
+  profBtn.style.animation='djf-neon-pulse 2s ease-in-out infinite';
   var dropdown=null;
   if(state.showProfiles){
     var profileRows=PROFILES.map(function(p){

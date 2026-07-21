@@ -1335,12 +1335,14 @@ function renderSidebar(){
   var navSearch = state.sidebarSearch || '';
   var navSearchLow = navSearch.toLowerCase();
 
-  // Todos os itens visíveis (sem hidden, filtrando por perfil)
+  // Todos os itens visíveis (sem hidden, filtrando por perfil e pages habilitadas)
+  var _pfPagesAll=pf.pages;
   var allNavItems = nav.filter(function(n){
     if(n.hidden)return false;
     if(n.onlyAE&&!_ae)return false;
     if(n.hideAE&&_ae)return false;
     if(n.onlyProfile&&n.onlyProfile!==state.profile)return false;
+    if(_pfPagesAll&&n.id!=='dashboard'&&_pfPagesAll.indexOf(n.id)===-1)return false;
     return true;
   });
 
@@ -1397,12 +1399,14 @@ function renderSidebar(){
   var secCollapsed=state.navSectionsCollapsed||{};
 
   var navEl=div('nav',sections.map(function(sec){
+    var _pfPages=pf.pages; // undefined = todas habilitadas (backwards compat)
     var items=nav.filter(function(n){
       if(n.section!==sec)return false;
       if(n.hidden)return false;
       if(n.onlyAE&&!_ae)return false;
       if(n.hideAE&&_ae)return false;
       if(n.onlyProfile&&n.onlyProfile!==state.profile)return false;
+      if(_pfPages&&n.id!=='dashboard'&&_pfPages.indexOf(n.id)===-1)return false;
       return true;
     });
     if(!items.length)return null;

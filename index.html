@@ -1455,22 +1455,22 @@ function renderSidebar(){
     }
   },(isLight?'🌙 Tema escuro':'☀️ Tema claro'));
 
-  // ── Slider de intensidade das cores ──────────────────────────────────────
-  var _intens=parseInt(lsGet('themeIntensity','100'))||100;
-  document.body.style.filter=_intens<100?'saturate('+_intens+'%)':'';
-  var intensInp=el('input',{type:'range',min:'0',max:'100',value:String(_intens),style:{
+  // ── Slider de brilho do fundo ────────────────────────────────────────────
+  var _bright=parseInt(lsGet('bgBrightness','100'))||100;
+  document.body.style.filter=_bright<100?'brightness('+_bright+'%)':'';
+  var intensInp=el('input',{type:'range',min:'10',max:'100',value:String(_bright),style:{
     width:'100%',cursor:'pointer',accentColor:pf.color,margin:'0',display:'block',
   }});
-  var intensLbl=el('span',{style:{fontSize:'10px',color:'var(--text3)',fontVariantNumeric:'tabular-nums',fontWeight:'600',minWidth:'30px',textAlign:'right'}},_intens+'%');
+  var intensLbl=el('span',{style:{fontSize:'10px',color:'var(--text3)',fontVariantNumeric:'tabular-nums',fontWeight:'600',minWidth:'30px',textAlign:'right'}},_bright+'%');
   intensInp.oninput=function(){
     var v=parseInt(intensInp.value);
     intensLbl.textContent=v+'%';
-    document.body.style.filter=v<100?'saturate('+v+'%)':'';
-    lsSet('themeIntensity',String(v));
+    document.body.style.filter=v<100?'brightness('+v+'%)':'';
+    lsSet('bgBrightness',String(v));
   };
   var intensWrap=el('div',{style:{padding:'6px 10px 4px',borderTop:'1px solid var(--border)'}},[
     el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'5px'}},[
-      el('span',{style:{fontSize:'10px',color:'var(--text3)'}},'🎨 Intensidade das cores'),
+      el('span',{style:{fontSize:'10px',color:'var(--text3)'}},'💡 Brilho do fundo'),
       intensLbl,
     ]),
     intensInp,

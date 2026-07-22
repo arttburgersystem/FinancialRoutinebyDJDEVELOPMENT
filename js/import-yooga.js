@@ -60,6 +60,13 @@ function _parseYoogaRows(raw){
   }
   if(!rows.length)throw new Error('Nenhuma linha de dados encontrada no arquivo.');
 
+  // Yooga exporta valores em centavos (inteiros) — dividir por 100 para obter reais
+  rows.forEach(function(r){
+    r.valorPago=Math.round(r.valorPago)/100;
+    r.taxa=Math.round(r.taxa)/100;
+    r.faturado=Math.round(r.faturado)/100;
+  });
+
   // Extrai data do título (linha 0): "...Período 01/07/2026 à 01/07/2026"
   var tituloTexto=(raw[0]||[]).concat(raw[1]||[]).map(function(c){return c+'';}).join(' ');
   var dm=tituloTexto.match(/(\d{2}\/\d{2}\/\d{4})/g);

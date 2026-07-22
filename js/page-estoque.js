@@ -799,26 +799,91 @@ function renderMovModal() {
 
   var prodAtual = prods.find(function(p){return p.id===m.produto_id;});
 
-  var _insOpts = prods.filter(function(p){return p.tipo==='insumo';}).map(function(p){
-    return el('option',{value:p.id},'⚙️ '+p.nome+' ('+formatQtd(p.estoqueAtual,p.unidade)+')');
-  });
-  var _prdOpts = prods.filter(function(p){return p.tipo!=='insumo';}).map(function(p){
-    return el('option',{value:p.id},'🍔 '+p.nome+' ('+formatQtd(p.estoqueAtual,p.unidade)+')');
-  });
   function _custoParaProd(prd) {
     if(!prd) return 0;
     if(prd.custoMedio>0) return prd.custoMedio;
     if(prd.precoEmbalagem>0) return prd.precoEmbalagem;
     return 0;
   }
-  var prodSel = el('select',{class:'form-input',onchange:function(){
-    var selVal = this.value;
-    var prd = prods.find(function(p){return p.id===selVal;});
-    var novoCusto = (prd && tipo!=='saida') ? _custoParaProd(prd) : m.custoUnitario;
-    setState({movModal:Object.assign({},m,{produto_id:selVal,custoUnitario:novoCusto,qtdEmb:'',unidPorEmb:''})});
-  }},
-    [el('option',{value:''},'— Selecione o produto / insumo —')].concat(_insOpts).concat(_prdOpts));
-  prodSel.value = m.produto_id || '';
+  function _selecionarProd(pid){
+    var prd=prods.find(function(p){return p.id===pid;});
+    var novoCusto=(prd&&tipo!=='saida')?_custoParaProd(prd):m.custoUnitario;
+    setState({movModal:Object.assign({},m,{produto_id:pid,custoUnitario:novoCusto,qtdEmb:'',unidPorEmb:''})});
+  }
+  var _prodLabel=prodAtual?(prodAtual.nome+' ('+formatQtd(prodAtual.estoqueAtual,prodAtual.unidade)+')'):'';
+  var prodBuscaInp=el('input',{
+    class:'form-input',type:'text',id:'mov-prod-busca',autocomplete:'off',
+    placeholder:'🔍 Digite para buscar produto ou insumo...',value:_prodLabel,
+    style:{paddingRight:'32px'},
+  });
+  var prodSuggestEl=el('div',{style:{
+    display:'none',position:'absolute',top:'100%',left:'0',right:'0',zIndex:'9999',
+    background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'8px',
+    boxShadow:'0 8px 24px rgba(0,0,0,.25)',maxHeight:'240px',overflowY:'auto',marginTop:'3px',
+  }});
+  var prodClearBtn=el('button',{type:'button',style:{
+    position:'absolute',right:'8px',top:'50%',transform:'translateY(-50%)',
+    background:'none',border:'none',cursor:'pointer',color:'var(--text3)',
+    fontSize:'14px',lineHeight:'1',padding:'2px 4px',display:_prodLabel?'block':'none',
+  }},'×');
+  prodClearBtn.onclick=function(){
+    prodBuscaInp.value='';
+    prodClearBtn.style.display='none';
+    m.produto_id='';
+    _renderSugestoes(prods);
+    prodBuscaInp.focus();
+  };
+  var prodSearchWrap=el('div',{style:{position:'relative'}},[prodBuscaInp,prodClearBtn,prodSuggestEl]);
+
+  function _filtrarProds(q){
+    if(!q)return prods;
+    var ql=q.toLowerCase();
+    return prods.filter(function(p){
+      return p.nome.toLowerCase().indexOf(ql)>=0||(p.categoria&&p.categoria.toLowerCase().indexOf(ql)>=0);
+    });
+  }
+  function _renderSugestoes(lista){
+    while(prodSuggestEl.firstChild)prodSuggestEl.removeChild(prodSuggestEl.firstChild);
+    if(!lista.length){
+      var vazio=el('div',{style:{padding:'14px',textAlign:'center',fontSize:'12px',color:'var(--text3)'}},'Nenhum produto encontrado');
+      prodSuggestEl.appendChild(vazio);
+      prodSuggestEl.style.display='block';
+      return;
+    }
+    lista.slice(0,50).forEach(function(p){
+      var ico=p.tipo==='insumo'?'⚙️':'🍔';
+      var sBg=p.estoqueAtual<=0?'var(--danger)':p.estoqueMinimo>0&&p.estoqueAtual<=p.estoqueMinimo?'#c9a84c':'var(--green)';
+      var sLbl=p.estoqueAtual<=0?'zerado':p.estoqueMinimo>0&&p.estoqueAtual<=p.estoqueMinimo?'crítico':'ok';
+      var row=el('div',{style:{padding:'9px 14px',cursor:'pointer',display:'flex',alignItems:'center',gap:'10px',borderBottom:'1px solid var(--border)',transition:'background .1s'}});
+      row.onmouseenter=function(){row.style.background='var(--bg3)';};
+      row.onmouseleave=function(){row.style.background='';};
+      var info=el('div',{style:{flex:'1',minWidth:'0'}});
+      var nomeLine=el('div',{style:{fontWeight:'600',fontSize:'13px',color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},ico+' '+p.nome);
+      var subLine=el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}},(p.categoria||'sem categoria')+' · '+formatQtd(p.estoqueAtual,p.unidade));
+      info.appendChild(nomeLine);info.appendChild(subLine);
+      row.appendChild(info);
+      var right=el('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'3px',flexShrink:'0'}});
+      right.appendChild(el('span',{style:{fontSize:'9px',fontWeight:'700',color:'#fff',background:sBg,padding:'2px 6px',borderRadius:'10px'}},sLbl));
+      if(p.custoMedio>0)right.appendChild(el('span',{style:{fontSize:'10px',color:'var(--text3)'}},fmtMoney(p.custoMedio)+'/'+p.unidade));
+      row.appendChild(right);
+      row.onmousedown=function(e){
+        e.preventDefault();
+        prodSuggestEl.style.display='none';
+        _selecionarProd(p.id);
+      };
+      prodSuggestEl.appendChild(row);
+    });
+    prodSuggestEl.style.display='block';
+  }
+  prodBuscaInp.oninput=function(){
+    prodClearBtn.style.display=this.value?'block':'none';
+    _renderSugestoes(_filtrarProds(this.value));
+  };
+  prodBuscaInp.onfocus=function(){
+    if(!m.produto_id){_renderSugestoes(prods);}
+    else{this.select();_renderSugestoes(_filtrarProds(this.value));}
+  };
+  prodBuscaInp.onblur=function(){setTimeout(function(){prodSuggestEl.style.display='none';},160);};
 
   var qtdInp = el('input',{class:'form-input',type:'number',min:'0',step:'0.001',value:m.quantidade||'',
     placeholder:tipo==='ajuste'?'Novo estoque total':'Quantidade',oninput:function(){m.quantidade=parseFloat(this.value)||0;}});
@@ -968,7 +1033,7 @@ function renderMovModal() {
           el('div',{style:{gridColumn:'1/-1'}},
             el('div',{class:'form-group'},[el('label',{class:'form-label'},'Tipo de movimentação'),tipoSel])),
           el('div',{style:{gridColumn:'1/-1'}},
-            el('div',{class:'form-group'},[el('label',{class:'form-label'},'Produto / Insumo'),prodSel])),
+            el('div',{class:'form-group'},[el('label',{class:'form-label'},'Produto / Insumo'),prodSearchWrap])),
           prodInfoEl ? el('div',{style:{gridColumn:'1/-1'}},prodInfoEl) : null,
           el('div',{class:'form-group'},[el('label',{class:'form-label'},tipo==='ajuste'?'Novo estoque total':'Quantidade'),qtdInp]),
           (tipo==='entrada'&&qtdEmbInp)?el('div',{style:{gridColumn:'1/-1',background:'var(--bg3)',borderRadius:'8px',padding:'10px 12px',marginTop:'-4px'}},[

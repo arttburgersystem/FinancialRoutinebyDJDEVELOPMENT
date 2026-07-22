@@ -95,6 +95,12 @@ function _cmRenderItens() {
           r2.appendChild(el('span', { style: { fontSize: '9px', fontWeight: '700', color: '#fff', background: sBg, padding: '2px 6px', borderRadius: '8px', flexShrink: '0' } }, sLbl));
           r2.onmousedown = function(e) {
             e.preventDefault();
+            // Verifica se este insumo já existe em outra linha da compra
+            var _dupIdx = -1;
+            _cmItens.forEach(function(it2, j) { if (j !== i && it2.insumoId === x.id) _dupIdx = j; });
+            if (_dupIdx >= 0 && !confirm('⚠️ Duplicidade detectada!\n\n"' + x.nome + '" já foi adicionado na linha ' + (_dupIdx + 1) + ' desta compra.\n\nDeseja mesmo repetir este produto?')) {
+              return;
+            }
             sd.style.display = 'none';
             _cmItens[i].item      = x.nome;
             _cmItens[i].insumoId  = x.id;
@@ -422,6 +428,17 @@ function renderCompraModal() {
   var addBtn = el('button', {}, '+ Adicionar produto');
   addBtn.style.cssText = 'margin-top:6px;background:none;border:1px dashed var(--primary);color:var(--primary);border-radius:6px;cursor:pointer;padding:5px 12px;font-size:12px;width:100%;';
   addBtn.onclick = function() {
+    // Detecta duplicatas já existentes na lista antes de adicionar nova linha
+    var _ids = {}, _dupNomes = [];
+    _cmItens.forEach(function(it) {
+      if (it.insumoId) {
+        if (_ids[it.insumoId] && _dupNomes.indexOf(it.item) < 0) _dupNomes.push(it.item);
+        _ids[it.insumoId] = true;
+      }
+    });
+    if (_dupNomes.length && !confirm('⚠️ Produtos duplicados identificados!\n\n' + _dupNomes.map(function(n){ return '• ' + n; }).join('\n') + '\n\nVerifique se os itens acima estão corretos antes de adicionar mais um produto.\n\nContinuar mesmo assim?')) {
+      return;
+    }
     _cmItens.push(_cmNovoItem());
     _cmRenderItens();
   };

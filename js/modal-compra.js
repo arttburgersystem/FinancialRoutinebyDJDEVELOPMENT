@@ -2,6 +2,7 @@
 
 var _cmItens   = [];
 var _cmModalId = null;
+var _cmAjuste  = 0;
 
 function _cmNovoItem() {
   return { item: '', quantidade: 1, unidade: 'un', precoUnit: 0, valorTotal: 0, insumoId: null, insumoSrc: null };
@@ -23,12 +24,16 @@ function _cmGetInsumos() {
 function _cmSomaTotal() {
   var t = 0;
   _cmItens.forEach(function(x) { t += parseFloat(x.valorTotal) || 0; });
-  return t;
+  return Math.round(t * 100) / 100;
 }
 
 function _cmAtualizarTotal() {
   var totalEl = document.getElementById('cm-grand-total');
-  if (totalEl) totalEl.textContent = fmtMoney(_cmSomaTotal());
+  if (totalEl) totalEl.textContent = fmtMoney(_cmSomaTotal() + _cmAjuste);
+  var ajusteEl = document.getElementById('cm-ajuste-badge');
+  if (ajusteEl) {
+    ajusteEl.textContent = _cmAjuste !== 0 ? '(itens: ' + fmtMoney(_cmSomaTotal()) + ')' : '';
+  }
 }
 
 function _cmRenderItens() {
@@ -142,7 +147,7 @@ function _cmRenderItens() {
       qtdInp.oninput = function(e) {
         _cmItens[i].quantidade = parseFloat(e.target.value) || 0;
         if (_cmItens[i].precoUnit) {
-          _cmItens[i].valorTotal = _cmItens[i].quantidade * _cmItens[i].precoUnit;
+          _cmItens[i].valorTotal = Math.round(_cmItens[i].quantidade * _cmItens[i].precoUnit * 100) / 100;
           var t = document.getElementById('cmi-tot-' + i);
           if (t) t.value = _cmItens[i].valorTotal.toFixed(2);
         }
@@ -169,7 +174,7 @@ function _cmRenderItens() {
         _cmItens[i].precoUnit = parseFloat(e.target.value) || 0;
         var qtd = _cmItens[i].quantidade || 0;
         if (qtd) {
-          _cmItens[i].valorTotal = _cmItens[i].precoUnit * qtd;
+          _cmItens[i].valorTotal = Math.round(_cmItens[i].precoUnit * qtd * 100) / 100;
           var t = document.getElementById('cmi-tot-' + i);
           if (t) t.value = _cmItens[i].valorTotal.toFixed(2);
         }
@@ -233,6 +238,7 @@ function renderCompraModal() {
   // Inicializa itens apenas ao abrir (não a cada re-render)
   if (curId !== _cmModalId) {
     _cmModalId = curId;
+    _cmAjuste = isEdit ? (edit.ajuste || 0) : 0;
     if (isEdit && edit.itens && edit.itens.length) {
       _cmItens = edit.itens.map(function(x) { return Object.assign({}, x); });
     } else if (isEdit && edit.item) {
@@ -338,7 +344,8 @@ function renderCompraModal() {
       status:         g('status') || 'pendente',
       nf:             g('nf').trim(),
       obs:            (document.getElementById('cm-obs') || {}).value || '',
-      valorTotal:     _cmSomaTotal(),
+      valorTotal:     Math.round((_cmSomaTotal() + _cmAjuste) * 100) / 100,
+      ajuste:         _cmAjuste,
       criadoEm:       edit.criadoEm || new Date().toISOString(),
     };
 
@@ -443,10 +450,25 @@ function renderCompraModal() {
     _cmRenderItens();
   };
 
-  // Total geral
-  var grandTotalWrap = el('div', { style: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px', marginTop: '8px', paddingTop: '8px', borderTop: '2px solid var(--border)' } }, [
-    el('span', { style: { fontSize: '12px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase' } }, 'Total geral:'),
-    el('span', { id: 'cm-grand-total', style: { fontSize: '22px', fontWeight: '800', color: 'var(--gold)' } }, 'R$ 0,00'),
+  // Total geral + campo de ajuste
+  var ajusteInp = el('input', {
+    id: 'cm-ajuste-inp', type: 'number', step: '0.01', placeholder: '0,00',
+    style: { width: '88px', fontSize: '12px', textAlign: 'right', padding: '4px 6px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text)', fontFamily: 'inherit' },
+    title: 'Ajuste positivo ou negativo para acertar diferença de arredondamento',
+  });
+  ajusteInp.value = _cmAjuste !== 0 ? String(_cmAjuste) : '';
+  ajusteInp.oninput = function() { _cmAjuste = Math.round((parseFloat(this.value) || 0) * 100) / 100; _cmAtualizarTotal(); };
+
+  var grandTotalWrap = el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '2px solid var(--border)' } }, [
+    el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', marginBottom: '6px' } }, [
+      el('span', { style: { fontSize: '11px', color: 'var(--text3)' } }, '± Ajuste NF (R$):'),
+      ajusteInp,
+      el('span', { id: 'cm-ajuste-badge', style: { fontSize: '11px', color: 'var(--text3)', fontStyle: 'italic' } }, ''),
+    ]),
+    el('div', { style: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px' } }, [
+      el('span', { style: { fontSize: '12px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase' } }, 'Total geral:'),
+      el('span', { id: 'cm-grand-total', style: { fontSize: '22px', fontWeight: '800', color: 'var(--gold)' } }, 'R$ 0,00'),
+    ]),
   ]);
 
   // Fornecedor

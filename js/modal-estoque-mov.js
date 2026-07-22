@@ -106,14 +106,76 @@ function renderEstoqueMovModal() {
     tipoEl.appendChild(tb);
   });
 
-  // Select de insumo
-  var insumoOpts = [{ v: '', l: '— Selecionar produto —' }].concat(
-    itens.map(function(x) { return { v: x.id, l: x.nome + ' (' + (x.estoqueAtual || 0) + ' ' + (x.unidade || 'un') + ')' }; })
-  );
-  var insumoSel2 = mkSel('insumoId', insumoOpts, insumoId);
-  insumoSel2.onchange = function(e) {
-    setState({ estoqueMovModal: Object.assign({}, m, { insumoId: e.target.value }) });
+  // Busca autocomplete de insumo
+  var _insumoLabel = insumoSel ? (insumoSel.nome + ' (' + (insumoSel.estoqueAtual||0) + ' ' + (insumoSel.unidade||'un') + ')') : '';
+  var insumoHidden = el('input', { type: 'hidden', id: 'em-insumoId', value: insumoId });
+  var insBuscaInp = el('input', {
+    class: 'form-input', type: 'text', id: 'em-insumo-busca', autocomplete: 'off',
+    placeholder: '🔍 Digite para buscar produto ou insumo...', value: _insumoLabel,
+    style: { paddingRight: '32px' },
+  });
+  var insSuggestEl = el('div', { style: {
+    display: 'none', position: 'absolute', top: '100%', left: '0', right: '0', zIndex: '9999',
+    background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '8px',
+    boxShadow: '0 8px 24px rgba(0,0,0,.25)', maxHeight: '220px', overflowY: 'auto', marginTop: '3px',
+  } });
+  var insClearBtn = el('button', { type: 'button', style: {
+    position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
+    background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)',
+    fontSize: '14px', lineHeight: '1', padding: '2px 4px', display: _insumoLabel ? 'block' : 'none',
+  } }, '×');
+  insClearBtn.onclick = function() {
+    insBuscaInp.value = ''; insClearBtn.style.display = 'none';
+    insumoHidden.value = ''; m.insumoId = '';
+    _insShowSug(itens); insBuscaInp.focus();
   };
+  var insSearchWrap = el('div', { style: { position: 'relative' } }, [insBuscaInp, insClearBtn, insSuggestEl, insumoHidden]);
+
+  function _insFiltrar(q) {
+    if (!q) return itens;
+    var ql = q.toLowerCase();
+    return itens.filter(function(x) {
+      return x.nome.toLowerCase().indexOf(ql) >= 0 || (x.categoria && x.categoria.toLowerCase().indexOf(ql) >= 0);
+    });
+  }
+  function _insShowSug(lista) {
+    while (insSuggestEl.firstChild) insSuggestEl.removeChild(insSuggestEl.firstChild);
+    if (!lista.length) {
+      insSuggestEl.appendChild(el('div', { style: { padding: '14px', textAlign: 'center', fontSize: '12px', color: 'var(--text3)' } }, 'Nenhum produto encontrado'));
+      insSuggestEl.style.display = 'block'; return;
+    }
+    lista.slice(0, 50).forEach(function(x) {
+      var sBg = x.estoqueAtual <= 0 ? 'var(--danger)' : (x.estoqueMinimo > 0 && x.estoqueAtual <= x.estoqueMinimo) ? '#c9a84c' : 'var(--green)';
+      var sLbl = x.estoqueAtual <= 0 ? 'zerado' : (x.estoqueMinimo > 0 && x.estoqueAtual <= x.estoqueMinimo) ? 'crítico' : 'ok';
+      var row = el('div', { style: { padding: '9px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid var(--border)', transition: 'background .1s' } });
+      row.onmouseenter = function() { row.style.background = 'var(--bg3)'; };
+      row.onmouseleave = function() { row.style.background = ''; };
+      var info = el('div', { style: { flex: '1', minWidth: '0' } });
+      info.appendChild(el('div', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, '⚙️ ' + x.nome));
+      info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text3)', marginTop: '2px' } }, (x.categoria || 'sem categoria') + ' · ' + (x.estoqueAtual || 0) + ' ' + (x.unidade || 'un')));
+      row.appendChild(info);
+      var right = el('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px', flexShrink: '0' } });
+      right.appendChild(el('span', { style: { fontSize: '9px', fontWeight: '700', color: '#fff', background: sBg, padding: '2px 6px', borderRadius: '10px' } }, sLbl));
+      if (x.custoMedio > 0) right.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--text3)' } }, fmtMoney(x.custoMedio) + '/' + (x.unidade || 'un')));
+      row.appendChild(right);
+      row.onmousedown = function(e) {
+        e.preventDefault();
+        insSuggestEl.style.display = 'none';
+        setState({ estoqueMovModal: Object.assign({}, m, { insumoId: x.id }) });
+      };
+      insSuggestEl.appendChild(row);
+    });
+    insSuggestEl.style.display = 'block';
+  }
+  insBuscaInp.oninput = function() {
+    insClearBtn.style.display = this.value ? 'block' : 'none';
+    _insShowSug(_insFiltrar(this.value));
+  };
+  insBuscaInp.onfocus = function() {
+    if (!m.insumoId) { _insShowSug(itens); }
+    else { this.select(); _insShowSug(_insFiltrar(this.value)); }
+  };
+  insBuscaInp.onblur = function() { setTimeout(function() { insSuggestEl.style.display = 'none'; }, 160); };
 
   // Motivos por tipo
   var motivoOpts = (_emMovMotivos[tipo] || []);
@@ -257,7 +319,7 @@ function renderEstoqueMovModal() {
       tipoEl,
       el('div', { style: { borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '12px' } }, [
         el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '8px' } }, '📦 Produto'),
-        div('form-group', [el('label', { class: 'form-label' }, 'Produto *'), insumoSel2]),
+        div('form-group', [el('label', { class: 'form-label' }, 'Produto *'), insSearchWrap]),
         compraInfo,
         alertaSaida,
         infoAjuste,

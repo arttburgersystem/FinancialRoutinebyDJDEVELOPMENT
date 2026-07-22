@@ -56,7 +56,8 @@ function _parseYoogaRows(raw){
     var valorPago=parseBRL(r[cPago]);
     var taxa=parseBRL(r[cTaxa]);
     var qtde=parseInt(r[cQtde])||0;
-    rows.push({nome:nome,qtde:qtde,valorPago:valorPago,taxa:taxa,faturado:faturado,incluir:faturado>0});
+    var isSubsidio=nome.toLowerCase().indexOf('subsídio')>=0||nome.toLowerCase().indexOf('subsidio')>=0;
+    rows.push({nome:nome,qtde:qtde,valorPago:valorPago,taxa:taxa,faturado:faturado,isSubsidio:isSubsidio,incluir:faturado>0&&!isSubsidio});
   }
   if(!rows.length)throw new Error('Nenhuma linha de dados encontrada no arquivo.');
 
@@ -88,14 +89,15 @@ function _yoogaConfirmar(){
   if(jaExiste&&!confirm('Já existem lançamentos Yooga importados para '+dataImport+'. Importar mesmo assim?'))return;
 
   var novas=toImport.map(function(r){
+    var isDesc=r.isSubsidio;
     return {
       id:uid(),
-      tipo:'receber',
+      tipo:isDesc?'pagar':'receber',
       descricao:'Yooga — '+r.nome,
       valor:r.faturado,
       vencimento:dataImport,
-      status:'recebido',
-      categoria:'Vendas PDV',
+      status:isDesc?'pago':'recebido',
+      categoria:isDesc?'Descontos / Promoções':'Vendas PDV',
       profile:state.profile,
       banco:'',
       notas:'[Yooga] Qtde: '+r.qtde+' | Bruto: '+fmtMoney(r.valorPago)+(r.taxa>0?' | Taxa: -'+fmtMoney(r.taxa):''),
@@ -188,9 +190,14 @@ function renderImportYoogaModal(){
         totalEl.textContent=fmtMoney(t);
       };
       var dim=r.faturado===0?'0.35':'1';
+      var nomeEl=el('td',{style:{padding:'7px 8px',fontSize:'13px',fontWeight:'500'}});
+      nomeEl.appendChild(document.createTextNode(r.nome));
+      if(r.isSubsidio){
+        nomeEl.appendChild(el('span',{style:{fontSize:'10px',marginLeft:'6px',color:'var(--danger)',fontWeight:'700',background:'var(--danger)22',padding:'1px 5px',borderRadius:'4px'}},'desconto'));
+      }
       tbody.appendChild(el('tr',{style:{opacity:dim,borderBottom:'1px solid var(--border)'}}, [
         el('td',{style:{padding:'7px 8px',verticalAlign:'middle'}},[chk]),
-        el('td',{style:{padding:'7px 8px',fontSize:'13px',fontWeight:'500'}},r.nome),
+        nomeEl,
         el('td',{style:{padding:'7px 8px',fontSize:'12px',color:'var(--text3)',textAlign:'right',fontVariantNumeric:'tabular-nums'}},r.qtde+'x'),
         el('td',{style:{padding:'7px 8px',fontSize:'12px',color:'var(--text2)',textAlign:'right',fontVariantNumeric:'tabular-nums'}},fmtMoney(r.valorPago)),
         el('td',{style:{padding:'7px 8px',fontSize:'12px',color:'var(--danger)',textAlign:'right',fontVariantNumeric:'tabular-nums'}},r.taxa>0?'-'+fmtMoney(r.taxa):'—'),

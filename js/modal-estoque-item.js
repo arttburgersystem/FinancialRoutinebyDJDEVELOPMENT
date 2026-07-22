@@ -250,7 +250,8 @@ function renderEstoqueItemModal() {
           }
           if (_ins) { ing.custoUnit = parseFloat(_ins.custoMedio) || 0; ing.custoTotal = Math.round(qtd * ing.custoUnit * 10000) / 10000; }
           else { ing.custoTotal = 0; }
-          _eiRenderIngredientes();
+          custoSpan.textContent = fmtMoney(ing.custoTotal || 0);
+          _updateCustoFromFT();
         };
 
         nomeInp.oninput = function() {

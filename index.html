@@ -3228,6 +3228,21 @@ function renderMobileNav(){
 // ── RENDER PRINCIPAL ──────────────────────────────────────────────────────────
 function render(){
   var root=document.getElementById('app');
+
+  // Preserva foco e cursor antes de destruir o DOM
+  var _fEl=document.activeElement;
+  var _fId=(_fEl&&_fEl.id)||null;
+  var _fIdx=-1;
+  var _fSel=null;
+  var _fTag=_fEl?_fEl.tagName:'';
+  if(_fEl&&(_fTag==='INPUT'||_fTag==='TEXTAREA'||_fTag==='SELECT')){
+    if(typeof _fEl.selectionStart==='number')_fSel={s:_fEl.selectionStart,e:_fEl.selectionEnd};
+    if(!_fId){
+      var _allPre=root.querySelectorAll('input,textarea,select');
+      for(var _fi=0;_fi<_allPre.length;_fi++){if(_allPre[_fi]===_fEl){_fIdx=_fi;break;}}
+    }
+  }
+
   root.innerHTML='';
 
   // PDV mode: tela cheia, sem sidebar
@@ -3338,6 +3353,17 @@ function render(){
     app.appendChild(t);
   }
   root.appendChild(app);
+
+  // Restaura foco após re-render para que inputs de busca não percam o cursor
+  if(_fId){
+    var _r=document.getElementById(_fId);
+    if(_r){_r.focus();if(_fSel&&typeof _r.setSelectionRange==='function')try{_r.setSelectionRange(_fSel.s,_fSel.e);}catch(e){}}
+  }else if(_fIdx>=0){
+    var _allPost=root.querySelectorAll('input,textarea,select');
+    var _r2=_allPost[_fIdx];
+    if(_r2){_r2.focus();if(_fSel&&typeof _r2.setSelectionRange==='function')try{_r2.setSelectionRange(_fSel.s,_fSel.e);}catch(e){}}
+  }
+
   if(window._djfClockTimer)clearInterval(window._djfClockTimer);
   window._djfClockTimer=setInterval(function(){
     var ck=document.getElementById('djf-clock');

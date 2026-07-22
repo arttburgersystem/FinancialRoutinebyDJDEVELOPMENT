@@ -47,7 +47,8 @@ input,select,textarea{font-family:inherit;outline:none}
 .nav-section-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 12px 5px;cursor:pointer;user-select:none;gap:6px;}
 .nav-section-hd:hover .nav-section-lbl{opacity:1;}
 .nav-section-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.4px;color:var(--gold);opacity:.65;flex:1;transition:opacity .15s;}
-.nav-section-arrow{font-size:10px;color:var(--text3);flex-shrink:0;line-height:1;transition:color .15s;}
+.nav-section-arrow{font-size:13px;color:var(--text3);flex-shrink:0;line-height:1;transition:transform .2s,color .15s;display:inline-block;}
+.nav-section-arrow.is-open{transform:rotate(90deg);}
 .nav-section-hd:hover .nav-section-arrow{color:var(--gold);}
 .nav-section-items{overflow:hidden;}
 .nav-section{padding:6px 14px 4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3)}
@@ -1439,7 +1440,7 @@ function renderSidebar(){
       setState({navSectionsCollapsed:nc});
     }});
     hd.appendChild(el('span',{class:'nav-section-lbl'},secLabels[sec]||sec));
-    hd.appendChild(el('span',{class:'nav-section-arrow'},isCollapsed?'▲':'▼'));
+    hd.appendChild(el('span',{class:'nav-section-arrow'+(isCollapsed?'':' is-open')},'›'));
 
     var itemsWrap=el('div',{class:'nav-section-items',style:{display:isCollapsed?'none':'block'}});
     items.forEach(function(n){

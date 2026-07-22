@@ -2,7 +2,7 @@
 // Mantém o app funcionando offline e dispara notificações de tarefas
 // mesmo com a aba em segundo plano
 
-var CACHE_NAME = 'djf-cache-v55';
+var CACHE_NAME = 'djf-cache-v56';
 var ASSETS = [
   '/',
   '/index.html',

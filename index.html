@@ -1282,7 +1282,7 @@ function _navDef(ae){
     {id:'estoque',label:'Estoque & CMV',icon:'📦',section:'sistema',hidden:true},
     {id:'impressoes',label:'Setores de Impressão',icon:'🖨️',section:'sistema',hidden:true},
     {id:'pdv',label:'PDV — Frente de Caixa',icon:'🏪',section:'sistema',hidden:true},
-    {id:'kds',label:'KDS',icon:'📺',section:'sistema',hidden:true},
+    {id:'kds',label:'KDS',icon:'📺',section:'sistema'},
     {id:'mapa',label:'Mapa',icon:'🗺️',section:'sistema',hidden:true},
     // ── sistema ──
     {id:'fiscal',label:'Planejamento Fiscal',icon:'📋',section:'sistema',hideAE:true},
@@ -3277,7 +3277,7 @@ function render(){
     return;
   }
 
-  var _hiddenPages=['estoque','impressoes','pdv','kds','mapa'];
+  var _hiddenPages=['estoque','impressoes','pdv','mapa'];
   if(_hiddenPages.indexOf(state.page)!==-1){setState({page:'dashboard'});return;}
 
   var pages={dashboard:isAEProfile()&&typeof renderDashboardAE==='function'?renderDashboardAE:renderDashboard,apostas:typeof renderApostas==='function'?renderApostas:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,compras:renderCompras,'lista-compras':renderListaCompras,'estoque-insumos':renderEstoqueInsumos,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,freelancers:renderFreelancers,administrador:renderAdministrador,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas,usuarios:renderUsuarios,recorrencias:renderRecorrencias,auditoria:renderAuditoria,ajuda:renderAjuda,estoque:renderEstoque,empresa:renderEmpresa,cardapio:renderCardapio,impressoes:renderImpressoes,kds:renderKDS,notas:renderNotas,mapa:renderMapa,pdv:renderPDV,daily:renderDailyOperation,caixa:renderCaixa,patrimonio:renderPatrimonio,fiscal:renderFiscal};

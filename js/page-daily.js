@@ -781,6 +781,62 @@ function renderDailyCalModal(){
 }
 
 // ── render principal ──────────────────────────────────────────────────────────
+function _criarRotinaCaixa(){
+  var pf=state.profile;
+  var jaExiste=(state.dailyTaskDefs||[]).some(function(d){
+    return d.profile===pf&&d.nome&&d.nome.indexOf('[Caixa]')>=0;
+  });
+  if(jaExiste){showToast('Rotina de caixa já existe nas suas rotinas diárias!','error');return;}
+
+  var TODOS=[0,1,2,3,4,5,6];
+  var SEGUNDA=[1];
+
+  var rotinas=[
+    {
+      nome:'[Caixa] 1. Importar vendas Yooga',
+      descricao:'Abrir o Yooga → Relatórios → Venda por Forma de Pagamento → filtrar o dia anterior → Exportar Excel.\nNo Financial Routine: clicar em 📊 Yooga no rodapé da sidebar → selecionar o arquivo → conferir e importar.',
+      horario:'08:00',dias:TODOS,prioridade:'alta',cor:'#3a8fd4',
+    },
+    {
+      nome:'[Caixa] 2. Conferir dinheiro físico',
+      descricao:'Contar o dinheiro físico no caixa.\nComparar com a soma de Dinheiro + Delivery - Dinheiro do relatório Yooga importado.\nOs dois valores têm que bater. Se sobrar ou faltar, registrar como diferença de caixa.',
+      horario:'08:15',dias:TODOS,prioridade:'alta',cor:'#4caf82',
+    },
+    {
+      nome:'[Caixa] 3. Conferir PIX no banco',
+      descricao:'Abrir o app do banco e verificar os PIX recebidos no dia anterior.\nComparar com a soma de Pix + YOOGA ONLINE - PIX do relatório.\nOs valores têm que bater.',
+      horario:'08:30',dias:TODOS,prioridade:'alta',cor:'#2bb5a0',
+    },
+    {
+      nome:'[Caixa] 4. Lançar despesas do dia',
+      descricao:'Registrar no Financial Routine (Despesas) todas as saídas de caixa do dia:\n- Compras de insumos pagos em dinheiro\n- Pequenas despesas operacionais\n- Sangrias do caixa\nManter sempre atualizado para o DRE fechar correto.',
+      horario:'22:00',dias:TODOS,prioridade:'media',cor:'#e07832',
+    },
+    {
+      nome:'[Caixa] 5. Verificar vencimentos próximos',
+      descricao:'Acessar Alertas ou Despesas no Financial Routine.\nVerificar se há contas vencendo nos próximos 7 dias.\nSe houver, garantir que o saldo em conta cobre os pagamentos.',
+      horario:'09:00',dias:TODOS,prioridade:'media',cor:'#c9a84c',
+    },
+    {
+      nome:'[Caixa] 6. Segunda — Conferir repasse iFood',
+      descricao:'Toda segunda-feira verificar se o repasse semanal do iFood caiu na conta bancária.\nComparar com a soma das vendas IFOOD - ONLINE da semana anterior.\nO iFood paga toda segunda referente às vendas de segunda a domingo da semana passada.',
+      horario:'09:00',dias:SEGUNDA,prioridade:'alta',cor:'#e05252',
+    },
+  ];
+
+  var novas=rotinas.map(function(r){
+    return {id:uid(),profile:pf,nome:r.nome,descricao:r.descricao,
+      horario:r.horario,dias:r.dias,alertaMinutos:15,
+      cor:r.cor,prioridade:r.prioridade,ativo:true};
+  });
+
+  var defs2=(state.dailyTaskDefs||[]).concat(novas);
+  lsSet('dailyTaskDefs',defs2);
+  setState({dailyTaskDefs:defs2});
+  scheduleSave();
+  showToast('6 rotinas de caixa criadas com sucesso! 🎉','success');
+}
+
 function renderDailyOperation(){
   if(!_doTimerRef){
     _doTimerRef=setInterval(function(){
@@ -882,6 +938,7 @@ function renderDailyOperation(){
     btn('btn-ghost','📅 Calendário',function(){setState({dailyCalModal:{mes:hj.slice(0,7)}});}),
     btn('btn-ghost','+ Nova Rotina Diária',function(){setState({dailyModal:{}});}),
     btn('btn-ghost','⚙️ Rotinas',function(){setState({dailyTemplatesOpen:true});}),
+    btn('btn-ghost','🏧 Criar Rotina de Caixa',_criarRotinaCaixa),
   ]);
 
   // Kanban: Tarefa Futura → Programação → Tarefa do Dia → Concluídas → Adiadas → Canceladas

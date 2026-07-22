@@ -211,14 +211,14 @@ function _fidTabClientes(todos,cfg,log) {
   tb.appendChild(inp);
   var novoBtn=el('button',{class:'btn-primary',style:{fontSize:'13px',padding:'8px 16px'}});
   novoBtn.textContent='+ Novo cliente';
-  novoBtn.onclick=function(){ _fidClienteModal={id:null,nome:'',telefone:'',nascimento:'',obs:''}; setState({}); };
+  novoBtn.onclick=function(){ _fidClienteModal={id:null,nome:'',telefone:'',cpf:'',nascimento:'',obs:''}; setState({}); };
   tb.appendChild(novoBtn);
   frag.appendChild(tb);
 
   var visivel=todos.slice().sort(function(a,b){ return (b.carimbosTotal||0)-(a.carimbosTotal||0); });
   if (_fidBusca.trim()) {
     var q=_fidBusca.toLowerCase();
-    visivel=visivel.filter(function(c){ return (c.nome||'').toLowerCase().includes(q)||(c.telefone||'').includes(q); });
+    visivel=visivel.filter(function(c){ return (c.nome||'').toLowerCase().includes(q)||(c.telefone||'').includes(q)||(c.cpf||'').replace(/\D/g,'').includes(q.replace(/\D/g,'')); });
   }
   if (!visivel.length) {
     var emp=el('div',{class:'fid-empty'});
@@ -272,6 +272,11 @@ function _fidCard(c,cfg) {
     var telEl=el('div',{style:{fontSize:'12px',color:'var(--text3)',marginTop:'2px'}});
     telEl.textContent='📱 '+c.telefone;
     info.appendChild(telEl);
+  }
+  if (c.cpf) {
+    var cpfEl=el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'1px'}});
+    cpfEl.textContent='🪪 CPF: '+c.cpf;
+    info.appendChild(cpfEl);
   }
   var badgeRow=el('div',{style:{display:'flex',alignItems:'center',flexWrap:'wrap',gap:'2px',marginTop:'3px'}});
   var badge=el('span',{class:'fid-tier-badge'});
@@ -513,12 +518,25 @@ function _fidModalCliente(c) {
   var inpNome=el('input',{class:'fid-input',type:'text',placeholder:'Nome completo',value:c.nome||''});
   inpNome.oninput=function(){c.nome=this.value;};
   modal.appendChild(field('Nome *',inpNome));
+
   var inpTel=el('input',{class:'fid-input',type:'tel',placeholder:'(00) 00000-0000',value:c.telefone||''});
   inpTel.oninput=function(){c.telefone=this.value;};
-  modal.appendChild(field('Telefone / WhatsApp',inpTel));
+  modal.appendChild(field('Telefone / WhatsApp *',inpTel));
+
+  var inpCpf=el('input',{class:'fid-input',type:'text',placeholder:'000.000.000-00',maxlength:'14',value:c.cpf||''});
+  inpCpf.oninput=function(){
+    var v=this.value.replace(/\D/g,'').slice(0,11);
+    if(v.length>9) v=v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6,9)+'-'+v.slice(9);
+    else if(v.length>6) v=v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6);
+    else if(v.length>3) v=v.slice(0,3)+'.'+v.slice(3);
+    this.value=v; c.cpf=v;
+  };
+  modal.appendChild(field('CPF *',inpCpf));
+
   var inpNasc=el('input',{class:'fid-input',type:'date',value:c.nascimento||''});
   inpNasc.oninput=function(){c.nascimento=this.value;};
-  modal.appendChild(field('Data de nascimento',inpNasc));
+  modal.appendChild(field('Data de nascimento *',inpNasc));
+
   var inpObs=el('textarea',{class:'fid-input',placeholder:'Observações...',rows:'2',style:'resize:vertical;'});
   inpObs.value=c.obs||'';
   inpObs.oninput=function(){c.obs=this.value;};
@@ -546,13 +564,20 @@ function _fidModalCliente(c) {
   var saveBtn=el('button',{class:'btn-primary',style:{flex:'1',padding:'9px',fontSize:'13px'}});
   saveBtn.textContent=isNew?'✅ Cadastrar':'💾 Salvar';
   saveBtn.onclick=function(){
-    if (!(c.nome||'').trim()){showToast('Digite o nome do cliente','error');return;}
+    if (!(c.nome||'').trim()){showToast('Nome é obrigatório','error');return;}
+    if (!(c.telefone||'').trim()){showToast('Telefone é obrigatório','error');return;}
+    if ((c.cpf||'').replace(/\D/g,'').length!==11){showToast('CPF inválido — informe os 11 dígitos','error');return;}
+    if (!(c.nascimento||'').trim()){showToast('Data de nascimento é obrigatória','error');return;}
     var perfil=state.profile;
     var clientes=(state.fidelidadeClientes||[]).slice();
     if (isNew) {
+      // CPF duplicado?
+      var cpfLimpo=(c.cpf||'').replace(/\D/g,'');
+      var jaExiste=clientes.find(function(x){return x.profile===perfil&&(x.cpf||'').replace(/\D/g,'')===cpfLimpo;});
+      if(jaExiste){showToast('CPF já cadastrado: '+jaExiste.nome,'error');return;}
       clientes.push({
         id:uid(),profile:perfil,
-        nome:c.nome.trim(),telefone:c.telefone||'',nascimento:c.nascimento||'',obs:c.obs||'',
+        nome:c.nome.trim(),telefone:c.telefone||'',cpf:c.cpf||'',nascimento:c.nascimento||'',obs:c.obs||'',
         carimbosTotal:0,carimbosAtuais:0,cartoesResgatados:0,
         cashbackSaldo:0,cashbackTotal:0,cashbackResgatado:0,
         criadoEm:new Date().toISOString()
@@ -560,7 +585,7 @@ function _fidModalCliente(c) {
     } else {
       for (var i=0;i<clientes.length;i++){
         if (clientes[i].id===c.id&&clientes[i].profile===perfil){
-          clientes[i]=Object.assign({},clientes[i],{nome:c.nome.trim(),telefone:c.telefone||'',nascimento:c.nascimento||'',obs:c.obs||''});
+          clientes[i]=Object.assign({},clientes[i],{nome:c.nome.trim(),telefone:c.telefone||'',cpf:c.cpf||'',nascimento:c.nascimento||'',obs:c.obs||''});
           break;
         }
       }

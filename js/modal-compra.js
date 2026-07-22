@@ -472,8 +472,93 @@ function renderCompraModal() {
   ]);
 
   // Fornecedor
+  // ── Autocomplete de fornecedor ──────────────────────────────────────────────
+  var _fornAtual = forns.filter(function(f) { return f.id === (edit.fornecedorId || ''); })[0] || null;
+  var _fornLabel = _fornAtual ? _fornAtual.nome : '';
+
+  var fornHidden = el('input', { type: 'hidden', id: 'cm-fornecedorId', value: edit.fornecedorId || '' });
+  var fornBuscaInp = el('input', {
+    class: 'form-input', type: 'text', autocomplete: 'off', id: 'cm-forn-busca',
+    placeholder: '🔍 Digite para buscar fornecedor...', value: _fornLabel,
+    style: { paddingRight: '28px' },
+  });
+  var fornClearBtn = el('button', { type: 'button', style: {
+    position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
+    background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)',
+    fontSize: '14px', lineHeight: '1', padding: '2px 4px', display: _fornLabel ? 'block' : 'none',
+  } }, '×');
+  fornClearBtn.onclick = function() {
+    fornBuscaInp.value = ''; fornClearBtn.style.display = 'none';
+    fornHidden.value = ''; _fornShowSug(forns); fornBuscaInp.focus();
+  };
+
+  var fornSugDiv = el('div', { style: {
+    display: 'none', position: 'fixed', zIndex: '99999',
+    background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '8px',
+    boxShadow: '0 8px 24px rgba(0,0,0,.25)', maxHeight: '220px', overflowY: 'auto',
+  } });
+  fornSugDiv.className = 'cm-sug-div';
+  document.body.appendChild(fornSugDiv);
+
+  var fornSearchWrap = el('div', { style: { position: 'relative' } }, [fornBuscaInp, fornClearBtn, fornHidden]);
+
+  function _fornFiltrar(q) {
+    if (!q) return forns;
+    var ql = q.toLowerCase();
+    return forns.filter(function(f) {
+      return f.nome.toLowerCase().indexOf(ql) >= 0 || (f.cnpj && f.cnpj.indexOf(ql) >= 0) || (f.categoria && f.categoria.toLowerCase().indexOf(ql) >= 0);
+    });
+  }
+  function _fornPos() {
+    var r = fornBuscaInp.getBoundingClientRect();
+    fornSugDiv.style.top  = (r.bottom + 3) + 'px';
+    fornSugDiv.style.left = r.left + 'px';
+    fornSugDiv.style.width = r.width + 'px';
+  }
+  function _fornShowSug(lista) {
+    while (fornSugDiv.firstChild) fornSugDiv.removeChild(fornSugDiv.firstChild);
+    _fornPos();
+    if (!lista.length) {
+      fornSugDiv.appendChild(el('div', { style: { padding: '14px', textAlign: 'center', fontSize: '12px', color: 'var(--text3)' } }, 'Nenhum fornecedor encontrado'));
+      fornSugDiv.style.display = 'block'; return;
+    }
+    lista.forEach(function(f) {
+      var isSelected = fornHidden.value === f.id;
+      var row = el('div', { style: {
+        padding: '9px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
+        borderBottom: '1px solid var(--border)', transition: 'background .1s',
+        background: isSelected ? 'var(--bg3)' : '',
+      } });
+      row.onmouseenter = function() { row.style.background = 'var(--bg3)'; };
+      row.onmouseleave = function() { row.style.background = isSelected ? 'var(--bg3)' : ''; };
+      var info = el('div', { style: { flex: '1', minWidth: '0' } });
+      info.appendChild(el('div', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, '🏪 ' + f.nome));
+      if (f.cnpj || f.categoria) {
+        info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text3)', marginTop: '1px' } }, [f.categoria, f.cnpj].filter(Boolean).join(' · ')));
+      }
+      row.appendChild(info);
+      if (isSelected) row.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--primary)' } }, '✓'));
+      row.onmousedown = function(e) {
+        e.preventDefault();
+        fornSugDiv.style.display = 'none';
+        fornHidden.value = f.id;
+        fornBuscaInp.value = f.nome;
+        fornClearBtn.style.display = 'block';
+      };
+      fornSugDiv.appendChild(row);
+    });
+    fornSugDiv.style.display = 'block';
+  }
+  fornBuscaInp.oninput = function() {
+    fornHidden.value = '';
+    fornClearBtn.style.display = this.value ? 'block' : 'none';
+    _fornShowSug(_fornFiltrar(this.value));
+  };
+  fornBuscaInp.onfocus = function() { _fornShowSug(_fornFiltrar(this.value)); };
+  fornBuscaInp.onblur  = function() { setTimeout(function() { fornSugDiv.style.display = 'none'; }, 160); };
+
   var fornRow = el('div', { style: { display: 'flex', gap: '8px' } });
-  fornRow.appendChild(el('div', { style: { flex: '1' } }, [el('label', { class: 'form-label' }, 'Fornecedor (cadastrado)'), mkSel('fornecedorId', fornOpts, edit.fornecedorId || '')]));
+  fornRow.appendChild(el('div', { style: { flex: '1' } }, [el('label', { class: 'form-label' }, 'Fornecedor (cadastrado)'), fornSearchWrap]));
   fornRow.appendChild(el('div', { style: { flex: '1' } }, [el('label', { class: 'form-label' }, 'Ou nome livre'), mkInp('fornecedorNome', 'text', 'Ex: Atacadão...', edit.fornecedor || '')]));
 
   // Datas

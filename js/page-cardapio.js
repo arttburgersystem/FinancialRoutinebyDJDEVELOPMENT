@@ -1382,15 +1382,31 @@ function renderCardapio() {
       function tdCell(style){var c=el('td',{});c.style.cssText='padding:10px 12px;font-size:13px;vertical-align:middle;'+(style||'');return c;}
 
       var td0=tdCell('width:36px;');td0.appendChild(chk);tr.appendChild(td0);
-      var td1=tdCell('max-width:200px;');
+      var td1=tdCell('max-width:240px;');
+      var _td1Row=el('div',{style:{display:'flex',alignItems:'center',gap:'8px'}});
+      var _thumb=el('div',{});
+      _thumb.style.cssText='width:38px;height:38px;border-radius:6px;flex-shrink:0;background:var(--bg3);border:1px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:16px;';
+      if(p.imagemUrl){
+        var _tImg=el('img',{});
+        _tImg.src=p.imagemUrl;
+        _tImg.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';
+        _thumb.appendChild(_tImg);
+      } else {
+        _thumb.textContent='🍽️';
+        _thumb.style.opacity='.35';
+      }
+      _td1Row.appendChild(_thumb);
+      var _nomeCol=el('div',{style:{minWidth:0,flex:'1'}});
       var _nomeDiv=el('div',{style:{fontWeight:'600',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:'4px'}});
       _nomeDiv.appendChild(document.createTextNode(p.nome||''));
       if(_fichaIds[p.id]) _nomeDiv.appendChild(el('span',{title:'Ficha Técnica cadastrada',style:{fontSize:'11px',opacity:'.8',flexShrink:'0'}},'📋'));
-      td1.appendChild(_nomeDiv);
+      _nomeCol.appendChild(_nomeDiv);
+      _td1Row.appendChild(_nomeCol);
+      td1.appendChild(_td1Row);
       if(!isComp&&setor){
         var setBadge=el('span',{style:{fontSize:'10px',color:setor.cor||'var(--blue)',marginTop:'2px',display:'block'}});
         setBadge.textContent='🖨️ '+setor.nome;
-        td1.appendChild(setBadge);
+        _nomeCol.appendChild(setBadge);
       }
       tr.appendChild(td1);
       var td2=tdCell('color:var(--text3);font-size:12px;font-family:monospace;width:90px;');

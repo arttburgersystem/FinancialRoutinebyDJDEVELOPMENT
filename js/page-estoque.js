@@ -4,6 +4,10 @@
 var EST_CATS_DEFAULT  = ['Proteínas','Pães','Vegetais/Saladas','Laticínios','Bebidas','Embalagens','Temperos/Molhos','Outros'];
 var EST_UNIDS_DEFAULT = ['kg','g','un','L','ml','cx','pct','sc'];
 
+// Ingredientes da ficha técnica no modal de produto (persiste entre re-renders do mesmo produto)
+var _pmIngredientes = [];
+var _pmProdModalId  = null;
+
 function estCats() {
   var cats = state.estCategorias || [];
   return cats.length ? cats.map(function(c){ return c.nome; }) : EST_CATS_DEFAULT;
@@ -366,6 +370,21 @@ function renderEstUnidManager() {
 function renderProdutoModal() {
   var p = state.produtoModal || {};
   var isEdit = !!p.id;
+
+  // Remove dropdowns de insumo da ficha técnica que possam ter ficado no body
+  var _pmOld = document.querySelectorAll('.pm-sug-ing');
+  for (var _psi = 0; _psi < _pmOld.length; _psi++) { if (_pmOld[_psi].parentNode) _pmOld[_psi].parentNode.removeChild(_pmOld[_psi]); }
+
+  // Inicializa ingredientes apenas ao abrir ou trocar produto (não em cada re-render por setState)
+  var _pmCurId = p.id || '__new__';
+  if (_pmCurId !== _pmProdModalId) {
+    _pmProdModalId = _pmCurId;
+    var _ftInit = (state.fichaTecnicas || []).filter(function(ft) { return ft.produtoId === p.id; })[0];
+    _pmIngredientes = _ftInit && _ftInit.ingredientes
+      ? _ftInit.ingredientes.map(function(x) { return Object.assign({}, x); })
+      : [];
+  }
+
   function fld(lbl, inp) { return el('div',{class:'form-group'},[el('label',{class:'form-label'},lbl),inp]); }
 
   // ── TIPO (obrigatório) ────────────────────────────────────────────────────
@@ -536,6 +555,150 @@ function renderProdutoModal() {
     return i;
   }
 
+  // ── FICHA TÉCNICA (só para produto) ───────────────────────────────────────
+  function buildFichaTecnicaSection() {
+    // Reúne todos os insumos disponíveis (estoqueItens + produtos tipo insumo), sem duplicatas
+    var _pmInsumos = [];
+    var _pmSeenIds = {};
+    (state.estoqueItens || []).filter(function(x) { return x.profile === state.profile; }).forEach(function(x) {
+      if (!_pmSeenIds[x.id]) { _pmSeenIds[x.id] = true; _pmInsumos.push(x); }
+    });
+    (state.produtos || []).filter(function(x) { return x.tipo === 'insumo' && x.profile === state.profile; }).forEach(function(x) {
+      if (!_pmSeenIds[x.id]) { _pmSeenIds[x.id] = true; _pmInsumos.push(x); }
+    });
+
+    var totalSpan = el('span', { style: { fontSize: '16px', fontWeight: '800', color: 'var(--gold)' } }, '');
+    function _pmUpdateTotal() {
+      var t = Math.round(_pmIngredientes.reduce(function(a, ing) { return a + (ing.custoTotal || 0); }, 0) * 10000) / 10000;
+      totalSpan.textContent = fmtMoney(t);
+    }
+    _pmUpdateTotal();
+
+    var ingContainer = el('div', {});
+
+    function _pmRenderIngredientes() {
+      while (ingContainer.firstChild) ingContainer.removeChild(ingContainer.firstChild);
+      // Remove dropdowns de renders anteriores
+      var _oldSug = document.querySelectorAll('.pm-sug-ing');
+      for (var _si = 0; _si < _oldSug.length; _si++) { if (_oldSug[_si].parentNode) _oldSug[_si].parentNode.removeChild(_oldSug[_si]); }
+
+      if (_pmIngredientes.length === 0) {
+        ingContainer.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text3)', padding: '10px 0', textAlign: 'center' } }, 'Nenhum ingrediente. Clique em + Adicionar para começar.'));
+        return;
+      }
+
+      _pmIngredientes.forEach(function(ing, idx) {
+        var row = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 78px 60px 90px 26px', gap: '4px', alignItems: 'center', marginBottom: '6px' } });
+
+        var ingInp = el('input', { class: 'form-input', type: 'text', autocomplete: 'off', placeholder: '🔍 Buscar insumo...', style: { fontSize: '12px' } });
+        ingInp.value = ing.insumoNome || '';
+
+        var sugDiv = el('div', { style: { display: 'none', position: 'fixed', zIndex: '99999', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,.25)', maxHeight: '200px', overflowY: 'auto' } });
+        sugDiv.className = 'pm-sug-ing';
+        document.body.appendChild(sugDiv);
+
+        var qtdInp = el('input', { class: 'form-input', type: 'number', min: '0.001', step: '0.001', value: String(ing.quantidade || 1), style: { fontSize: '12px' } });
+        var unidSpan = el('div', { style: { fontSize: '11px', padding: '7px 6px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center', color: 'var(--text3)', whiteSpace: 'nowrap' } }, ing.unidade || '—');
+        var custoSpan = el('div', { style: { fontSize: '12px', padding: '7px 4px', textAlign: 'right', color: 'var(--text2)', fontWeight: '600', whiteSpace: 'nowrap' } }, fmtMoney(ing.custoTotal || 0));
+        var delBtn = el('button', { style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '20px', padding: '0 2px', lineHeight: '1', flexShrink: '0' } }, '×');
+        delBtn.onclick = function(e) { e.preventDefault(); _pmIngredientes.splice(idx, 1); _pmRenderIngredientes(); _pmUpdateTotal(); };
+
+        (function(i, nd, sd, qi, ue, ce) {
+          function _fil(q) {
+            if (!q) return _pmInsumos;
+            var ql = q.toLowerCase();
+            return _pmInsumos.filter(function(x) { return x.nome.toLowerCase().indexOf(ql) >= 0 || (x.categoria && x.categoria.toLowerCase().indexOf(ql) >= 0); });
+          }
+          function _pos() { var r = nd.getBoundingClientRect(); sd.style.top = (r.bottom + 3) + 'px'; sd.style.left = r.left + 'px'; sd.style.width = r.width + 'px'; }
+          function _show(lista) {
+            while (sd.firstChild) sd.removeChild(sd.firstChild);
+            _pos();
+            if (!lista.length) {
+              sd.appendChild(el('div', { style: { padding: '12px', textAlign: 'center', fontSize: '11px', color: 'var(--text3)' } }, 'Nenhum insumo encontrado'));
+              sd.style.display = 'block'; return;
+            }
+            lista.slice(0, 50).forEach(function(x) {
+              var opt = el('div', { style: { padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', transition: 'background .1s' } });
+              opt.onmouseenter = function() { opt.style.background = 'var(--bg3)'; };
+              opt.onmouseleave = function() { opt.style.background = ''; };
+              opt.appendChild(el('div', { style: { fontWeight: '600', fontSize: '12px', color: 'var(--text)' } }, x.nome));
+              opt.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text3)', marginTop: '1px' } }, (x.categoria || 'insumo') + ' · ' + (x.unidade || 'un') + (x.custoMedio > 0 ? ' · ' + fmtMoney(x.custoMedio) + '/un' : '')));
+              opt.onmousedown = function(e) {
+                e.preventDefault();
+                sd.style.display = 'none';
+                _pmIngredientes[i].insumoId   = x.id;
+                _pmIngredientes[i].insumoNome = x.nome;
+                _pmIngredientes[i].unidade    = x.unidade || 'un';
+                _pmIngredientes[i].custoUnit  = x.custoMedio || 0;
+                _pmIngredientes[i].custoTotal = Math.round((_pmIngredientes[i].quantidade || 1) * (x.custoMedio || 0) * 10000) / 10000;
+                nd.value = x.nome;
+                ue.textContent = x.unidade || '—';
+                ce.textContent = fmtMoney(_pmIngredientes[i].custoTotal);
+                _pmUpdateTotal();
+              };
+              sd.appendChild(opt);
+            });
+            sd.style.display = 'block';
+          }
+          nd.onfocus = function() { _show(_fil(this.value)); };
+          nd.oninput = function() { _pmIngredientes[i].insumoId = null; _pmIngredientes[i].insumoNome = this.value; _show(_fil(this.value)); };
+          nd.onblur  = function() { setTimeout(function() { sd.style.display = 'none'; }, 160); };
+          qi.oninput = function() {
+            _pmIngredientes[i].quantidade = parseFloat(this.value) || 0;
+            _pmIngredientes[i].custoTotal = Math.round(_pmIngredientes[i].quantidade * (_pmIngredientes[i].custoUnit || 0) * 10000) / 10000;
+            ce.textContent = fmtMoney(_pmIngredientes[i].custoTotal);
+            _pmUpdateTotal();
+          };
+        })(idx, ingInp, sugDiv, qtdInp, unidSpan, custoSpan);
+
+        row.appendChild(ingInp); row.appendChild(qtdInp); row.appendChild(unidSpan); row.appendChild(custoSpan); row.appendChild(delBtn);
+        ingContainer.appendChild(row);
+      });
+    }
+
+    _pmRenderIngredientes();
+
+    var addIngBtn = el('button', { class: 'btn-ghost', style: { fontSize: '11px', padding: '5px 12px' } }, '+ Adicionar ingrediente');
+    addIngBtn.onclick = function(e) {
+      e.preventDefault();
+      _pmIngredientes.push({ insumoId: null, insumoNome: '', quantidade: 1, unidade: 'un', custoUnit: 0, custoTotal: 0 });
+      _pmRenderIngredientes();
+      _pmUpdateTotal();
+    };
+
+    var _ftExistLink = (state.fichaTecnicas || []).filter(function(ft) { return ft.produtoId === (p.id || ''); })[0];
+    var actRow = el('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '6px' } });
+    actRow.appendChild(addIngBtn);
+    if (_ftExistLink && p.id) {
+      var ftFullBtn = el('button', { class: 'btn-ghost', style: { fontSize: '11px', padding: '5px 12px' } }, '📋 Abrir ficha completa →');
+      ftFullBtn.onclick = function(e) { e.preventDefault(); setState({ produtoModal: null, fichaTecnicaModal: { editItem: _ftExistLink } }); };
+      actRow.appendChild(ftFullBtn);
+    }
+
+    var hdrCols = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 78px 60px 90px 26px', gap: '4px', marginBottom: '4px' } }, [
+      el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700' } }, 'INGREDIENTE / INSUMO'),
+      el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textAlign: 'center' } }, 'QTDE'),
+      el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textAlign: 'center' } }, 'UNID'),
+      el('span', { style: { fontSize: '10px', color: 'var(--text3)', fontWeight: '700', textAlign: 'right' } }, 'CUSTO'),
+      el('span', {}, ''),
+    ]);
+
+    var ftWrap = el('div', {});
+    ftWrap.appendChild(secHead('📋', 'Ficha Técnica / Ingredientes'));
+    if (_pmInsumos.length === 0) {
+      ftWrap.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text3)', padding: '6px 0' } }, '⚠️ Cadastre insumos (tipo Insumo) para montar a ficha técnica aqui.'));
+    } else {
+      ftWrap.appendChild(hdrCols);
+      ftWrap.appendChild(ingContainer);
+      ftWrap.appendChild(actRow);
+      ftWrap.appendChild(el('div', { style: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed var(--border)' } }, [
+        el('span', { style: { fontSize: '11px', color: 'var(--text3)' } }, 'Custo dos ingredientes:'),
+        totalSpan,
+      ]));
+    }
+    return ftWrap;
+  }
+
   // ── ERRO + SALVAR ──────────────────────────────────────────────────────────
   var errEl = el('div',{style:{color:'var(--danger)',fontSize:'12px',minHeight:'18px',marginTop:'4px'}});
 
@@ -668,8 +831,41 @@ function renderProdutoModal() {
     var novos = isEdit
       ? state.produtos.map(function(x){return x.id===prod.id?prod:x;})
       : (state.produtos||[]).concat([prod]);
+
+    // Ficha Técnica: salva/atualiza ingredientes ao cadastrar produto
+    var _statePatch = { produtos: novos, produtoModal: null };
+    if (prod.tipo === 'produto') {
+      var _pmIngsValidos = _pmIngredientes.filter(function(ing) { return !!ing.insumoId; });
+      if (_pmIngsValidos.length > 0) {
+        var _pmFtCusto = Math.round(_pmIngsValidos.reduce(function(a, ing) { return a + (ing.custoTotal || 0); }, 0) * 10000) / 10000;
+        var _ftListaAtual = state.fichaTecnicas || [];
+        var _ftExistNow   = _ftListaAtual.filter(function(ft) { return ft.produtoId === prod.id; })[0];
+        var _ftNova = Object.assign({}, _ftExistNow || {}, {
+          id:          (_ftExistNow && _ftExistNow.id) || uid(),
+          profile:     state.profile,
+          nome:        (_ftExistNow && _ftExistNow.nome) || prod.nome,
+          categoria:   prod.categoria || '',
+          rendimento:  (_ftExistNow && _ftExistNow.rendimento)  || 1,
+          unidadeRend: (_ftExistNow && _ftExistNow.unidadeRend) || 'porção',
+          ingredientes: _pmIngsValidos,
+          custoTotal:   _pmFtCusto,
+          custoPorcao:  _pmFtCusto,
+          precoVenda:   prod.precoVenda || (_ftExistNow && _ftExistNow.precoVenda) || 0,
+          produtoId:    prod.id,
+          criadoEm:    (_ftExistNow && _ftExistNow.criadoEm) || today(),
+        });
+        var _ftListaNova = _ftExistNow
+          ? _ftListaAtual.map(function(ft) { return ft.produtoId === prod.id ? _ftNova : ft; })
+          : _ftListaAtual.concat([_ftNova]);
+        // Auto-preenche custo médio do produto se não foi informado manualmente
+        if (_pmFtCusto > 0 && !(prod.custoMedio > 0)) { prod.custoMedio = _pmFtCusto; }
+        lsSet('fichaTecnicas', _ftListaNova);
+        _statePatch.fichaTecnicas = _ftListaNova;
+      }
+    }
+
     logAudit((isEdit?'editou':'cadastrou')+' '+prod.tipo, prod.nome);
-    setState({produtos:novos, produtoModal:null});
+    setState(_statePatch);
     scheduleSave();
     showToast(isEdit?'Produto atualizado!':'Produto cadastrado!','success');
   }
@@ -745,6 +941,9 @@ function renderProdutoModal() {
 
         // EMBALAGENS (só produto)
         p.tipo==='produto' ? buildEmbSection() : null,
+
+        // FICHA TÉCNICA (só produto)
+        p.tipo==='produto' ? buildFichaTecnicaSection() : null,
 
         // FISCAL
         secHead('🧾','Informações Fiscais'),

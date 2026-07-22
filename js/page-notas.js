@@ -50,6 +50,13 @@ function _autoSaveTituloNota(id, titulo) {
 
 var NOTA_CORES = ['#c9a84c','#3b82f6','#16a34a','#dc2626','#9333ea','#ea580c','#0891b2','#be185d'];
 
+// Converte plain text para HTML ao carregar notas antigas (preserva quebras de linha)
+function _notaParaHtml(c) {
+  if (!c) return '';
+  if (/<[a-z][^>]*>/i.test(c)) return c; // já é HTML
+  return c.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
 // ── PAINEL FLUTUANTE (touch bar) ──────────────────────────────────────────────
 function renderNotaPanel() {
   var notas = _notasDoPerfil();
@@ -113,7 +120,7 @@ function renderNotaPanel() {
     var tituloRow = el('div',{style:{display:'flex',alignItems:'center',gap:'6px',padding:'8px 10px',borderBottom:'1px solid var(--border)',flexShrink:'0'}});
     var tituloInp = el('input',{style:{flex:'1',background:'none',border:'none',fontWeight:'700',fontSize:'13px',color:'var(--text)',fontFamily:'inherit',outline:'none'}});
     tituloInp.value = nota.titulo||'';
-    tituloInp.onchange = function(){_autoSaveTituloNota(nota.id,this.value);};
+    tituloInp.oninput = function(){_autoSaveTituloNota(nota.id,this.value);};
 
     // Seletor de cor
     var corBtn = el('button',{style:{width:'16px',height:'16px',borderRadius:'50%',background:nota.cor||'var(--gold)',border:'2px solid var(--border)',cursor:'pointer',flexShrink:'0',position:'relative'}});
@@ -156,13 +163,34 @@ function renderNotaPanel() {
     tituloRow.appendChild(delBtn);
     editor.appendChild(tituloRow);
 
-    // Textarea
-    var ta = el('textarea',{});
-    ta.style.cssText='flex:1;resize:none;background:transparent;border:none;padding:12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;line-height:1.6;';
-    ta.placeholder='Escreva sua nota aqui...';
-    ta.value = nota.conteudo||'';
-    ta.oninput=function(){_autoSaveNota(nota.id,this.value);};
-    editor.appendChild(ta);
+    // Mini barra de formatação no painel
+    var pFmtBar=el('div',{style:{display:'flex',gap:'2px',padding:'4px 8px',borderBottom:'1px solid var(--border)',flexShrink:'0',flexWrap:'wrap',background:'var(--bg2)'}});
+    var _pEdRef=null;
+    function _pfc(cmd,arg){document.execCommand(cmd,false,arg||null);if(_pEdRef)_pEdRef.focus();}
+    function _pfb(html,title,fn){
+      var b=document.createElement('button');b.title=title;b.innerHTML=html;
+      b.style.cssText='background:none;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text);padding:1px 6px;line-height:1.5;font-family:inherit;transition:background .1s;flex-shrink:0;';
+      b.onmouseenter=function(){this.style.background='var(--bg3)';};
+      b.onmouseleave=function(){this.style.background='none';};
+      b.onmousedown=function(e){e.preventDefault();fn();};
+      return b;
+    }
+    pFmtBar.appendChild(_pfb('<b>N</b>','Negrito',function(){_pfc('bold');}));
+    pFmtBar.appendChild(_pfb('<i>I</i>','Itálico',function(){_pfc('italic');}));
+    pFmtBar.appendChild(_pfb('<u>S</u>','Sublinhado',function(){_pfc('underline');}));
+    pFmtBar.appendChild(_pfb('<s>T</s>','Tachado',function(){_pfc('strikeThrough');}));
+    pFmtBar.appendChild(_pfb('<span style="font-size:10px">• Lista</span>','Lista',function(){_pfc('insertUnorderedList');}));
+    pFmtBar.appendChild(_pfb('<span style="font-size:10px">1.</span>','Lista numerada',function(){_pfc('insertOrderedList');}));
+    editor.appendChild(pFmtBar);
+
+    // Editor contenteditable no painel
+    var pEd=document.createElement('div');
+    pEd.contentEditable='true';
+    pEd.style.cssText='flex:1;overflow-y:auto;background:transparent;padding:10px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;line-height:1.6;word-break:break-word;';
+    pEd.innerHTML=_notaParaHtml(nota.conteudo||'');
+    _pEdRef=pEd;
+    pEd.oninput=function(){_autoSaveNota(nota.id,this.innerHTML);};
+    editor.appendChild(pEd);
   }
 
   body.appendChild(editor);
@@ -229,50 +257,92 @@ function renderNotas() {
     noSel.appendChild(btn('btn-primary','+ Nova nota',novaNotaFn));
     editorArea.appendChild(noSel);
   } else {
-    // Toolbar
+    // ── Toolbar: título + cores + excluir ────────────────────────────────────
     var toolbar=el('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'10px 16px',borderBottom:'1px solid var(--border)',flexShrink:'0',background:'var(--bg3)'}});
-    var tituloInp2=el('input',{style:{flex:'1',background:'none',border:'none',fontWeight:'700',fontSize:'16px',color:'var(--text)',fontFamily:'inherit',outline:'none'}});
+    toolbar.appendChild(el('span',{style:{fontSize:'13px',color:'var(--text3)',flexShrink:'0'}},'✏️'));
+    var tituloInp2=el('input',{style:{flex:'1',background:'none',border:'none',fontWeight:'700',fontSize:'16px',color:'var(--text)',fontFamily:'inherit',outline:'none'},placeholder:'Título da nota...'});
     tituloInp2.value=nota.titulo||'';
-    tituloInp2.onchange=function(){_autoSaveTituloNota(nota.id,this.value);};
+    tituloInp2.oninput=function(){_autoSaveTituloNota(nota.id,this.value);};
     toolbar.appendChild(tituloInp2);
 
-    // Cores
     var corRow=el('div',{style:{display:'flex',gap:'5px'}});
     NOTA_CORES.forEach(function(c){
       var cb=el('button',{style:{width:'18px',height:'18px',borderRadius:'50%',background:c,border:'2px solid '+(c===nota.cor?'var(--text)':'transparent'),cursor:'pointer',flexShrink:'0'}});
       cb.onclick=function(){
         var newNota=Object.assign({},nota,{cor:c});
         var arr=(state.notas||[]).map(function(n){return n.id===nota.id?newNota:n;});
-        lsSet('notas',arr);scheduleSave();
-        setState({notas:arr});
+        lsSet('notas',arr);scheduleSave();setState({notas:arr});
       };
       corRow.appendChild(cb);
     });
     toolbar.appendChild(corRow);
-
     var delBtn2=btn('btn-ghost','🗑 Excluir',function(){
       if(!window.confirm('Excluir nota "'+nota.titulo+'"?'))return;
       var arr=(state.notas||[]).filter(function(n){return n.id!==nota.id;});
       lsSet('notas',arr);scheduleSave();
       var lista2=arr.filter(function(n){return n.profile===state.profile;});
-      var novoPrimeiro=(lista2[0]||{}).id||null;
-      setState({notas:arr,notaAtualId:novoPrimeiro});
+      setState({notas:arr,notaAtualId:(lista2[0]||{}).id||null});
     });
     toolbar.appendChild(delBtn2);
     editorArea.appendChild(toolbar);
 
-    // Editor text
-    var ta2=el('textarea',{class:'_nota-editor-ta'});
-    ta2.style.cssText='flex:1;resize:none;background:var(--bg2);border:none;padding:20px;font-size:14px;color:var(--text);font-family:inherit;outline:none;line-height:1.7;';
-    ta2.placeholder='Escreva aqui...';
-    ta2.value=nota.conteudo||'';
-    ta2.oninput=function(){_autoSaveNota(nota.id,this.value);};
-    editorArea.appendChild(ta2);
+    // ── Barra de formatação ───────────────────────────────────────────────────
+    var fmtBar=el('div',{style:{display:'flex',alignItems:'center',gap:'2px',padding:'5px 14px',borderBottom:'1px solid var(--border)',flexShrink:'0',flexWrap:'wrap',background:'var(--bg2)'}});
+    var _edRef=null; // referência ao div editor — atribuída abaixo
 
-    // Status bar
+    function _fc(cmd,arg){document.execCommand(cmd,false,arg||null);if(_edRef)_edRef.focus();}
+    function _fb(html,title,fn){
+      var b=document.createElement('button');
+      b.title=title;
+      b.innerHTML=html;
+      b.style.cssText='background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text);padding:2px 8px;line-height:1.6;font-family:inherit;transition:background .12s;white-space:nowrap;flex-shrink:0;min-width:28px;';
+      b.onmouseenter=function(){this.style.background='var(--bg3)';};
+      b.onmouseleave=function(){this.style.background='none';};
+      b.onmousedown=function(e){e.preventDefault();fn();};
+      return b;
+    }
+    function _fsep(){var s=document.createElement('span');s.style.cssText='width:1px;height:16px;background:var(--border);margin:0 4px;flex-shrink:0;align-self:center;';return s;}
+
+    fmtBar.appendChild(_fb('<b style="font-size:13px">N</b>','Negrito (Ctrl+B)',function(){_fc('bold');}));
+    fmtBar.appendChild(_fb('<i style="font-size:13px">I</i>','Itálico (Ctrl+I)',function(){_fc('italic');}));
+    fmtBar.appendChild(_fb('<u style="font-size:13px">S</u>','Sublinhado (Ctrl+U)',function(){_fc('underline');}));
+    fmtBar.appendChild(_fb('<s style="font-size:13px">T</s>','Tachado',function(){_fc('strikeThrough');}));
+    fmtBar.appendChild(_fsep());
+    fmtBar.appendChild(_fb('<span style="font-size:11px;font-weight:700">T1</span>','Título grande',function(){_fc('formatBlock','h1');}));
+    fmtBar.appendChild(_fb('<span style="font-size:11px;font-weight:700">T2</span>','Título médio',function(){_fc('formatBlock','h2');}));
+    fmtBar.appendChild(_fb('<span style="font-size:11px;font-weight:600">T3</span>','Subtítulo',function(){_fc('formatBlock','h3');}));
+    fmtBar.appendChild(_fb('<span style="font-size:11px">¶</span>','Parágrafo normal',function(){_fc('formatBlock','p');}));
+    fmtBar.appendChild(_fsep());
+    fmtBar.appendChild(_fb('<span style="font-size:11px">• Lista</span>','Lista com marcadores',function(){_fc('insertUnorderedList');}));
+    fmtBar.appendChild(_fb('<span style="font-size:11px">1. Lista</span>','Lista numerada',function(){_fc('insertOrderedList');}));
+    fmtBar.appendChild(_fsep());
+    fmtBar.appendChild(_fb('<span style="font-size:12px">⬅</span>','Alinhar à esquerda',function(){_fc('justifyLeft');}));
+    fmtBar.appendChild(_fb('<span style="font-size:12px">↔</span>','Centralizar',function(){_fc('justifyCenter');}));
+    fmtBar.appendChild(_fb('<span style="font-size:12px">➡</span>','Alinhar à direita',function(){_fc('justifyRight');}));
+    editorArea.appendChild(fmtBar);
+
+    // ── Editor contenteditable ────────────────────────────────────────────────
     var statusBar=el('div',{style:{padding:'6px 16px',borderTop:'1px solid var(--border)',fontSize:'10px',color:'var(--text3)',display:'flex',gap:'16px',flexShrink:'0'}});
-    var wc=(nota.conteudo||'').trim().split(/\s+/).filter(Boolean).length;
-    statusBar.textContent=wc+' palavras · '+((nota.conteudo||'').length)+' caracteres · Salvo automaticamente';
+    function _updateStatus(txt){
+      var wc2=txt.trim()?txt.trim().split(/\s+/).filter(Boolean).length:0;
+      statusBar.textContent=wc2+' palavras · '+txt.replace(/\s+/g,' ').length+' caracteres · Salvo automaticamente';
+    }
+    var _txtInit=(nota.conteudo||'').replace(/<[^>]*>/g,' ');
+    _updateStatus(_txtInit);
+
+    var ed=document.createElement('div');
+    ed.className='_nota-editor-ta';
+    ed.contentEditable='true';
+    ed.style.cssText='flex:1;overflow-y:auto;background:var(--bg2);padding:20px;font-size:14px;color:var(--text);font-family:inherit;outline:none;line-height:1.75;word-break:break-word;';
+    ed.innerHTML=_notaParaHtml(nota.conteudo||'');
+    _edRef=ed;
+
+    ed.oninput=function(){
+      var html=this.innerHTML;
+      _autoSaveNota(nota.id,html);
+      _updateStatus(this.innerText||'');
+    };
+    editorArea.appendChild(ed);
     editorArea.appendChild(statusBar);
   }
 

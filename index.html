@@ -468,6 +468,9 @@ var state={
   fichaTecnicas: lsGet('fichaTecnicas',[]),
   embConfig: lsGet('embConfig',{delivery:{itens:[]},salao:{itens:[]}}),
   fiscalConfig: lsGet('fiscalConfig',{}),
+  manualArtigos: lsGet('manualArtigos',[]),
+  manualSel: null,
+  manualModal: null,
   estoqueItemModal: null,
   estoqueMovModal: null,
   fichaTecnicaModal: null,
@@ -1285,6 +1288,7 @@ function _navDef(ae){
     {id:'kds',label:'KDS',icon:'📺',section:'sistema'},
     {id:'mapa',label:'Mapa',icon:'🗺️',section:'sistema',hidden:true},
     // ── sistema ──
+    {id:'manual',label:'Manual de Operação',icon:'📖',section:'sistema',hideAE:true},
     {id:'fiscal',label:'Planejamento Fiscal',icon:'📋',section:'sistema',hideAE:true},
     {id:'empresa',label:'Dados da Empresa',icon:'🏢',section:'sistema'},
     {id:'usuarios',label:'Usuários & Permissões',icon:'🔐',section:'sistema'},
@@ -3280,7 +3284,7 @@ function render(){
   var _hiddenPages=['estoque','impressoes','mapa'];
   if(_hiddenPages.indexOf(state.page)!==-1){setState({page:'dashboard'});return;}
 
-  var pages={dashboard:isAEProfile()&&typeof renderDashboardAE==='function'?renderDashboardAE:renderDashboard,apostas:typeof renderApostas==='function'?renderApostas:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,compras:renderCompras,'lista-compras':renderListaCompras,'estoque-insumos':renderEstoqueInsumos,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,freelancers:renderFreelancers,administrador:renderAdministrador,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas,usuarios:renderUsuarios,recorrencias:renderRecorrencias,auditoria:renderAuditoria,ajuda:renderAjuda,estoque:renderEstoque,empresa:renderEmpresa,cardapio:renderCardapio,impressoes:renderImpressoes,kds:renderKDS,notas:renderNotas,mapa:renderMapa,pdv:renderPDV,daily:renderDailyOperation,caixa:renderCaixa,patrimonio:renderPatrimonio,fiscal:renderFiscal};
+  var pages={manual:renderManual,dashboard:isAEProfile()&&typeof renderDashboardAE==='function'?renderDashboardAE:renderDashboard,apostas:typeof renderApostas==='function'?renderApostas:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,compras:renderCompras,'lista-compras':renderListaCompras,'estoque-insumos':renderEstoqueInsumos,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,freelancers:renderFreelancers,administrador:renderAdministrador,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas,usuarios:renderUsuarios,recorrencias:renderRecorrencias,auditoria:renderAuditoria,ajuda:renderAjuda,estoque:renderEstoque,empresa:renderEmpresa,cardapio:renderCardapio,impressoes:renderImpressoes,kds:renderKDS,notas:renderNotas,mapa:renderMapa,pdv:renderPDV,daily:renderDailyOperation,caixa:renderCaixa,patrimonio:renderPatrimonio,fiscal:renderFiscal};
   var pageContent=(pages[state.page]||renderDashboard)();
   var content=div('content',[pageContent]);
   var mainCls='main'+(state.sidebarCollapsed?' sb-collapsed':'');
@@ -3417,6 +3421,7 @@ function render(){
 <script src="js/page-estoque.js"></script>
 <script src="js/page-empresa.js"></script>
 <script src="js/page-fiscal.js"></script>
+<script src="js/page-manual.js"></script>
 <script src="js/page-caixa.js"></script>
 <script src="js/page-patrimonio.js"></script>
 <script src="js/page-impressoes.js"></script>

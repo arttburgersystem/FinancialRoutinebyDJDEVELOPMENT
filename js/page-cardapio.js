@@ -326,9 +326,10 @@ function renderCardapio() {
   var perfil  = state.profile;
   var cats    = estCats();
   var setores = (state.setoresImpressao||[]).filter(function(s){return s.profile===perfil;});
-  var isComp  = _crdTab === 'complementos';
-  var isCats  = _crdTab === 'categorias';
-  var isEmb   = _crdTab === 'embalagens';
+  var isComp   = _crdTab === 'complementos';
+  var isCats   = _crdTab === 'categorias';
+  var isEmb    = _crdTab === 'embalagens';
+  var isGrupos = _crdTab === 'grupos';
 
   var todosProd = (state.produtos||[]).filter(function(p){
     return p.profile===perfil && p.tipo==='produto';
@@ -476,6 +477,136 @@ function renderCardapio() {
     ]);
     var mOv2=div('modal-overlay',[mEl2]);
     compModal=mOv2;
+  }
+
+  // ── Modal GRUPO DE MONTAGEM ──────────────────────────────────────────────────
+  var grupoCompModal = null;
+  if (state.grupoCompModal !== null && state.grupoCompModal !== undefined) {
+    var gcm = state.grupoCompModal;
+    var isEditGrp = !!gcm.id;
+    if (!gcm.opcoes) gcm.opcoes = [];
+    var todosInsGcm = (state.estoqueItens||[]).filter(function(x){return x.profile===perfil;})
+      .concat((state.produtos||[]).filter(function(x){return x.tipo==='insumo'&&x.profile===perfil;}));
+
+    var gcmNomeInp = el('input',{class:'form-input',type:'text',placeholder:'Ex: Tipo de Pão, Ponto da Carne, Molhos...',value:gcm.nome||''});
+    gcmNomeInp.oninput = function(){gcm.nome=this.value;};
+
+    function mkGcmToggle(label, getVal, setVal) {
+      var t=el('div',{style:{display:'inline-flex',alignItems:'center',width:'32px',height:'18px',borderRadius:'9px',background:getVal()?'var(--green)':'var(--border)',padding:'2px',cursor:'pointer',transition:'background .2s',flexShrink:'0'}});
+      var th=el('div',{style:{width:'14px',height:'14px',borderRadius:'50%',background:'#fff',boxShadow:'0 1px 3px rgba(0,0,0,.3)',transition:'transform .2s',transform:'translateX('+(getVal()?'14px':'0px')+')'}});
+      t.appendChild(th);
+      t.onclick=function(){setVal(!getVal());t.style.background=getVal()?'var(--green)':'var(--border)';th.style.transform='translateX('+(getVal()?'14px':'0px')+')';};
+      return el('div',{style:{display:'flex',alignItems:'center',gap:'8px',userSelect:'none'}},[t,el('span',{style:{fontSize:'13px',color:'var(--text2)'}},label)]);
+    }
+
+    var optsContainer = el('div',{});
+
+    function renderGcmOpts() {
+      while(optsContainer.firstChild) optsContainer.removeChild(optsContainer.firstChild);
+      if(!gcm.opcoes.length){
+        optsContainer.appendChild(el('div',{style:{textAlign:'center',color:'var(--text3)',fontSize:'12px',padding:'12px 0'}},'Nenhuma opção adicionada.'));
+        return;
+      }
+      optsContainer.appendChild(el('div',{style:{display:'grid',gridTemplateColumns:'1fr 80px 1fr 64px 24px',gap:'6px',fontSize:'10px',fontWeight:'700',color:'var(--text3)',textTransform:'uppercase',marginBottom:'6px'}},
+        [el('span',{},'Opção'),el('span',{style:{textAlign:'center'}},'+Preço'),el('span',{},'Insumo (baixa estoque)'),el('span',{style:{textAlign:'center'}},'Qtd'),el('span',{},'')]));
+      gcm.opcoes.forEach(function(opt,idx){
+        var nInp=el('input',{class:'form-input',type:'text',placeholder:'Nome da opção',style:{fontSize:'12px'}});
+        nInp.value=opt.nome||'';
+        nInp.oninput=function(){opt.nome=this.value;};
+        var pInp=el('input',{class:'form-input',type:'number',min:'0',step:'0.01',placeholder:'0,00',style:{fontSize:'12px',textAlign:'center'}});
+        pInp.value=opt.preco!=null?String(opt.preco):'0';
+        pInp.oninput=function(){opt.preco=parseFloat(this.value)||0;};
+        var insInp=el('input',{class:'form-input',type:'text',placeholder:'Buscar insumo...',style:{fontSize:'12px'},autocomplete:'off'});
+        var insM=opt.insumoId?todosInsGcm.find(function(x){return x.id===opt.insumoId;}):null;
+        insInp.value=insM?insM.nome:(opt.insumoNome||'');
+        insInp.oninput=function(){
+          opt.insumoId=null; opt.insumoNome=this.value;
+          var q=this.value.trim().toLowerCase();
+          var olds=document.querySelectorAll('.gcm-sug');
+          for(var _i=0;_i<olds.length;_i++){if(olds[_i].parentNode)olds[_i].parentNode.removeChild(olds[_i]);}
+          if(!q) return;
+          var matches=todosInsGcm.filter(function(x){return x.nome&&x.nome.toLowerCase().includes(q);}).slice(0,8);
+          if(!matches.length) return;
+          var sugDiv=document.createElement('div');
+          sugDiv.className='gcm-sug';
+          var rect=insInp.getBoundingClientRect();
+          sugDiv.style.cssText='position:fixed;z-index:9999;background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:160px;overflow-y:auto;box-shadow:0 4px 24px rgba(0,0,0,.18);';
+          sugDiv.style.left=rect.left+'px';sugDiv.style.top=(rect.bottom+2)+'px';sugDiv.style.width=Math.max(rect.width,200)+'px';
+          matches.forEach(function(ins){
+            var it=document.createElement('div');
+            it.style.cssText='padding:7px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;';
+            it.innerHTML='<span>'+ins.nome+'</span><span style="font-size:10px;color:var(--text3)">'+(ins.unidade||'un')+'</span>';
+            it.onmouseover=function(){this.style.background='var(--bg3)';};
+            it.onmouseout=function(){this.style.background='';};
+            it.onmousedown=function(e){
+              e.preventDefault();
+              opt.insumoId=ins.id;opt.insumoNome=ins.nome;insInp.value=ins.nome;
+              var drops=document.querySelectorAll('.gcm-sug');
+              for(var _d=0;_d<drops.length;_d++){if(drops[_d].parentNode)drops[_d].parentNode.removeChild(drops[_d]);}
+            };
+            sugDiv.appendChild(it);
+          });
+          document.body.appendChild(sugDiv);
+          insInp.onblur=function(){setTimeout(function(){var drops=document.querySelectorAll('.gcm-sug');for(var _d=0;_d<drops.length;_d++){if(drops[_d].parentNode)drops[_d].parentNode.removeChild(drops[_d]);}},150);};
+        };
+        var qInp=el('input',{class:'form-input',type:'number',min:'0.001',step:'0.001',placeholder:'1',style:{fontSize:'12px',textAlign:'center'}});
+        qInp.value=opt.quantidade!=null?String(opt.quantidade):'1';
+        qInp.oninput=function(){opt.quantidade=parseFloat(this.value)||1;};
+        var rmOpt=el('button',{class:'btn-ghost',style:{padding:'2px 6px',fontSize:'14px',color:'var(--danger)'}});
+        rmOpt.textContent='×';
+        rmOpt.onclick=function(e){e.preventDefault();gcm.opcoes.splice(idx,1);renderGcmOpts();};
+        optsContainer.appendChild(el('div',{style:{display:'grid',gridTemplateColumns:'1fr 80px 1fr 64px 24px',gap:'6px',alignItems:'center',marginBottom:'4px'}},[nInp,pInp,insInp,qInp,rmOpt]));
+      });
+    }
+    renderGcmOpts();
+
+    var addOptBtn=btn('btn-ghost','+ Adicionar opção',function(e){
+      e.preventDefault();
+      gcm.opcoes.push({id:uid(),nome:'',preco:0,insumoId:null,insumoNome:'',quantidade:1});
+      renderGcmOpts();
+    });
+    addOptBtn.style.fontSize='12px';addOptBtn.style.marginTop='6px';
+
+    function salvarGrupo(){
+      if(!(gcm.nome||'').trim()){showToast('Informe o nome do grupo','error');return;}
+      var grp={
+        id:gcm.id||uid(), profile:state.profile,
+        nome:(gcm.nome||'').trim(),
+        obrigatorio:!!gcm.obrigatorio, multiplo:!!gcm.multiplo,
+        opcoes:(gcm.opcoes||[]).filter(function(o){return !!(o.nome||'').trim();}).map(function(o){
+          return {id:o.id||uid(),nome:o.nome.trim(),preco:o.preco||0,insumoId:o.insumoId||null,insumoNome:o.insumoNome||'',quantidade:o.quantidade||1};
+        }),
+      };
+      var arr=isEditGrp
+        ?(state.gruposComp||[]).map(function(g){return g.id===grp.id?grp:g;})
+        :(state.gruposComp||[]).concat([grp]);
+      lsSet('gruposComp',arr);
+      setState({gruposComp:arr,grupoCompModal:null});
+      scheduleSave();
+      showToast(isEditGrp?'Grupo atualizado!':'Grupo criado!');
+    }
+
+    var gcmBody=el('div',{class:'modal-body'});
+    gcmBody.appendChild(div('form-group',[el('label',{class:'form-label'},'Nome do grupo *'),gcmNomeInp]));
+    gcmBody.appendChild(el('div',{style:{display:'flex',gap:'20px',marginBottom:'14px',flexWrap:'wrap'}},[
+      mkGcmToggle('Obrigatório (operador deve escolher)',function(){return !!gcm.obrigatorio;},function(v){gcm.obrigatorio=v;}),
+      mkGcmToggle('Seleção múltipla',function(){return !!gcm.multiplo;},function(v){gcm.multiplo=v;}),
+    ]));
+    gcmBody.appendChild(el('div',{style:{fontSize:'11px',fontWeight:'700',color:'var(--text3)',textTransform:'uppercase',marginBottom:'8px'}},'📋 Opções do grupo'));
+    gcmBody.appendChild(optsContainer);
+    gcmBody.appendChild(addOptBtn);
+
+    var gcmMod=el('div',{class:'modal',style:{maxWidth:'660px'}});
+    gcmMod.appendChild(el('div',{class:'modal-header'},[
+      el('h3',{class:'modal-title'},(isEditGrp?'✏️ Editar':'➕ Novo')+' Grupo de Montagem'),
+      el('button',{class:'modal-close',onclick:function(){setState({grupoCompModal:null});}}, '✕'),
+    ]));
+    gcmMod.appendChild(gcmBody);
+    gcmMod.appendChild(el('div',{class:'modal-footer'},[
+      btn('btn-secondary','Cancelar',function(){setState({grupoCompModal:null});}),
+      btn('btn-primary',isEditGrp?'💾 Salvar':'➕ Criar',salvarGrupo),
+    ]));
+    grupoCompModal = div('modal-overlay',[gcmMod]);
   }
 
   // ── Helpers de dropdown ──────────────────────────────────────────────────────
@@ -634,11 +765,93 @@ function renderCardapio() {
     el('div',{style:{display:'flex'}},[
       tabBtn('produtos','Produtos'),
       tabBtn('complementos','Montagens'),
+      tabBtn('grupos','🎛️ Grupos'),
       tabBtn('categorias','🏷️ Categorias'),
       tabBtn('embalagens','📦 Embalagens'),
     ]),
     tabBarRight,
   ]);
+
+  // ── ABA GRUPOS DE MONTAGEM ───────────────────────────────────────────────────
+  function renderGruposTab() {
+    var todosInsGT = (state.estoqueItens||[]).filter(function(x){return x.profile===perfil;})
+      .concat((state.produtos||[]).filter(function(x){return x.tipo==='insumo'&&x.profile===perfil;}));
+    var grupos = (state.gruposComp||[]).filter(function(g){return g.profile===perfil;});
+
+    var wrap = el('div',{style:{padding:'16px'}});
+    var hdrRow = el('div',{style:{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'16px',gap:'12px'}});
+    hdrRow.appendChild(el('div',{},[
+      el('div',{style:{fontSize:'15px',fontWeight:'700',color:'var(--text)'}},'🎛️ Grupos de Montagem / Complementos'),
+      el('div',{style:{fontSize:'12px',color:'var(--text3)',marginTop:'4px'}},'Configure grupos de opções para os produtos (ex: "Tipo de Pão", "Ponto da Carne", "Molhos"). No PDV o operador seleciona antes de finalizar.'),
+    ]));
+    var addGrpBtn = el('button',{class:'btn-primary',style:{fontSize:'12px',padding:'7px 14px',flexShrink:'0'}});
+    addGrpBtn.textContent = '+ Novo Grupo';
+    addGrpBtn.onclick = function(){setState({grupoCompModal:{opcoes:[]}});};
+    hdrRow.appendChild(addGrpBtn);
+    wrap.appendChild(hdrRow);
+
+    if(!grupos.length){
+      wrap.appendChild(el('div',{style:{textAlign:'center',padding:'60px 20px',color:'var(--text3)'}}, [
+        el('div',{style:{fontSize:'36px',marginBottom:'12px'}},'🎛️'),
+        el('div',{style:{fontWeight:'700',fontSize:'14px',marginBottom:'6px'}},'Nenhum grupo criado'),
+        el('div',{style:{fontSize:'13px'}},'Clique em "+ Novo Grupo" para criar grupos de complementos (ex: "Tipo de Pão") com suas opções e vincular a insumos de estoque.'),
+      ]));
+      return wrap;
+    }
+
+    var grid = el('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:'14px'}});
+    grupos.forEach(function(grp){
+      var card = el('div',{style:{background:'var(--bg)',border:'1px solid var(--border)',borderRadius:'10px',overflow:'hidden'}});
+      var cardHdr = el('div',{style:{padding:'12px 14px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:'8px'}});
+      var info = el('div',{style:{flex:'1'}});
+      var nameRow = el('div',{style:{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}});
+      nameRow.appendChild(el('span',{style:{fontWeight:'700',fontSize:'14px',color:'var(--text)'}},grp.nome));
+      if(grp.obrigatorio) nameRow.appendChild(el('span',{style:{fontSize:'10px',padding:'2px 7px',borderRadius:'10px',background:'rgba(239,68,68,.1)',color:'#ef4444',fontWeight:'700'}},'Obrigatório'));
+      if(grp.multiplo)    nameRow.appendChild(el('span',{style:{fontSize:'10px',padding:'2px 7px',borderRadius:'10px',background:'var(--bg3)',color:'var(--text3)',fontWeight:'600'}},'Múltiplo'));
+      info.appendChild(nameRow);
+      info.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'3px'}},(grp.opcoes||[]).length+' opção(ões)'));
+      cardHdr.appendChild(info);
+      var editBtn=el('button',{style:{background:'none',border:'1px solid var(--border)',cursor:'pointer',borderRadius:'5px',padding:'3px 8px',fontSize:'12px',color:'var(--text3)',flexShrink:'0'}});
+      editBtn.textContent='✏️';
+      editBtn.onclick=function(){setState({grupoCompModal:Object.assign({},grp,{opcoes:(grp.opcoes||[]).map(function(o){return Object.assign({},o);})})});};
+      var delGBtn=el('button',{style:{background:'none',border:'1px solid var(--border)',cursor:'pointer',borderRadius:'5px',padding:'3px 8px',fontSize:'12px',color:'var(--danger)',flexShrink:'0'}});
+      delGBtn.textContent='🗑';
+      delGBtn.onclick=function(){
+        if(!confirm('Excluir grupo "'+grp.nome+'"?')) return;
+        var arr=(state.gruposComp||[]).filter(function(g){return g.id!==grp.id;});
+        lsSet('gruposComp',arr); setState({gruposComp:arr}); scheduleSave();
+        showToast('Grupo excluído','error');
+      };
+      cardHdr.appendChild(editBtn); cardHdr.appendChild(delGBtn);
+      card.appendChild(cardHdr);
+
+      var optList = el('div',{style:{padding:'8px 14px'}});
+      if(!(grp.opcoes||[]).length){
+        optList.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)',padding:'4px 0'}},'Nenhuma opção. Clique em ✏️ para adicionar.'));
+      } else {
+        (grp.opcoes||[]).forEach(function(opt){
+          var ins = todosInsGT.find(function(x){return x.id===opt.insumoId;});
+          var row=el('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'4px 0',borderBottom:'1px solid var(--border)',fontSize:'12px'}});
+          row.appendChild(el('span',{style:{flex:'1',color:'var(--text)'}},opt.nome));
+          if(opt.preco>0) row.appendChild(el('span',{style:{color:'var(--gold)',fontWeight:'600',flexShrink:'0'}},'+'+fmtMoney(opt.preco)));
+          if(ins) row.appendChild(el('span',{style:{fontSize:'10px',color:'var(--text3)',flexShrink:'0'}},'📦 '+ins.nome+' ×'+(opt.quantidade||1)));
+          else if(opt.insumoNome) row.appendChild(el('span',{style:{fontSize:'10px',color:'var(--danger)',flexShrink:'0'}},'⚠️ '+opt.insumoNome));
+          optList.appendChild(row);
+        });
+      }
+      card.appendChild(optList);
+
+      var prodUsing=(state.produtos||[]).filter(function(p){return p.profile===perfil&&(p.gruposComp||[]).indexOf(grp.id)>=0;});
+      var foot=el('div',{style:{padding:'7px 14px',background:'var(--bg3)',borderTop:'1px solid var(--border)',fontSize:'11px',color:'var(--text3)'}});
+      foot.textContent=prodUsing.length
+        ?'📋 '+prodUsing.length+' produto(s): '+prodUsing.slice(0,3).map(function(p){return p.nome;}).join(', ')+(prodUsing.length>3?' e mais...':'')
+        :'Não atribuído a nenhum produto ainda';
+      card.appendChild(foot);
+      grid.appendChild(card);
+    });
+    wrap.appendChild(grid);
+    return wrap;
+  }
 
   // ── ABA EMBALAGENS ───────────────────────────────────────────────────────────
   function renderEmbalagemTab() {
@@ -1241,15 +1454,16 @@ function renderCardapio() {
     el('div',{style:{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'10px',overflow:'visible'}},[
       tabBar,
       toolbar,
-      isCats ? renderCategoriasTab() : isEmb ? renderEmbalagemTab() : renderTabela(),
+      isCats ? renderCategoriasTab() : isEmb ? renderEmbalagemTab() : isGrupos ? renderGruposTab() : renderTabela(),
     ]),
   ]);
 
   var root=el('div',{});
   root.appendChild(page);
   if(catModal)    root.appendChild(catModal);
-  if(compModal)   root.appendChild(compModal);
-  if(prodModal)   root.appendChild(prodModal);
+  if(compModal)      root.appendChild(compModal);
+  if(grupoCompModal) root.appendChild(grupoCompModal);
+  if(prodModal)      root.appendChild(prodModal);
   if(catMgrMod)   root.appendChild(catMgrMod);
   if(unidMgrMod)  root.appendChild(unidMgrMod);
   if(importModal) root.appendChild(importModal);

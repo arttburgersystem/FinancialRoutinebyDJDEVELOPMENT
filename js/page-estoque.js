@@ -831,6 +831,46 @@ function renderProdutoModal() {
     return wrap;
   }
 
+  function buildGruposCompSection() {
+    var todosGrupos = (state.gruposComp||[]).filter(function(g){return g.profile===state.profile;});
+    if (!todosGrupos.length) return null;
+    if (!p.gruposComp) p.gruposComp = [];
+
+    var wrap = el('div',{});
+    wrap.appendChild(secHead('🎛️','Grupos de Montagem / Complementos'));
+    wrap.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'10px'}},'Selecione quais grupos de complementos aparecem no PDV para este produto.'));
+
+    todosGrupos.forEach(function(grp){
+      var isActive = (p.gruposComp||[]).indexOf(grp.id) >= 0;
+      var track=el('div',{style:{display:'inline-flex',alignItems:'center',width:'32px',height:'18px',borderRadius:'9px',background:isActive?'var(--green)':'var(--border)',padding:'2px',cursor:'pointer',transition:'background .2s',flexShrink:'0'}});
+      var thumb=el('div',{style:{width:'14px',height:'14px',borderRadius:'50%',background:'#fff',boxShadow:'0 1px 3px rgba(0,0,0,.3)',transition:'transform .2s',transform:'translateX('+(isActive?'14px':'0px')+')'}});
+      track.appendChild(thumb);
+      (function(g,t,th){
+        t.onclick=function(){
+          var idx=(p.gruposComp||[]).indexOf(g.id);
+          if(!p.gruposComp) p.gruposComp=[];
+          if(idx>=0){p.gruposComp.splice(idx,1);}else{p.gruposComp.push(g.id);}
+          var now=(p.gruposComp||[]).indexOf(g.id)>=0;
+          t.style.background=now?'var(--green)':'var(--border)';
+          th.style.transform='translateX('+(now?'14px':'0px')+')';
+        };
+      })(grp,track,thumb);
+      var optsText=(grp.opcoes||[]).map(function(o){return o.nome;}).slice(0,4).join(', ')+((grp.opcoes||[]).length>4?'...':'');
+      var row=el('div',{style:{display:'flex',alignItems:'center',gap:'10px',padding:'8px 0',borderBottom:'1px solid var(--border)'}});
+      row.appendChild(track);
+      var rowInfo=el('div',{style:{flex:'1'}});
+      var rowName=el('div',{style:{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}});
+      rowName.appendChild(el('span',{style:{fontWeight:'600',fontSize:'13px'}},grp.nome));
+      if(grp.obrigatorio) rowName.appendChild(el('span',{style:{fontSize:'10px',padding:'1px 6px',background:'rgba(239,68,68,.1)',color:'#ef4444',borderRadius:'8px',fontWeight:'700'}},'Obrigatório'));
+      if(grp.multiplo)    rowName.appendChild(el('span',{style:{fontSize:'10px',padding:'1px 6px',background:'var(--bg3)',color:'var(--text3)',borderRadius:'8px'}},'Múltiplo'));
+      rowInfo.appendChild(rowName);
+      if(optsText) rowInfo.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}},optsText));
+      row.appendChild(rowInfo);
+      wrap.appendChild(row);
+    });
+    return wrap;
+  }
+
   function salvar() {
     if (!p.tipo) { errEl.textContent='⚠️ Selecione o tipo: Produto ou Insumo.'; return; }
     if (!(p.nome||'').trim()) { errEl.textContent='Informe o nome.'; return; }
@@ -861,7 +901,8 @@ function renderProdutoModal() {
       aliqPis:p.aliqPis||0, aliqCofins:p.aliqCofins||0,
       unidTrib:p.unidTrib||'',
       ativo:true, criadoEm:p.criadoEm||today(),
-      embalagens: p.embalagens||null,
+      embalagens:   p.embalagens||null,
+      gruposComp:   p.gruposComp||[],
     };
     var novos = isEdit
       ? state.produtos.map(function(x){return x.id===prod.id?prod:x;})
@@ -976,6 +1017,9 @@ function renderProdutoModal() {
 
         // EMBALAGENS (só produto)
         p.tipo==='produto' ? buildEmbSection() : null,
+
+        // GRUPOS DE MONTAGEM (só produto)
+        p.tipo==='produto' ? buildGruposCompSection() : null,
 
         // FICHA TÉCNICA (só produto)
         p.tipo==='produto' ? buildFichaTecnicaSection() : null,

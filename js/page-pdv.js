@@ -498,13 +498,51 @@ function renderPDV() {
   var rightHeader=el('div',{style:{padding:'10px',borderBottom:'1px solid var(--border)',background:'var(--bg2)',flexShrink:'0'}});
   rightHeader.appendChild(tipoRow);
   if(tipo==='salao'){
-    var mesaRow=el('div',{style:{display:'flex',gap:'6px',alignItems:'center'}});
+    var mesaRow=el('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginBottom:'6px'}});
     var mesaInp=el('input',{class:'form-input',placeholder:'Mesa nº...',value:state.pdvMesa||'',
       style:{marginBottom:'0',fontSize:'13px',textAlign:'center',fontWeight:'700'},
       oninput:function(){state.pdvMesa=this.value;}});
     mesaRow.appendChild(el('span',{style:{fontSize:'12px',color:'var(--text3)',whiteSpace:'nowrap'}},'🍽️ Mesa:'));
     mesaRow.appendChild(mesaInp);
     rightHeader.appendChild(mesaRow);
+  }
+  // Seletor de cliente cadastrado (todos os modos)
+  if(typeof cliPickerWidget==='function'){
+    var cliLabel=el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'3px'}});
+    var cliSel=state.pdvClienteSel;
+    if(cliSel){
+      // mostra cliente selecionado com info de endereço/cashback
+      var cliSelRow=el('div',{style:{display:'flex',alignItems:'center',gap:'8px',background:'var(--bg3)',borderRadius:'8px',padding:'7px 10px'}});
+      var tier=(typeof _cliTierCor==='function')?_cliTierCor(cliSel.carimbosTotal||0):{cor:'#b87333'};
+      var av2=el('div',{style:{width:'28px',height:'28px',borderRadius:'50%',background:tier.cor,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',fontWeight:'800',color:'#fff',flexShrink:'0'}});
+      av2.textContent=(cliSel.nome||'?').split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();
+      cliSelRow.appendChild(av2);
+      var cliInfo2=el('div',{style:{flex:'1',minWidth:0}});
+      var cliNm=el('div',{style:{fontSize:'12px',fontWeight:'700',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}});
+      cliNm.textContent=cliSel.nome; cliInfo2.appendChild(cliNm);
+      var cliSub2=[];
+      if(cliSel.telefone) cliSub2.push(cliSel.telefone);
+      var endParts=[cliSel.logradouro,cliSel.numero,cliSel.complemento,cliSel.bairro].filter(Boolean);
+      if(endParts.length) cliSub2.push(endParts.join(', '));
+      if((state.fidelidadeConfig||{}).cashbackAtivo&&(cliSel.cashbackSaldo||0)>0) cliSub2.push('💰 Cashback: R$ '+(cliSel.cashbackSaldo||0).toFixed(2).replace('.',','));
+      if(cliSub2.length){var cliSubEl=el('div',{style:{fontSize:'10px',color:'var(--text3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}});cliSubEl.textContent=cliSub2.join('  •  ');cliInfo2.appendChild(cliSubEl);}
+      cliSelRow.appendChild(cliInfo2);
+      var cliXBtn=el('button',{style:{background:'none',border:'none',cursor:'pointer',fontSize:'14px',opacity:'.6',padding:'2px'}});
+      cliXBtn.textContent='✕';
+      cliXBtn.onclick=function(){setState({pdvClienteSel:null,pdvCliente:''});};
+      cliSelRow.appendChild(cliXBtn);
+      cliLabel.textContent='👤 Cliente vinculado:';
+      rightHeader.appendChild(cliLabel);
+      rightHeader.appendChild(cliSelRow);
+    } else {
+      cliLabel.textContent='👤 Vincular cliente (opcional):';
+      rightHeader.appendChild(cliLabel);
+      var picker=cliPickerWidget(state.pdvCliente||'',function(cliente){
+        if(cliente) setState({pdvClienteSel:cliente,pdvCliente:cliente.nome});
+        else setState({pdvCliente:'',pdvClienteSel:null});
+      });
+      rightHeader.appendChild(picker);
+    }
   } else if(tipo==='delivery'){
     var cliRow=el('div',{style:{display:'flex',gap:'6px',alignItems:'center'}});
     var cliInp=el('input',{class:'form-input',placeholder:'Nome do cliente...',value:state.pdvCliente||'',

@@ -34,7 +34,7 @@ function _fidCfg() {
 
 function _fidSave(patch) {
   setState(patch);
-  if (patch.fidelidadeClientes !== undefined) lsSet('fidelidadeClientes', patch.fidelidadeClientes);
+  if (patch.clientes !== undefined) lsSet('clientes', patch.clientes);
   if (patch.fidelidadeLog      !== undefined) lsSet('fidelidadeLog',      patch.fidelidadeLog);
   if (patch.fidelidadeConfig   !== undefined) lsSet('fidelidadeConfig',   patch.fidelidadeConfig);
   scheduleSave();
@@ -162,7 +162,7 @@ function renderFidelidade() {
 
   var cfg    = _fidCfg();
   var perfil = state.profile;
-  var todos  = (state.fidelidadeClientes||[]).filter(function(c){ return c.profile===perfil; });
+  var todos  = (state.clientes||[]).filter(function(c){ return c.profile===perfil; });
   var log    = (state.fidelidadeLog||[]).filter(function(l){ return l.profile===perfil; });
 
   var stampsTotal  = todos.reduce(function(s,c){ return s+(c.carimbosTotal||0); }, 0);
@@ -568,7 +568,7 @@ function _fidModalCliente(c) {
     delBtn.onclick=function(){
       if (!window.confirm('Excluir cliente "'+c.nome+'" e todo o histórico?')) return;
       var perfil=state.profile;
-      var clientes=(state.fidelidadeClientes||[]).filter(function(x){return !(x.id===c.id&&x.profile===perfil);});
+      var clientes=(state.clientes||[]).filter(function(x){return !(x.id===c.id&&x.profile===perfil);});
       var logs=(state.fidelidadeLog||[]).filter(function(x){return !(x.clienteId===c.id&&x.profile===perfil);});
       _fidClienteModal=null;
       _fidSave({fidelidadeClientes:clientes,fidelidadeLog:logs});
@@ -588,7 +588,7 @@ function _fidModalCliente(c) {
     if (!_validarCPF(c.cpf)){showToast('CPF inválido — verifique os dígitos','error');return;}
     if (!(c.nascimento||'').trim()){showToast('Data de nascimento é obrigatória','error');return;}
     var perfil=state.profile;
-    var clientes=(state.fidelidadeClientes||[]).slice();
+    var clientes=(state.clientes||[]).slice();
     if (isNew) {
       // CPF duplicado?
       var cpfLimpo=(c.cpf||'').replace(/\D/g,'');
@@ -690,7 +690,7 @@ function _fidModalCarimbo(clienteId,todos,cfg) {
     var valorPedido=parseFloat(tmp.valorPedido)||0;
     var cashbackGerado=cfg.cashbackAtivo&&valorPedido>0?Math.round(valorPedido*(cfg.cashbackPorcentagem||5)/100*100)/100:0;
     var perfil=state.profile;
-    var clientes=(state.fidelidadeClientes||[]).slice();
+    var clientes=(state.clientes||[]).slice();
     var logs=(state.fidelidadeLog||[]).slice();
     for (var i=0;i<clientes.length;i++){
       if (clientes[i].id===c.id&&clientes[i].profile===perfil){
@@ -763,7 +763,7 @@ function _fidModalLog(clienteId,todos,log,cfg) {
     rBanner.onclick=function(){
       if (!window.confirm('Confirmar resgate de "'+cfg.descricaoRecompensa+'" para '+c.nome+'?')) return;
       var perfil=state.profile;
-      var clientes=(state.fidelidadeClientes||[]).slice();
+      var clientes=(state.clientes||[]).slice();
       var logs2=(state.fidelidadeLog||[]).slice();
       for (var i=0;i<clientes.length;i++){
         if (clientes[i].id===c.id&&clientes[i].profile===perfil){
@@ -792,7 +792,7 @@ function _fidModalLog(clienteId,todos,log,cfg) {
       if (isNaN(valorUso)||valorUso<=0) return;
       valorUso=Math.min(valorUso,saldo);
       var perfil=state.profile;
-      var clientes=(state.fidelidadeClientes||[]).slice();
+      var clientes=(state.clientes||[]).slice();
       var logs2=(state.fidelidadeLog||[]).slice();
       for (var i=0;i<clientes.length;i++){
         if (clientes[i].id===c.id&&clientes[i].profile===perfil){

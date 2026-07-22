@@ -42,6 +42,25 @@ function _fidSave(patch) {
 
 function _fidFmt(v) { return 'R$ ' + (v||0).toFixed(2).replace('.',','); }
 
+function _validarCPF(cpf) {
+  var n = (cpf||'').replace(/\D/g,'');
+  if (n.length !== 11) return false;
+  // Rejeita sequências repetidas (000...000, 111...111, etc.)
+  if (/^(\d)\1{10}$/.test(n)) return false;
+  // Primeiro dígito verificador
+  var s = 0;
+  for (var i = 0; i < 9; i++) s += parseInt(n[i]) * (10 - i);
+  var r = (s * 10) % 11;
+  if (r === 10 || r === 11) r = 0;
+  if (r !== parseInt(n[9])) return false;
+  // Segundo dígito verificador
+  s = 0;
+  for (var j = 0; j < 10; j++) s += parseInt(n[j]) * (11 - j);
+  r = (s * 10) % 11;
+  if (r === 10 || r === 11) r = 0;
+  return r === parseInt(n[10]);
+}
+
 function renderFidelidade() {
   if (!document.getElementById('fid-styles')) {
     var s = document.createElement('style');
@@ -566,7 +585,7 @@ function _fidModalCliente(c) {
   saveBtn.onclick=function(){
     if (!(c.nome||'').trim()){showToast('Nome é obrigatório','error');return;}
     if (!(c.telefone||'').trim()){showToast('Telefone é obrigatório','error');return;}
-    if ((c.cpf||'').replace(/\D/g,'').length!==11){showToast('CPF inválido — informe os 11 dígitos','error');return;}
+    if (!_validarCPF(c.cpf)){showToast('CPF inválido — verifique os dígitos','error');return;}
     if (!(c.nascimento||'').trim()){showToast('Data de nascimento é obrigatória','error');return;}
     var perfil=state.profile;
     var clientes=(state.fidelidadeClientes||[]).slice();

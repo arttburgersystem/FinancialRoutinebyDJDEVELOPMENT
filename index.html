@@ -1533,8 +1533,11 @@ function renderSidebar(){
   var collapseBtn=el('button',{class:'sidebar-collapse-btn',onclick:function(){
     var c=!state.sidebarCollapsed;lsSet('sidebarCollapsed',c);setState({sidebarCollapsed:c});
   }},[el('span',{},state.sidebarCollapsed?'→':'← Recolher')]);
-  var importBtn=el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'8px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',color:'var(--gold)',fontWeight:'700',borderTop:'1px solid var(--border)',marginBottom:'2px'},onclick:function(){if(typeof _importarAbrir==='function')_importarAbrir();}},'📸 Importar Extrato');
-  var footer=div('sidebar-footer',[collapseBtn,sessionEl,importBtn,intensWrap,themeBtn,lockBtn,renderSyncBadge()].filter(Boolean));
+  var importRow=el('div',{style:{display:'flex',gap:'4px',borderTop:'1px solid var(--border)',padding:'2px 0'}}, [
+    el('button',{class:'btn-ghost',style:{flex:'1',fontSize:'11px',padding:'7px 6px',display:'flex',alignItems:'center',gap:'5px',justifyContent:'center',color:'var(--gold)',fontWeight:'700'},onclick:function(){if(typeof _importarAbrir==='function')_importarAbrir();}},'📸 Extrato'),
+    el('button',{class:'btn-ghost',style:{flex:'1',fontSize:'11px',padding:'7px 6px',display:'flex',alignItems:'center',gap:'5px',justifyContent:'center',color:'var(--primary)',fontWeight:'700'},onclick:function(){setState({yoogaImportModal:{}});}},'📊 Yooga'),
+  ]);
+  var footer=div('sidebar-footer',[collapseBtn,sessionEl,importRow,intensWrap,themeBtn,lockBtn,renderSyncBadge()].filter(Boolean));
   var sbCls='sidebar'+(state.sidebarCollapsed?' collapsed':'')+(state.sidebarOpen?' mobile-open':'');
 
   // Busca ativa: mostra lista filtrada flat em vez das seções
@@ -3312,6 +3315,7 @@ function render(){
   if(typeof renderDailyTemplatesModal==='function'){var dtM=renderDailyTemplatesModal();if(dtM)app.appendChild(dtM);}
   if(typeof renderDailyCalModal==='function'){var dcM=renderDailyCalModal();if(dcM)app.appendChild(dcM);}
   if(typeof renderImportarExtratoModal==='function'){var impExtM=renderImportarExtratoModal();if(impExtM)app.appendChild(impExtM);}
+  if(typeof renderImportYoogaModal==='function'){var impYM=renderImportYoogaModal();if(impYM)app.appendChild(impYM);}
   if(typeof renderCedulasModal==='function'){var cedM=renderCedulasModal();if(cedM)app.appendChild(cedM);}
   if(typeof renderCompraModal==='function'){var compraM=renderCompraModal();if(compraM)app.appendChild(compraM);}
   if(typeof renderLembreteCompraModal==='function'){var lcM=renderLembreteCompraModal();if(lcM)app.appendChild(lcM);}
@@ -3354,6 +3358,7 @@ function render(){
 <script src="js/page-lista-compras.js"></script>
 <script src="js/page-estoque-insumos.js"></script>
 <script src="js/page-requisicao.js"></script>
+<script src="js/import-yooga.js"></script>
 <script src="js/modal-estoque-item.js"></script>
 <script src="js/modal-estoque-mov.js"></script>
 <script src="js/modal-ficha-tecnica.js"></script>

@@ -5,12 +5,16 @@ var _dpSelCargo   = null;
 var _dpExpandDept = {};
 var _dpEntBusca   = '';
 var _dpEntFiltro  = '';
-var _dpPendingCv  = null;
-var _dpPendingDoc = null;
+var _dpPendingCv       = null;
+var _dpPendingDoc      = null;
+var _dpArqSelFolder    = null;
+var _dpArqExpandFolders= {};
+var _dpArqPendingDoc   = null;
 
-var DP_ADM_CATS = ['Documento Pessoal','Exame Admissional','Contrato / Acordo','Termo de Ciência','EPI / Uniforme','Treinamento Inicial','Regra Interna','Outros'];
-var DP_DEM_CATS = ['Exame Demissional','Devolução EPI / Uniforme','Termo de Rescisão','Acerto Financeiro','Entrega de Crachá / Chave','Outros'];
-var DP_ENT_STATUS = ['Agendada','Realizada','Aprovada','Reprovada','Em espera'];
+var DP_ADM_CATS  = ['Documento Pessoal','Exame Admissional','Contrato / Acordo','Termo de Ciência','EPI / Uniforme','Treinamento Inicial','Regra Interna','Outros'];
+var DP_DEM_CATS  = ['Exame Demissional','Devolução EPI / Uniforme','Termo de Rescisão','Acerto Financeiro','Entrega de Crachá / Chave','Outros'];
+var DP_ENT_STATUS= ['Agendada','Realizada','Aprovada','Reprovada','Em espera'];
+var DP_ARQ_CATS  = ['Admissão','Demissão','Contrato','Termo','Folha de Ponto','Férias / FGTS','Exame Médico','Benefícios','Outros'];
 
 // ── RENDER PRINCIPAL ──────────────────────────────────────────────────────────
 
@@ -22,12 +26,18 @@ function renderDp() {
     return btn('tab-btn'+(_dpTab===id?' active':''), label, function(){ _dpTab=id; setState({}); });
   }
 
+  var dpFolders   = (state.dpFolders    || []).filter(function(f){ return f.profile===state.profile; });
+  var dpAllDocs   = (state.dpDocs       || []).filter(function(d){ return d.profile===state.profile; });
+
   var subtitle = _dpTab==='admissao' ? 'Checklists e documentos por cargo — Processo de Admissão'
     : _dpTab==='demissao'  ? 'Checklists e documentos por cargo — Processo de Demissão'
-    : 'Candidatos cadastrados · '+entrevistas.length+' entrevista'+(entrevistas.length!==1?'s':'');
+    : _dpTab==='entrevista'? 'Candidatos cadastrados · '+entrevistas.length+' entrevista'+(entrevistas.length!==1?'s':'')
+    : 'Repositório central de documentos DP/RH — '+dpFolders.length+' pasta'+(dpFolders.length!==1?'s':'');
 
   var headerBtn = _dpTab==='entrevista'
     ? btn('btn-primary','+ Nova Entrevista',function(){ setState({dpEntModal:{novo:true}}); })
+    : _dpTab==='arquivos'
+    ? btn('btn-primary','⬆ Enviar Documento',function(){ _dpArqPendingDoc=null; setState({dpArqDocModal:{folderId:_dpArqSelFolder}}); })
     : btn('btn-primary','+ Novo Cargo',function(){ setState({dpCargoModal:{novo:true,deptId:'cozinha',nome:'',funcao:''}}); });
 
   var header = el('div',{class:'manual-header'},[
@@ -39,21 +49,25 @@ function renderDp() {
   ]);
 
   var tabsRow = div('tabs-row',[
-    dpTabBtn('admissao','✅ Processo de Admissão'),
-    dpTabBtn('demissao','📤 Processo de Demissão'),
+    dpTabBtn('admissao','✅ Admissão'),
+    dpTabBtn('demissao','📤 Demissão'),
     dpTabBtn('entrevista','🧑‍💼 Entrevistas'),
+    dpTabBtn('arquivos','📁 Arquivos'),
   ]);
 
   var wrap = div('page-section',[header,tabsRow]);
   if     (_dpTab==='admissao')  wrap.appendChild(_dpProcessoTab('admissao',  cargos));
   else if(_dpTab==='demissao')  wrap.appendChild(_dpProcessoTab('demissao',  cargos));
-  else                          wrap.appendChild(_dpEntrevistaTab(entrevistas, cargos));
+  else if(_dpTab==='entrevista')wrap.appendChild(_dpEntrevistaTab(entrevistas, cargos));
+  else                          wrap.appendChild(_dpArquivosTab(dpAllDocs.filter(function(d){return !d.cargoId;}), dpFolders));
 
-  if(state.dpCargoModal)   wrap.appendChild(_dpCargoModalEl(state.dpCargoModal, cargos));
-  if(state.dpCheckModal)   wrap.appendChild(_dpCheckItemModalEl(state.dpCheckModal));
-  if(state.dpDocModal)     wrap.appendChild(_dpDocModalEl(state.dpDocModal));
-  if(state.dpEntModal)     wrap.appendChild(_dpEntModalEl(state.dpEntModal, cargos));
-  if(state.dpEntViewModal) wrap.appendChild(_dpEntViewModalEl(state.dpEntViewModal, cargos));
+  if(state.dpCargoModal)    wrap.appendChild(_dpCargoModalEl(state.dpCargoModal, cargos));
+  if(state.dpCheckModal)    wrap.appendChild(_dpCheckItemModalEl(state.dpCheckModal));
+  if(state.dpDocModal)      wrap.appendChild(_dpDocModalEl(state.dpDocModal));
+  if(state.dpEntModal)      wrap.appendChild(_dpEntModalEl(state.dpEntModal, cargos));
+  if(state.dpEntViewModal)  wrap.appendChild(_dpEntViewModalEl(state.dpEntViewModal, cargos));
+  if(state.dpArqFolderModal)wrap.appendChild(_dpArqFolderModalEl(state.dpArqFolderModal, dpFolders));
+  if(state.dpArqDocModal)   wrap.appendChild(_dpArqDocModalEl(state.dpArqDocModal, dpFolders));
   return wrap;
 }
 
@@ -784,6 +798,341 @@ function _dpEntPrint(ent, dept){
     w.document.write('</div></body></html>');
     w.document.close(); setTimeout(function(){w.print();},400);
   }
+}
+
+// ── ABA ARQUIVOS DP ───────────────────────────────────────────────────────────
+
+function _dpArquivosTab(docs, folders) {
+  var layout = el('div',{class:'manual-layout',style:{minHeight:'520px'}},[
+    _dpArqSidebar(folders, docs),
+    _dpArqContent(folders, docs),
+  ]);
+  return layout;
+}
+
+function _dpArqSidebar(folders, docs) {
+  var rootItem = el('div',{
+    class:'ftree-item ftree-root'+(_dpArqSelFolder===null?' active':''),
+    onclick:function(){ _dpArqSelFolder=null; setState({}); },
+  },[
+    el('span',{class:'ftree-icon'},'🗂️'),
+    el('span',{class:'ftree-name'},'Todos os documentos'),
+    el('span',{class:'manual-dept-count'},String(docs.length)),
+  ]);
+  var treeItems = _dpArqBuildTree(folders, null, 0, docs);
+  var newFolderBtn = el('div',{class:'ftree-new-row'},[
+    btn('ftree-new-btn','📁 Nova Pasta',function(){
+      setState({dpArqFolderModal:{novo:true,parentId:_dpArqSelFolder,name:''}});
+    }),
+  ]);
+  return el('div',{class:'manual-sidebar ftree-sidebar'},[rootItem].concat(treeItems).concat([newFolderBtn]));
+}
+
+function _dpArqBuildTree(folders, parentId, depth, docs) {
+  var children = folders.filter(function(f){ return (f.parentId||null)===(parentId||null); });
+  var items = [];
+  children.forEach(function(folder){
+    var hasKids    = folders.some(function(f){ return f.parentId===folder.id; });
+    var isExpanded = !!_dpArqExpandFolders[folder.id];
+    var isSelected = _dpArqSelFolder===folder.id;
+    var docCount   = docs.filter(function(d){ return d.folderId===folder.id; }).length;
+    var item = el('div',{
+      class:'ftree-item'+(isSelected?' active':''),
+      style:{paddingLeft:(10+depth*16)+'px'},
+    },[
+      el('span',{class:'ftree-toggle'},hasKids?(isExpanded?'▾':'▸'):''),
+      el('span',{class:'ftree-icon'},isExpanded?'📂':'📁'),
+      el('span',{class:'ftree-name'},folder.name),
+      docCount>0?el('span',{class:'manual-dept-count'},String(docCount)):null,
+    ].filter(Boolean));
+    item.onclick=function(e){
+      e.stopPropagation();
+      _dpArqSelFolder=folder.id;
+      if(hasKids) _dpArqExpandFolders[folder.id]=!isExpanded;
+      setState({});
+    };
+    items.push(item);
+    if(isExpanded) items=items.concat(_dpArqBuildTree(folders,folder.id,depth+1,docs));
+  });
+  return items;
+}
+
+function _dpArqContent(folders, docs) {
+  var selFolder = _dpArqSelFolder;
+  // Breadcrumb
+  var path=[]; var cur=selFolder;
+  while(cur){ var pf=folders.find(function(x){return x.id===cur;}); if(!pf)break; path.unshift(pf); cur=pf.parentId||null; }
+  var bcParts=[el('span',{class:'bc-item'+(selFolder===null?' bc-current':''),onclick:function(){_dpArqSelFolder=null;setState({});}},  '🗂️ Início')];
+  path.forEach(function(folder,i){
+    bcParts.push(el('span',{class:'bc-sep'},'›'));
+    var isCur=i===path.length-1;
+    var bcItem=el('span',{class:'bc-item'+(isCur?' bc-current':'')},folder.name);
+    if(!isCur) bcItem.onclick=function(){_dpArqSelFolder=folder.id;_dpArqExpandFolders[folder.id]=true;setState({});};
+    bcParts.push(bcItem);
+  });
+
+  var toolbar=el('div',{class:'exp-toolbar'},[
+    el('div',{class:'breadcrumb'},bcParts),
+    btn('ftree-new-btn','📁 Nova Pasta',function(){
+      setState({dpArqFolderModal:{novo:true,parentId:selFolder,name:''}});
+    }),
+  ]);
+
+  var subFolders=folders.filter(function(f){ return (f.parentId||null)===(selFolder||null); });
+  var folderGrid=subFolders.length?el('div',{class:'exp-folder-grid'},subFolders.map(function(f){
+    var dCnt=docs.filter(function(d){return d.folderId===f.id;}).length;
+    var sCnt=folders.filter(function(sf){return sf.parentId===f.id;}).length;
+    var meta=[]; if(dCnt)meta.push(dCnt+' arquivo'+(dCnt!==1?'s':'')); if(sCnt)meta.push(sCnt+' subpasta'+(sCnt!==1?'s':''));
+    var renBtn=el('button',{class:'exp-fold-act',title:'Renomear / Mover'},'✏️');
+    renBtn.onclick=function(e){e.stopPropagation();setState({dpArqFolderModal:{editId:f.id,name:f.name,parentId:f.parentId||null}});};
+    var delBtn=el('button',{class:'exp-fold-act exp-fold-del',title:'Excluir'},'🗑');
+    delBtn.onclick=function(e){
+      e.stopPropagation();
+      if(folders.some(function(sf){return sf.parentId===f.id;})||docs.some(function(d){return d.folderId===f.id;})){
+        showToast('Pasta não está vazia. Mova ou exclua o conteúdo primeiro.','error');return;
+      }
+      if(!confirm('Excluir pasta "'+f.name+'"?'))return;
+      var arr=(state.dpFolders||[]).filter(function(fl){return fl.id!==f.id;});
+      lsSet('dpFolders',arr);setState({dpFolders:arr});scheduleSave();showToast('Pasta excluída','error');
+    };
+    var card=el('div',{class:'exp-folder-card'},[
+      el('div',{class:'exp-folder-top'},[el('span',{class:'exp-folder-icon'},'📂'),el('div',{class:'exp-fold-btns'},[renBtn,delBtn])]),
+      el('div',{class:'exp-folder-label'},f.name),
+      el('div',{class:'exp-folder-meta'},meta.length?meta.join(' · '):'Pasta vazia'),
+    ]);
+    card.onclick=function(){_dpArqSelFolder=f.id;_dpArqExpandFolders[f.id]=true;setState({});};
+    return card;
+  })):null;
+
+  var folderDocs=selFolder===null
+    ?docs.filter(function(d){return !d.folderId||!folders.some(function(f){return f.id===d.folderId;});})
+    :docs.filter(function(d){return d.folderId===selFolder;});
+  folderDocs=folderDocs.slice().sort(function(a,b){return (b.criadoEm||'').localeCompare(a.criadoEm||'');});
+
+  var docsSection=folderDocs.length?el('div',{class:'exp-docs-section'},[
+    subFolders.length?el('div',{class:'exp-section-label'},'Arquivos nesta pasta'):null,
+    el('div',{class:'doc-list'},folderDocs.map(function(doc){return _dpArqDocCard(doc,folders);})),
+  ].filter(Boolean)):null;
+
+  var isEmpty=!subFolders.length&&!folderDocs.length;
+  var emptyEl=isEmpty?el('div',{class:'doc-empty'},[
+    el('div',{style:{fontSize:'2.5rem',marginBottom:'8px'}},selFolder?'📂':'🗂️'),
+    el('p',{style:{margin:'0',color:'var(--text-muted)'}},selFolder?'Pasta vazia. Envie um documento ou crie subpastas.':'Nenhum documento ainda. Crie uma pasta e envie arquivos.'),
+  ]):null;
+
+  var children=[toolbar];
+  if(folderGrid)  children.push(folderGrid);
+  if(docsSection) children.push(docsSection);
+  if(emptyEl)     children.push(emptyEl);
+  return el('div',{class:'exp-content'},children);
+}
+
+function _dpArqDocCard(doc, folders) {
+  var ext=(doc.nome||'').split('.').pop().toUpperCase();
+  var ecol={PDF:'#e53e3e',DOC:'#3182ce',DOCX:'#3182ce',XLS:'#38a169',XLSX:'#38a169',JPG:'#dd6b20',PNG:'#dd6b20',ZIP:'#805ad5'}[ext]||'#718096';
+  var folder=doc.folderId?folders.find(function(f){return f.id===doc.folderId;}):null;
+  return el('div',{class:'doc-card'},[
+    el('div',{class:'doc-card-left'},[el('div',{class:'doc-ext-badge',style:{background:ecol}},ext||'?')]),
+    el('div',{class:'doc-card-body'},[
+      el('div',{class:'doc-card-nome'},doc.nome),
+      el('div',{class:'doc-card-meta'},[
+        doc.cat?el('span',{class:'doc-tag'},doc.cat):null,
+        folder?el('span',{class:'doc-tag-period'},'📂 '+folder.name):null,
+        doc.tamanho?el('span',{style:{color:'var(--text-muted)',fontSize:'0.75rem'}},_fmtSize(doc.tamanho)):null,
+        doc.criadoEm?el('span',{style:{color:'var(--text-muted)',fontSize:'0.75rem'}},'📅 '+doc.criadoEm):null,
+      ].filter(Boolean)),
+    ]),
+    el('div',{class:'doc-card-actions'},[
+      btn('btn-secondary doc-act-btn','👁',function(){_docAction(doc.id,doc.nome,doc.mimeType,'view');}),
+      btn('btn-secondary doc-act-btn','⬇',function(){_docAction(doc.id,doc.nome,doc.mimeType,'download');}),
+      btn('btn-secondary doc-act-btn','✏️ Mover',function(){
+        _dpArqPendingDoc=null;
+        setState({dpArqDocModal:{editDoc:doc,folderId:doc.folderId||null}});
+      }),
+      btn('btn-danger-outline doc-act-btn','🗑',function(){
+        if(!confirm('Excluir "'+doc.nome+'"?'))return;
+        _idbDel(doc.id);
+        var arr=(state.dpDocs||[]).filter(function(d){return d.id!==doc.id;});
+        lsSet('dpDocs',arr);setState({dpDocs:arr});scheduleSave();showToast('Documento excluído','error');
+      }),
+    ]),
+  ]);
+}
+
+// ── MODAL: PASTA ARQUIVOS DP ──────────────────────────────────────────────────
+
+function _dpArqFolderModalEl(m, allFolders) {
+  var isEdit=!!m.editId;
+  var editFolder=isEdit?allFolders.find(function(f){return f.id===m.editId;}):null;
+
+  function _buildParentOpts(folders, excludeId, parentId, depth){
+    var children=folders.filter(function(f){return (f.parentId||null)===(parentId||null)&&f.id!==excludeId;});
+    var opts=[];
+    children.forEach(function(f){
+      var prefix=depth>0?Array(depth+1).join('　')+'└ ':'';
+      opts.push(el('option',{value:f.id},prefix+'📂 '+f.name));
+      opts=opts.concat(_buildParentOpts(folders,excludeId,f.id,depth+1));
+    });
+    return opts;
+  }
+
+  function salvar(){
+    var nome=((document.getElementById('dp-arq-fn')||{}).value||'').trim();
+    if(!nome){showToast('Digite um nome para a pasta','error');return;}
+    var newParent=isEdit?((document.getElementById('dp-arq-fp')||{}).value||'__root__'):'__root__';
+    if(newParent==='__root__') newParent=null;
+    else newParent=newParent||null;
+    if(isEdit&&newParent){
+      var desc=[m.editId];
+      var collect=function(pid){allFolders.filter(function(f){return f.parentId===pid;}).forEach(function(f){desc.push(f.id);collect(f.id);});};
+      collect(m.editId);
+      if(desc.indexOf(newParent)!==-1){showToast('Não é possível mover uma pasta para dentro de si mesma','error');return;}
+    }
+    var arr=state.dpFolders||[];
+    if(isEdit){
+      arr=arr.map(function(f){return f.id===m.editId?Object.assign({},f,{name:nome,parentId:newParent}):f;});
+    } else {
+      var parent=m.parentId||null;
+      arr=arr.concat([{id:uid(),profile:state.profile,name:nome,parentId:parent,criadoEm:today()}]);
+      if(parent) _dpArqExpandFolders[parent]=true;
+    }
+    lsSet('dpFolders',arr);
+    setState({dpFolders:arr,dpArqFolderModal:null});
+    scheduleSave(); showToast(isEdit?'Pasta atualizada!':'Pasta criada!','success');
+  }
+
+  var nameInp=el('input',{id:'dp-arq-fn',type:'text',class:'mop-input mop-titulo',placeholder:'Nome da pasta...',value:m.name||''},[]);
+  nameInp.onkeydown=function(e){if(e.key==='Enter')salvar();};
+  setTimeout(function(){var x=document.getElementById('dp-arq-fn');if(x){x.focus();x.select();}},80);
+
+  var parentEl=null;
+  if(isEdit){
+    var rootOpt=el('option',{value:'__root__'},'📁 Raiz (nível raiz)');
+    var parentSel=el('select',{id:'dp-arq-fp',class:'mop-input'},[rootOpt].concat(_buildParentOpts(allFolders,m.editId,null,0)));
+    parentSel.value=(editFolder&&editFolder.parentId)||'__root__';
+    parentEl=el('div',{},[el('label',{class:'mop-label'},'Mover para (pasta pai)'),parentSel]);
+  }
+
+  var overlay=el('div',{class:'modal-overlay',onclick:function(e){if(e.target===overlay)setState({dpArqFolderModal:null});}},[
+    el('div',{class:'modal-box',style:{maxWidth:'420px'},onclick:function(e){e.stopPropagation();}},[
+      el('div',{class:'modal-header'},[
+        el('h3',{style:{margin:0}},isEdit?'✏️ Renomear / Mover Pasta':'📁 Nova Pasta'),
+        btn('modal-close','×',function(){setState({dpArqFolderModal:null});}),
+      ]),
+      el('div',{style:{padding:'20px'}},[
+        el('label',{class:'mop-label'},'Nome da Pasta'),nameInp,
+        parentEl,
+      ].filter(Boolean)),
+      el('div',{class:'modal-footer'},[
+        el('div',{style:{display:'flex',gap:'8px',marginLeft:'auto'}},[
+          btn('btn-secondary','Cancelar',function(){setState({dpArqFolderModal:null});}),
+          btn('btn-primary',isEdit?'✓ Salvar':'✓ Criar',salvar),
+        ]),
+      ]),
+    ]),
+  ]);
+  return overlay;
+}
+
+// ── MODAL: UPLOAD / MOVER DOCUMENTO (ARQUIVOS DP) ─────────────────────────────
+
+function _dpArqDocModalEl(m, allFolders) {
+  var isEdit=!!(m.editDoc);
+  var doc=m.editDoc||null;
+
+  var sizeInfo=el('span',{style:{fontSize:'0.78rem',color:'var(--text-muted)',marginLeft:'8px'}},'');
+  var statusEl=el('div',{style:{fontSize:'0.82rem',marginTop:'4px'}},'');
+  var fileWrap=null;
+
+  if(!isEdit){
+    var fileInp=el('input',{type:'file',accept:'.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt',style:{width:'100%',boxSizing:'border-box'}},[]);
+    fileInp.onchange=function(){
+      var file=this.files[0]; _dpArqPendingDoc=null;
+      if(!file){sizeInfo.textContent='';return;}
+      if(file.size>50*1024*1024){showToast('Máximo 50 MB','error');this.value='';return;}
+      sizeInfo.textContent='('+_fmtSize(file.size)+')';
+      statusEl.textContent='⏳ Lendo...'; statusEl.style.color='var(--text-muted)';
+      var r=new FileReader();
+      r.onload=function(e){
+        _dpArqPendingDoc={dataBase64:e.target.result,tipo:file.type,tamanho:file.size};
+        var n=document.getElementById('dp-arq-dn'); if(n&&!n.value)n.value=file.name;
+        statusEl.textContent='✅ Pronto.'; statusEl.style.color='var(--success,#22a047)';
+      };
+      r.onerror=function(){statusEl.textContent='❌ Erro ao ler.';statusEl.style.color='#e53e3e';};
+      r.readAsDataURL(file);
+    };
+    fileWrap=el('div',{},[
+      el('label',{class:'mop-label'},'Arquivo'),
+      el('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},[fileInp,sizeInfo]),
+      statusEl,
+    ]);
+  }
+
+  function _buildFolderOpts(folders, parentId, depth){
+    var children=folders.filter(function(f){return (f.parentId||null)===(parentId||null);});
+    var opts=[];
+    children.forEach(function(f){
+      var prefix=depth>0?Array(depth+1).join('　')+'└ ':'';
+      var o=el('option',{value:f.id},prefix+'📂 '+f.name);
+      opts.push(o);
+      opts=opts.concat(_buildFolderOpts(folders,f.id,depth+1));
+    });
+    return opts;
+  }
+  var rootFolderOpt=el('option',{value:''},'📁 Raiz (sem pasta específica)');
+  var folderSel=el('select',{id:'dp-arq-df',class:'mop-input'},[rootFolderOpt].concat(_buildFolderOpts(allFolders,null,0)));
+  folderSel.value=m.folderId||'';
+
+  var nomeInp=el('input',{id:'dp-arq-dn',type:'text',class:'mop-input',placeholder:'Nome do documento...',value:doc?doc.nome:''},[]);
+  var catSel=el('select',{id:'dp-arq-dc',class:'mop-input'},DP_ARQ_CATS.map(function(c){return el('option',{value:c},c);}));
+  catSel.value=(doc&&doc.cat)||DP_ARQ_CATS[0];
+
+  function salvar(){
+    var nome=((document.getElementById('dp-arq-dn')||{}).value||'').trim();
+    var cat =((document.getElementById('dp-arq-dc')||{}).value)||DP_ARQ_CATS[0];
+    var fid =((document.getElementById('dp-arq-df')||{}).value)||null;
+    if(!nome){showToast('Informe o nome do documento','error');return;}
+    if(isEdit){
+      var arr=(state.dpDocs||[]).map(function(d){
+        return d.id===doc.id?Object.assign({},d,{nome:nome,cat:cat,folderId:fid||null}):d;
+      });
+      lsSet('dpDocs',arr); setState({dpDocs:arr,dpArqDocModal:null}); scheduleSave();
+      showToast('Documento atualizado!','success');
+    } else {
+      if(!_dpArqPendingDoc){showToast('Selecione um arquivo','error');return;}
+      var id=uid();
+      var meta={id:id,profile:state.profile,cargoId:null,tipo:null,nome:nome,cat:cat,mimeType:_dpArqPendingDoc.tipo,tamanho:_dpArqPendingDoc.tamanho,folderId:fid||null,criadoEm:today()};
+      _idbPut({id:id,dataBase64:_dpArqPendingDoc.dataBase64},function(ok){
+        if(!ok){showToast('Erro ao salvar arquivo','error');return;}
+        var arr2=(state.dpDocs||[]).concat([meta]);
+        lsSet('dpDocs',arr2); setState({dpDocs:arr2,dpArqDocModal:null}); scheduleSave(); _dpArqPendingDoc=null;
+        showToast('Documento enviado!','success');
+      });
+    }
+  }
+
+  var overlay=el('div',{class:'modal-overlay',onclick:function(e){if(e.target===overlay)setState({dpArqDocModal:null});}},[
+    el('div',{class:'modal-box',style:{maxWidth:'500px'},onclick:function(e){e.stopPropagation();}},[
+      el('div',{class:'modal-header'},[
+        el('h3',{style:{margin:0}},isEdit?'✏️ Editar / Mover Documento':'📁 Enviar Documento — DP/RH'),
+        btn('modal-close','×',function(){setState({dpArqDocModal:null});}),
+      ]),
+      el('div',{class:'mop-form',style:{padding:'20px'}},[
+        fileWrap,
+        el('label',{class:'mop-label'},'Nome do Documento'),nomeInp,
+        el('label',{class:'mop-label'},'Pasta de Destino'),folderSel,
+        el('label',{class:'mop-label'},'Categoria'),catSel,
+        !isEdit?el('div',{class:'doc-storage-note'},'📦 Arquivos salvos localmente (IndexedDB).'):null,
+      ].filter(Boolean)),
+      el('div',{class:'modal-footer'},[
+        el('div',{style:{display:'flex',gap:'8px',marginLeft:'auto'}},[
+          btn('btn-secondary','Cancelar',function(){setState({dpArqDocModal:null});}),
+          btn('btn-primary',isEdit?'✓ Salvar':'💾 Enviar',salvar),
+        ]),
+      ]),
+    ]),
+  ]);
+  return overlay;
 }
 
 // ── CSS ───────────────────────────────────────────────────────────────────────

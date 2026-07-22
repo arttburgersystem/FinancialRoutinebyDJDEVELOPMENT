@@ -344,13 +344,35 @@ function _explorerContent(modulo, folders, docs, selFolder) {
 // ── MODAL CRIAR / RENOMEAR PASTA ──────────────────────────────────────────────
 
 function _folderModal(m, allFolders) {
-  var isEdit = !!m.editId;
+  var isEdit    = !!m.editId;
+  var editFolder= isEdit ? (allFolders||[]).find(function(f){return f.id===m.editId;}) : null;
+  var sameMod   = (allFolders||[]).filter(function(f){return f.modulo===m.modulo;});
+
+  function _buildParentOpts(folders, excludeId, parentId, depth){
+    var ch=folders.filter(function(f){return (f.parentId||null)===(parentId||null)&&f.id!==excludeId;});
+    var opts=[];
+    ch.forEach(function(f){
+      var pfx=depth>0?Array(depth+1).join('　')+'└ ':'';
+      opts.push(el('option',{value:f.id},pfx+'📂 '+f.name));
+      opts=opts.concat(_buildParentOpts(folders,excludeId,f.id,depth+1));
+    });
+    return opts;
+  }
+
   function salvar(){
     var nome=((document.getElementById('folder-name')||{}).value||'').trim();
     if(!nome){showToast('Digite um nome para a pasta','error');return;}
     var arr=state.manualFolders||[];
     if(isEdit){
-      arr=arr.map(function(f){return f.id===m.editId?Object.assign({},f,{name:nome}):f;});
+      var rawParent=((document.getElementById('folder-parent')||{}).value||'__root__');
+      var newParent=rawParent==='__root__'?null:rawParent;
+      if(newParent){
+        var desc=[m.editId];
+        var collect=function(pid){arr.filter(function(f){return f.parentId===pid;}).forEach(function(f){desc.push(f.id);collect(f.id);});};
+        collect(m.editId);
+        if(desc.indexOf(newParent)!==-1){showToast('Não é possível mover para dentro de si mesma','error');return;}
+      }
+      arr=arr.map(function(f){return f.id===m.editId?Object.assign({},f,{name:nome,parentId:newParent}):f;});
     } else {
       var newId=uid();
       arr=arr.concat([{id:newId,modulo:m.modulo,profile:state.profile,name:nome,parentId:m.parentId||null,criadoEm:today()}]);
@@ -362,7 +384,7 @@ function _folderModal(m, allFolders) {
     lsSet('manualFolders',arr);
     setState({manualFolders:arr,manualFolderModal:null});
     scheduleSave();
-    showToast(isEdit?'Pasta renomeada!':'Pasta criada!','success');
+    showToast(isEdit?'Pasta atualizada!':'Pasta criada!','success');
   }
   var parentLabel='';
   if(!isEdit&&m.parentId){
@@ -372,20 +394,30 @@ function _folderModal(m, allFolders) {
   var nameInp=el('input',{id:'folder-name',type:'text',class:'mop-input',style:{fontSize:'1rem'},placeholder:'Nome da pasta...',value:m.name||''},[]);
   nameInp.onkeydown=function(e){if(e.key==='Enter')salvar();};
   setTimeout(function(){var el2=document.getElementById('folder-name');if(el2){el2.focus();el2.select();}},80);
+
+  var parentEl=null;
+  if(isEdit){
+    var rootOpt=el('option',{value:'__root__'},'📁 Raiz (nível raiz)');
+    var parentSel=el('select',{id:'folder-parent',class:'mop-input'},[rootOpt].concat(_buildParentOpts(sameMod,m.editId,null,0)));
+    parentSel.value=(editFolder&&editFolder.parentId)||'__root__';
+    parentEl=el('div',{},[el('label',{class:'mop-label',style:{marginTop:'12px'}},'Mover para (pasta pai)'),parentSel]);
+  }
+
   var overlay=el('div',{class:'modal-overlay',onclick:function(e){if(e.target===overlay)setState({manualFolderModal:null});}},[
-    el('div',{class:'modal-box',style:{maxWidth:'400px'},onclick:function(e){e.stopPropagation();}},[
+    el('div',{class:'modal-box',style:{maxWidth:'420px'},onclick:function(e){e.stopPropagation();}},[
       el('div',{class:'modal-header'},[
-        el('h3',{style:{margin:0}},isEdit?'✏️ Renomear Pasta':'📁 Nova Pasta'+parentLabel),
+        el('h3',{style:{margin:0}},isEdit?'✏️ Renomear / Mover Pasta':'📁 Nova Pasta'+parentLabel),
         btn('modal-close','×',function(){setState({manualFolderModal:null});}),
       ]),
       el('div',{style:{padding:'20px'}},[
         el('label',{class:'mop-label'},'Nome'),
         nameInp,
-      ]),
+        parentEl,
+      ].filter(Boolean)),
       el('div',{class:'modal-footer'},[
         el('div',{style:{display:'flex',gap:'8px',marginLeft:'auto'}},[
           btn('btn-secondary','Cancelar',function(){setState({manualFolderModal:null});}),
-          btn('btn-primary',isEdit?'✓ Renomear':'✓ Criar Pasta',salvar),
+          btn('btn-primary',isEdit?'✓ Salvar':'✓ Criar Pasta',salvar),
         ]),
       ]),
     ]),

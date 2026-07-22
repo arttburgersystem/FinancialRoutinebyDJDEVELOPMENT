@@ -50,6 +50,15 @@ function _autoSaveTituloNota(id, titulo) {
 
 var NOTA_CORES = ['#c9a84c','#3b82f6','#16a34a','#dc2626','#9333ea','#ea580c','#0891b2','#be185d'];
 
+var NOTA_TEXT_CORES = [
+  '#f8fafc','#1e293b','#64748b','#dc2626',
+  '#ea580c','#d97706','#16a34a','#0891b2',
+  '#2563eb','#7c3aed','#db2777','#e6b800',
+  '#10b981','#f43f5e',
+];
+var _notaTexCor = '#1e293b';
+var _notaTexPickerId = null; // id do picker aberto
+
 // Converte plain text para HTML ao carregar notas antigas (preserva quebras de linha)
 function _notaParaHtml(c) {
   if (!c) return '';
@@ -181,6 +190,15 @@ function renderNotaPanel() {
     pFmtBar.appendChild(_pfb('<s>T</s>','Tachado',function(){_pfc('strikeThrough');}));
     pFmtBar.appendChild(_pfb('<span style="font-size:10px">• Lista</span>','Lista',function(){_pfc('insertUnorderedList');}));
     pFmtBar.appendChild(_pfb('<span style="font-size:10px">1.</span>','Lista numerada',function(){_pfc('insertOrderedList');}));
+    // Cor do texto no painel
+    NOTA_TEXT_CORES.forEach(function(clr){
+      var cb=document.createElement('button');
+      cb.title='Cor: '+clr;
+      cb.style.cssText='width:14px;height:14px;border-radius:50%;background:'+clr+';border:2px solid var(--border);cursor:pointer;flex-shrink:0;padding:0;';
+      cb.onmousedown=function(e){e.preventDefault();_notaTexCor=clr;_pfc('foreColor',clr);};
+      pFmtBar.appendChild(cb);
+    });
+    pFmtBar.appendChild(_pfb('<span style="font-size:9px;color:var(--text3)">A✕</span>','Remover cor',function(){_pfc('removeFormat');}));
     editor.appendChild(pFmtBar);
 
     // Editor contenteditable no painel
@@ -319,6 +337,18 @@ function renderNotas() {
     fmtBar.appendChild(_fb('<span style="font-size:12px">⬅</span>','Alinhar à esquerda',function(){_fc('justifyLeft');}));
     fmtBar.appendChild(_fb('<span style="font-size:12px">↔</span>','Centralizar',function(){_fc('justifyCenter');}));
     fmtBar.appendChild(_fb('<span style="font-size:12px">➡</span>','Alinhar à direita',function(){_fc('justifyRight');}));
+    fmtBar.appendChild(_fsep());
+    // Cor do texto
+    NOTA_TEXT_CORES.forEach(function(clr){
+      var cb=document.createElement('button');
+      cb.title='Cor do texto: '+clr;
+      cb.style.cssText='width:16px;height:16px;border-radius:50%;background:'+clr+';border:2px solid var(--border);cursor:pointer;flex-shrink:0;padding:0;transition:transform .1s;';
+      cb.onmouseenter=function(){this.style.transform='scale(1.25)';};
+      cb.onmouseleave=function(){this.style.transform='';};
+      cb.onmousedown=function(e){e.preventDefault();_notaTexCor=clr;_fc('foreColor',clr);};
+      fmtBar.appendChild(cb);
+    });
+    fmtBar.appendChild(_fb('<span style="font-size:10px;text-decoration:underline wavy;color:var(--text3)">A✕</span>','Remover cor do texto',function(){_fc('removeFormat');}));
     editorArea.appendChild(fmtBar);
 
     // ── Editor contenteditable ────────────────────────────────────────────────

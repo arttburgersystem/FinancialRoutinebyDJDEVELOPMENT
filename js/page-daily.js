@@ -550,7 +550,7 @@ function _doCard(op){
 }
 
 // ── coluna kanban ─────────────────────────────────────────────────────────────
-function _doColuna(titulo,icone,cor,cards){
+function _doColuna(titulo,icone,cor,cards,extraBtn){
   return el('div',{style:{
     background:'var(--bg2)',borderRadius:'10px',padding:'12px',
     border:'1px solid var(--border)',display:'flex',flexDirection:'column',minWidth:'200px',
@@ -559,11 +559,106 @@ function _doColuna(titulo,icone,cor,cards){
       el('span',{style:{fontSize:'16px'}},icone),
       el('span',{style:{fontWeight:'700',fontSize:'13px',color:'var(--text)',flex:'1'}},titulo),
       el('span',{style:{fontSize:'11px',fontWeight:'700',padding:'2px 7px',borderRadius:'10px',background:cor+'22',color:cor}},String(cards.length)),
-    ]),
+      extraBtn||null,
+    ].filter(Boolean)),
     cards.length===0
       ?el('div',{style:{color:'var(--text3)',fontSize:'12px',textAlign:'center',padding:'24px 0',opacity:'.5'}},'Nenhuma tarefa')
       :el('div',{style:{maxHeight:'60vh',overflowY:'auto'}},cards),
   ]);
+}
+
+function renderDailyTimelineModal(){
+  if(!state.dailyTimelineModal)return null;
+  var pf=state.profile;
+  var hj=today();
+  var dow=new Date(hj+'T12:00:00').getDay();
+
+  // Coleta todas as tarefas com horário definido
+  var defs=(state.dailyTaskDefs||[]).filter(function(d){
+    return d.profile===pf&&d.ativo&&d.horario&&(!d.dias||!d.dias.length||d.dias.indexOf(dow)>=0);
+  });
+  var opsHoje=(state.dailyOps||[]).filter(function(o){
+    return o.profile===pf&&o.horario&&(o.data===hj||o.status==='hoje'||o.status==='programacao');
+  });
+
+  // Monta mapa hora→tarefas
+  var slotMap={};
+  defs.forEach(function(d){
+    var h=d.horario.slice(0,5);
+    if(!slotMap[h])slotMap[h]=[];
+    slotMap[h].push({nome:d.nome,cor:d.cor||'var(--gold)',tipo:'rotina',prioridade:d.prioridade});
+  });
+  opsHoje.forEach(function(o){
+    if(o.defId)return; // já representado pela def
+    var h=o.horario.slice(0,5);
+    if(!slotMap[h])slotMap[h]=[];
+    slotMap[h].push({nome:o.nome,cor:o.cor||'var(--blue)',tipo:'tarefa',prioridade:o.prioridade,status:o.status});
+  });
+
+  // Gera slots das 06:00 às 23:30 de meia em meia hora
+  var slots=[];
+  for(var h=6;h<24;h++){
+    slots.push(String(h).padStart(2,'0')+':00');
+    slots.push(String(h).padStart(2,'0')+':30');
+  }
+
+  var PRI={alta:'#e05252',media:'#c9a84c',baixa:'#4caf82'};
+
+  var rows=slots.map(function(slot){
+    var tarefas=slotMap[slot]||[];
+    var livre=tarefas.length===0;
+    return el('div',{style:{
+      display:'flex',alignItems:'flex-start',gap:'10px',
+      padding:'6px 10px',borderRadius:'6px',
+      background:livre?'transparent':'var(--bg3)',
+      borderLeft:'3px solid '+(livre?'var(--border)':'var(--primary)'),
+      marginBottom:'3px',minHeight:'32px',
+      opacity:livre?'0.5':'1',
+      transition:'background .1s',
+    }},[
+      el('span',{style:{
+        fontSize:'11px',fontWeight:'700',color:livre?'var(--text3)':'var(--text)',
+        minWidth:'38px',fontVariantNumeric:'tabular-nums',paddingTop:'2px',
+      }},slot),
+      livre
+        ?el('span',{style:{fontSize:'11px',color:'var(--text3)',fontStyle:'italic',paddingTop:'2px'}},'livre')
+        :el('div',{style:{display:'flex',flexDirection:'column',gap:'3px',flex:'1'}},
+            tarefas.map(function(t){
+              return el('div',{style:{
+                display:'flex',alignItems:'center',gap:'6px',
+              }},[
+                el('div',{style:{width:'8px',height:'8px',borderRadius:'50%',background:t.cor,flexShrink:'0'}}),
+                el('span',{style:{fontSize:'12px',color:'var(--text)',flex:'1',lineHeight:'1.3'}},
+                  t.nome.replace(/^\[Caixa\]\s*\d+\.\s*/,'')),
+                t.prioridade?el('span',{style:{fontSize:'9px',fontWeight:'700',color:PRI[t.prioridade]||'var(--text3)'}},(t.prioridade==='alta'?'●':t.prioridade==='media'?'●':'●')):null,
+              ].filter(Boolean));
+            })
+          ),
+    ]);
+  });
+
+  // Resumo do dia
+  var totalOcupados=Object.keys(slotMap).length;
+  var totalSlots=slots.length;
+
+  var modal=div('modal',[
+    div('modal-title',[
+      el('span',{style:{flex:'1'}},'⏱ Agenda do Dia'),
+      el('div',{style:{fontSize:'11px',color:'var(--text3)',marginRight:'8px'}},[
+        el('span',{style:{color:'var(--green)',fontWeight:'700'}},totalOcupados+' ocupados'),
+        el('span',{},' · '),
+        el('span',{style:{color:'var(--text3)'}},(totalSlots-totalOcupados)+' livres'),
+      ]),
+      el('button',{class:'modal-close',onclick:function(){setState({dailyTimelineModal:null});}},'×'),
+    ]),
+    el('div',{style:{
+      maxHeight:'65vh',overflowY:'auto',padding:'4px 0',
+    }},rows),
+  ]);
+  modal.style.maxWidth='420px';
+  var ov=div('modal-overlay',[modal]);
+  ov.onclick=function(e){if(e.target===ov)setState({dailyTimelineModal:null});};
+  return ov;
 }
 
 // ── modal calendário de tarefas ───────────────────────────────────────────────
@@ -948,7 +1043,19 @@ function renderDailyOperation(){
     gap:'12px',alignItems:'start',
   }},[
     _doColuna('Tarefa Futura','🔮','var(--blue)',opFutura.map(_doCard)),
-    _doColuna('Programação','📅','var(--text2)',defs.map(_doDefCard)),
+    _doColuna('Programação','📅','var(--text2)',defs.map(_doDefCard),
+      el('button',{
+        title:'Ver agenda de horários',
+        style:{
+          background:'none',border:'none',cursor:'pointer',padding:'2px 5px',
+          fontSize:'13px',lineHeight:'1',borderRadius:'4px',color:'var(--text3)',
+          transition:'color .15s',
+        },
+        onmouseenter:function(e){e.target.style.color='var(--text)';},
+        onmouseleave:function(e){e.target.style.color='var(--text3)';},
+        onclick:function(){setState({dailyTimelineModal:{}});},
+      },'🕐')
+    ),
     _doColuna('Tarefa do Dia','📋','var(--gold)',opHoje.map(_doCard)),
     _doColuna('Concluídas','✅','var(--green)',opConc.map(_doCard)),
     _doColuna('Adiadas','↻','var(--blue)',opAdiada.map(_doCard)),

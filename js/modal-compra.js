@@ -39,8 +39,8 @@ function _cmAtualizarTotal() {
 function _cmRenderItens() {
   var container = document.getElementById('cm-itens-container');
   if (!container) return;
-  // Remove dropdowns de renders anteriores
-  var _oldSugs = document.querySelectorAll('.cm-sug-div');
+  // Remove apenas dropdowns de produtos de renders anteriores (forn usa .cm-sug-forn)
+  var _oldSugs = document.querySelectorAll('.cm-sug-prod');
   for (var _si = 0; _si < _oldSugs.length; _si++) { if (_oldSugs[_si].parentNode) _oldSugs[_si].parentNode.removeChild(_oldSugs[_si]); }
   while (container.firstChild) container.removeChild(container.firstChild);
 
@@ -65,7 +65,7 @@ function _cmRenderItens() {
       background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '8px',
       boxShadow: '0 8px 24px rgba(0,0,0,.25)', maxHeight: '210px', overflowY: 'auto',
     }});
-    sugDiv.className = 'cm-sug-div';
+    sugDiv.className = 'cm-sug-prod';
     document.body.appendChild(sugDiv);
     var nomWrap = el('div', { style: { position: 'relative' } }, [nomeInp]);
     (function(i, nd, sd, insumos) {
@@ -225,7 +225,7 @@ function _cmRenderItens() {
 
 function renderCompraModal() {
   // Limpa dropdowns de autocomplete que possam ter ficado no body
-  var _os = document.querySelectorAll('.cm-sug-div');
+  var _os = document.querySelectorAll('.cm-sug-prod, .cm-sug-forn');
   for (var _si = 0; _si < _os.length; _si++) { if (_os[_si].parentNode) _os[_si].parentNode.removeChild(_os[_si]); }
 
   var m = state.compraModal;
@@ -497,7 +497,7 @@ function renderCompraModal() {
     background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '8px',
     boxShadow: '0 8px 24px rgba(0,0,0,.25)', maxHeight: '220px', overflowY: 'auto',
   } });
-  fornSugDiv.className = 'cm-sug-div';
+  fornSugDiv.className = 'cm-sug-forn';
   document.body.appendChild(fornSugDiv);
 
   var fornSearchWrap = el('div', { style: { position: 'relative' } }, [fornBuscaInp, fornClearBtn, fornHidden]);

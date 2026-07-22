@@ -565,9 +565,18 @@ function renderPDV() {
       var row=el('div',{style:{borderBottom:'1px solid var(--border)',padding:'8px 10px'}});
 
       var topRow=el('div',{style:{display:'flex',gap:'8px',alignItems:'center',marginBottom:'5px'}});
-      var thumbEl=el('div',{style:{width:'40px',height:'40px',borderRadius:'6px',flexShrink:'0',overflow:'hidden',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px',border:'1px solid var(--border)'}});
-      if(item.imagemUrl){var tImg=el('img',{});tImg.src=item.imagemUrl;tImg.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';thumbEl.appendChild(tImg);}
-      else{thumbEl.textContent='🍔';}
+      var thumbEl=document.createElement('div');
+      thumbEl.style.cssText='width:44px;height:44px;border-radius:7px;flex-shrink:0;overflow:hidden;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px;border:1px solid var(--border);';
+      // busca imagemUrl no item ou diretamente no produto caso seja novo
+      var _imgUrl=item.imagemUrl||'';
+      if(!_imgUrl){var _p=(state.produtos||[]).find(function(p){return p.id===item.prodId;})||{};_imgUrl=_p.imagemUrl||'';}
+      if(_imgUrl){
+        thumbEl.style.backgroundImage='url("'+_imgUrl+'")';
+        thumbEl.style.backgroundSize='cover';
+        thumbEl.style.backgroundPosition='center';
+      } else {
+        thumbEl.textContent='🍔';
+      }
       topRow.appendChild(thumbEl);
       var nEl=el('div',{style:{flex:'1',fontWeight:'700',fontSize:'12px',lineHeight:'1.3'}},item.nome);
       var pvEl=el('div',{style:{fontWeight:'900',fontSize:'13px',color:'var(--gold)',whiteSpace:'nowrap'}},fmtMoney(item.precoUnit*item.qtd));

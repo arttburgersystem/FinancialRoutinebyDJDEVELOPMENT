@@ -4,6 +4,7 @@ var _manualBusca     = '';
 var _manualDept      = null;
 var _manualTab       = 'artigos';
 var _clSelDept       = 'cozinha';
+var _clSelSetor      = null;
 var _clEdits         = {};
 var _sgSelFolder     = null;
 var _opSelFolder     = null;
@@ -81,6 +82,7 @@ function renderManual() {
   if (state.manualModal)       wrap.appendChild(_manualModal(state.manualModal));
   if (state.manualDocModal)    wrap.appendChild(_docUploadModal(state.manualDocModal, folders));
   if (state.manualFolderModal) wrap.appendChild(_folderModal(state.manualFolderModal, folders));
+  if (state.manualSetorModal)  wrap.appendChild(_setorModal(state.manualSetorModal));
   return wrap;
 }
 
@@ -124,37 +126,72 @@ function _manualArtigosTab(artigos) {
 // ── ABA: DEPARTAMENTOS / CHECKLISTS ──────────────────────────────────────────
 
 function _manualDeptTab() {
-  var cls  = state.manualChecklists||{};
-  var dept = MANUAL_DEPTS.find(function(d){return d.id===_clSelDept;})||MANUAL_DEPTS[0];
+  var cls    = state.manualChecklists||{};
+  var dept   = MANUAL_DEPTS.find(function(d){return d.id===_clSelDept;})||MANUAL_DEPTS[0];
+  var clDept = cls[dept.id]||{};
+  var setores = clDept.setores||[];
+
+  // Migração automática de dados legados (abertura/fechamento na raiz) para um setor "Geral"
+  if (!clDept.setores && ((clDept.abertura||[]).length > 0 || (clDept.fechamento||[]).length > 0)) {
+    var gId = uid();
+    setTimeout(function(){
+      var c2=Object.assign({},state.manualChecklists||{});
+      c2[dept.id]={setores:[{id:gId,nome:'Geral',abertura:clDept.abertura||[],fechamento:clDept.fechamento||[]}]};
+      lsSet('manualChecklists',c2); setState({manualChecklists:c2}); scheduleSave();
+      _clSelSetor=gId;
+    },0);
+  }
+
+  // Auto-seleciona o primeiro setor se o selecionado não existir
+  if (setores.length>0 && (!_clSelSetor||!setores.find(function(s){return s.id===_clSelSetor;}))) {
+    _clSelSetor=setores[0].id;
+  }
+  var selSetor = setores.find(function(s){return s.id===_clSelSetor;})||null;
 
   var sideItems = MANUAL_DEPTS.map(function(d){
-    var clD=cls[d.id]||{}; var tA=(clD.abertura||[]).length,tF=(clD.fechamento||[]).length;
-    return el('div',{class:'manual-dept-hdr'+(_clSelDept===d.id?' active':''),onclick:function(){_clSelDept=d.id;setState({});}},
-      [el('span',{},d.label),el('span',{class:'manual-dept-count'},tA+'/'+tF)]);
+    var clD=cls[d.id]||{};
+    var setsD=clD.setores||[];
+    var tot=setsD.reduce(function(acc,s){return acc+(s.abertura||[]).length+(s.fechamento||[]).length;},0);
+    if(!clD.setores) tot=(clD.abertura||[]).length+(clD.fechamento||[]).length;
+    return el('div',{class:'manual-dept-hdr'+(_clSelDept===d.id?' active':''),onclick:function(){_clSelDept=d.id;_clSelSetor=null;setState({});}},
+      [el('span',{},d.label),el('span',{class:'manual-dept-count'},String(tot))]);
   });
 
-  var clDept=cls[dept.id]||{};
-  var abertura=clDept.abertura||[];
-  var fechamento=clDept.fechamento||[];
+  function salvarClDept(novo){
+    var c2=Object.assign({},cls); c2[dept.id]=novo;
+    lsSet('manualChecklists',c2); setState({manualChecklists:c2}); scheduleSave();
+  }
+  function salvarTipo(setor,tipo,itens){
+    var patch={}; patch[tipo]=itens;
+    var novos=setores.map(function(s){return s.id===setor.id?Object.assign({},s,patch):s;});
+    salvarClDept(Object.assign({},clDept,{setores:novos}));
+  }
+  function addItem(setor,tipo,itens){
+    var txt=((document.getElementById('cl-add-'+tipo)||{}).value||'').trim();
+    if(!txt)return;
+    salvarTipo(setor,tipo,itens.concat([{id:uid(),texto:txt}]));
+  }
+  function removeItem(setor,tipo,itens,idx){salvarTipo(setor,tipo,itens.filter(function(_,i){return i!==idx;}));}
+  function saveEdits(setor,tipo,itens){
+    var k0=dept.id+'.'+setor.id+'.'+tipo+'.';
+    var nova=itens.map(function(item,i){return _clEdits[k0+i]!==undefined?Object.assign({},item,{texto:_clEdits[k0+i]}):item;});
+    itens.forEach(function(_,i){delete _clEdits[k0+i];});
+    salvarTipo(setor,tipo,nova);
+  }
 
-  function salvarTipo(tipo,itens){ var novo=Object.assign({},cls);if(!novo[dept.id])novo[dept.id]={};novo[dept.id]=Object.assign({},novo[dept.id]);novo[dept.id][tipo]=itens;lsSet('manualChecklists',novo);setState({manualChecklists:novo});scheduleSave(); }
-  function addItem(tipo,itens){ var txt=((document.getElementById('cl-add-'+tipo)||{}).value||'').trim();if(!txt)return;salvarTipo(tipo,itens.concat([{id:uid(),texto:txt}])); }
-  function removeItem(tipo,itens,idx){ salvarTipo(tipo,itens.filter(function(_,i){return i!==idx;})); }
-  function saveEdits(tipo,itens){ var nova=itens.map(function(item,i){var k=dept.id+'.'+tipo+'.'+i;return _clEdits[k]!==undefined?Object.assign({},item,{texto:_clEdits[k]}):item;});itens.forEach(function(_,i){delete _clEdits[dept.id+'.'+tipo+'.'+i];});salvarTipo(tipo,nova); }
-
-  function buildSection(tipo,itens,cor,icon){
+  function buildSection(setor,tipo,itens,cor,icon){
+    var k0=dept.id+'.'+setor.id+'.'+tipo+'.';
     var rows=itens.map(function(item,i){
-      var k=dept.id+'.'+tipo+'.'+i;
       var inp=el('input',{type:'text',value:item.texto||'',class:'cl-item-input',placeholder:'Descrição da tarefa...'},[]);
-      inp.oninput=function(){_clEdits[k]=this.value;};
-      inp.onblur=function(){saveEdits(tipo,itens);};
+      inp.oninput=function(){_clEdits[k0+i]=this.value;};
+      inp.onblur=function(){saveEdits(setor,tipo,itens);};
       var del=el('button',{class:'cl-del-btn',type:'button'},'✕');
       del.onmousedown=function(e){e.preventDefault();};
-      del.onclick=function(){removeItem(tipo,itens,i);};
+      del.onclick=function(){removeItem(setor,tipo,itens,i);};
       return el('div',{class:'cl-item-row'},[el('span',{class:'cl-num'},String(i+1)),el('span',{class:'cl-check-box'},'☐'),inp,del]);
     });
     var addInp=el('input',{id:'cl-add-'+tipo,type:'text',class:'cl-add-input',placeholder:'Nova tarefa... (Enter para adicionar)'},[]);
-    addInp.onkeydown=function(e){if(e.key==='Enter')addItem(tipo,itens);};
+    addInp.onkeydown=function(e){if(e.key==='Enter')addItem(setor,tipo,itens);};
     return el('div',{class:'cl-section'},[
       el('div',{class:'cl-section-header'},[
         el('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},[
@@ -162,24 +199,67 @@ function _manualDeptTab() {
           el('h3',{class:'cl-section-title',style:{color:cor}},tipo==='abertura'?'Checklist de Abertura':'Checklist de Fechamento'),
           el('span',{class:'manual-dept-count'},String(itens.length)+' itens'),
         ]),
-        btn('btn-secondary cl-print-btn','🖨️ Imprimir PDF',function(){_clPrint(dept,tipo,itens);}),
+        btn('btn-secondary cl-print-btn','🖨️ Imprimir PDF',function(){_clPrint(dept,tipo,itens,setor);}),
       ]),
       rows.length?el('div',{class:'cl-items'},rows):el('div',{class:'cl-empty-hint'},'Nenhuma tarefa ainda. Adicione abaixo.'),
-      el('div',{class:'cl-add-row'},[addInp,btn('btn-secondary cl-add-btn','+ Adicionar',function(){addItem(tipo,itens);})]),
+      el('div',{class:'cl-add-row'},[addInp,btn('btn-secondary cl-add-btn','+ Adicionar',function(){addItem(setor,tipo,itens);})]),
     ]);
+  }
+
+  var mainContent;
+  if (setores.length===0) {
+    mainContent=el('div',{class:'cl-main'},[
+      el('div',{class:'cl-dept-title'},[
+        el('h2',{style:{margin:'0 0 4px',fontSize:'1.1rem',fontWeight:'700'}},dept.label),
+        el('p',{style:{margin:'0',fontSize:'0.82rem',color:'var(--text-muted)'}},'Crie setores para organizar os checklists deste departamento.'),
+      ]),
+      el('div',{class:'doc-empty',style:{marginTop:'24px'}},[
+        el('div',{style:{fontSize:'2.5rem',marginBottom:'8px'}},'🏢'),
+        el('p',{style:{margin:'0 0 16px',color:'var(--text-muted)'}},'Nenhum setor criado ainda.'),
+        btn('btn-primary','+ Criar Primeiro Setor',function(){setState({manualSetorModal:{deptId:dept.id,nome:''}});}),
+      ]),
+    ]);
+  } else {
+    var abertura  =(selSetor&&selSetor.abertura)||[];
+    var fechamento=(selSetor&&selSetor.fechamento)||[];
+
+    var setorTabs=el('div',{class:'cl-setor-bar'},[
+      el('div',{class:'cl-setor-tabs'},setores.map(function(s){
+        var isAct=selSetor&&selSetor.id===s.id;
+        var tab=el('div',{class:'cl-setor-tab'+(isAct?' active':''),onclick:function(){_clSelSetor=s.id;setState({});}},s.nome);
+        return tab;
+      })),
+      btn('cl-setor-add-btn','+ Setor',function(){setState({manualSetorModal:{deptId:dept.id,nome:''}});}),
+    ]);
+
+    var setorActions=selSetor?el('div',{class:'cl-setor-actions'},[
+      btn('btn-secondary','✏️ Renomear',function(){setState({manualSetorModal:{deptId:dept.id,editId:selSetor.id,nome:selSetor.nome}});}),
+      btn('btn-danger-outline','🗑 Excluir Setor',function(){
+        if((abertura.length||fechamento.length)&&!confirm('Este setor tem tarefas. Excluir mesmo assim?'))return;
+        var novos=setores.filter(function(s){return s.id!==selSetor.id;});
+        _clSelSetor=novos.length?novos[0].id:null;
+        salvarClDept(Object.assign({},clDept,{setores:novos}));
+        showToast('Setor excluído','error');
+      }),
+    ]):null;
+
+    mainContent=el('div',{class:'cl-main'},[
+      el('div',{class:'cl-dept-title'},[
+        el('h2',{style:{margin:'0 0 4px',fontSize:'1.1rem',fontWeight:'700'}},dept.label),
+        el('p',{style:{margin:'0',fontSize:'0.82rem',color:'var(--text-muted)'}},
+          selSetor?abertura.length+' itens de abertura · '+fechamento.length+' itens de fechamento':'Selecione um setor'),
+        selSetor?el('div',{style:{marginTop:'10px'}},[btn('btn-primary','🖨️ Imprimir Abertura + Fechamento',function(){_clPrintAmbos(dept,abertura,fechamento,selSetor);})]):el('span',{},''),
+      ]),
+      setorTabs,
+      setorActions,
+      selSetor?buildSection(selSetor,'abertura',abertura,'var(--success,#22a047)','🌅'):null,
+      selSetor?buildSection(selSetor,'fechamento',fechamento,'var(--primary)','🌙'):null,
+    ].filter(Boolean));
   }
 
   return el('div',{class:'manual-layout',style:{minHeight:'560px'}},[
     el('div',{class:'manual-sidebar'},sideItems),
-    el('div',{class:'cl-main'},[
-      el('div',{class:'cl-dept-title'},[
-        el('h2',{style:{margin:'0 0 4px',fontSize:'1.1rem',fontWeight:'700'}},dept.label),
-        el('p',{style:{margin:'0',fontSize:'0.82rem',color:'var(--text-muted)'}},abertura.length+' itens de abertura · '+fechamento.length+' itens de fechamento'),
-        el('div',{style:{marginTop:'10px'}},[btn('btn-primary','🖨️ Imprimir Abertura + Fechamento',function(){_clPrintAmbos(dept,abertura,fechamento);})]),
-      ]),
-      buildSection('abertura',abertura,'var(--success,#22a047)','🌅'),
-      buildSection('fechamento',fechamento,'var(--primary)','🌙'),
-    ]),
+    mainContent,
   ]);
 }
 
@@ -693,11 +773,61 @@ function _toolBtn(label,onclick,title){var b=el('button',{class:'mop-tool',title
 function _clLogoHTML(){var ed=(state.empresaData||{});var logo=ed.logo||ed.logoUrl||'';if(logo)return '<img src="'+logo+'" style="max-height:80px;max-width:200px;object-fit:contain;" alt="Logo">';return '<div style="font-size:1.8rem;font-weight:900;letter-spacing:-0.03em;">'+(ed.nome||'Artt Burger')+'</div>';}
 function _clPrintCSS(){return '@page{size:A4 portrait;margin:18mm 16mm;}body{font-family:Arial,sans-serif;color:#000;font-size:10pt;line-height:1.4;margin:0;padding:0;}.pg{max-width:170mm;margin:0 auto;}.logo-area{text-align:center;padding-bottom:10px;border-bottom:3px solid #000;margin-bottom:12px;}.empresa-nome{font-size:9pt;text-transform:uppercase;letter-spacing:0.12em;color:#333;margin-top:4px;}.doc-type{font-size:7pt;color:#666;}.titulo-checklist{text-align:center;font-size:14pt;font-weight:900;text-transform:uppercase;letter-spacing:0.06em;margin:14px 0 4px;}.dept-label{text-align:center;font-size:10pt;color:#333;margin-bottom:12px;}.info-bar{display:flex;gap:16px;border:1px solid #000;border-radius:4px;padding:8px 12px;margin-bottom:12px;font-size:9pt;}.info-field{flex:1;}.info-field label{font-size:7.5pt;text-transform:uppercase;letter-spacing:0.06em;color:#555;display:block;margin-bottom:2px;}.info-line{border-bottom:1px solid #777;min-height:18px;display:block;}table{width:100%;border-collapse:collapse;margin-bottom:14px;}thead th{background:#000;color:#fff;padding:5px 8px;font-size:8.5pt;text-align:left;}thead th.c{text-align:center;}tbody tr{border-bottom:1px solid #ccc;}tbody tr:nth-child(even){background:#f5f5f5;}tbody td{padding:5px 8px;font-size:9pt;vertical-align:middle;}td.num{width:24px;text-align:center;color:#555;font-size:8pt;}td.chk{width:26px;text-align:center;font-size:12pt;}.assinaturas{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px;padding-top:12px;border-top:1px solid #ccc;}.ass-bloco label{font-size:7.5pt;text-transform:uppercase;letter-spacing:0.06em;color:#555;display:block;margin-bottom:2px;}.ass-line{border-bottom:1px solid #777;margin-bottom:10px;min-height:22px;}.rodape{margin-top:18px;padding-top:8px;border-top:1px solid #ccc;font-size:7.5pt;color:#888;display:flex;justify-content:space-between;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';}
 function _clBuildTableHTML(itens){if(!itens.length)return '<p style="color:#999;text-align:center;">Nenhuma tarefa cadastrada.</p>';return '<table><thead><tr><th style="width:28px;" class="c">#</th><th>Tarefa</th><th style="width:36px;" class="c">✓</th></tr></thead><tbody>'+itens.map(function(item,i){return '<tr><td class="num">'+(i+1)+'</td><td>'+_esc(item.texto||'')+'</td><td class="chk">☐</td></tr>';}).join('')+'</tbody></table>';}
-function _clPageHTML(dept,tipo,itens){var ed=(state.empresaData||{}),empresa=ed.nome||'Artt Burger',tipoIcon=tipo==='abertura'?'🌅':'🌙';return '<div class="pg"><div class="logo-area">'+_clLogoHTML()+'<div class="empresa-nome">'+_esc(empresa)+'</div><div class="doc-type">P.O.P — Manual de Operação</div></div><div class="titulo-checklist">'+tipoIcon+' Checklist de '+(tipo==='abertura'?'ABERTURA':'FECHAMENTO')+'</div><div class="dept-label">Departamento: <strong>'+_esc(dept.label)+'</strong></div><div class="info-bar"><div class="info-field"><label>Data</label><span class="info-line"></span></div><div class="info-field"><label>Turno</label><span class="info-line"></span></div><div class="info-field"><label>Responsável</label><span class="info-line"></span></div></div>'+_clBuildTableHTML(itens)+'<div class="assinaturas"><div class="ass-bloco"><label>Assinatura do Responsável</label><div class="ass-line"></div><label>Data</label><div class="ass-line"></div></div><div class="ass-bloco"><label>Visto do Supervisor</label><div class="ass-line"></div><label>Data</label><div class="ass-line"></div></div></div><div class="rodape"><span>'+_esc(empresa)+' · Documento controlado — P.O.P</span><span>Versão: '+today()+'</span></div></div>';}
-function _clPrint(dept,tipo,itens){if(!itens.length){showToast('Adicione pelo menos um item antes de imprimir.','error');return;}var w=window.open('','_blank');if(w){w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Checklist '+dept.label+'</title><style>'+_clPrintCSS()+'</style></head><body>'+_clPageHTML(dept,tipo,itens)+'</body></html>');w.document.close();setTimeout(function(){w.print();},400);}}
-function _clPrintAmbos(dept,abertura,fechamento){if(!abertura.length&&!fechamento.length){showToast('Adicione itens antes de imprimir.','error');return;}var pages='';if(abertura.length)pages+=_clPageHTML(dept,'abertura',abertura);if(fechamento.length){if(abertura.length)pages+='<div style="page-break-before:always;"></div>';pages+=_clPageHTML(dept,'fechamento',fechamento);}var w=window.open('','_blank');if(w){w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Checklists '+dept.label+'</title><style>'+_clPrintCSS()+'</style></head><body>'+pages+'</body></html>');w.document.close();setTimeout(function(){w.print();},400);}}
+function _clPageHTML(dept,tipo,itens,setor){var ed=(state.empresaData||{}),empresa=ed.nome||'Artt Burger',tipoIcon=tipo==='abertura'?'🌅':'🌙';var setorLabel=setor?' — Setor: '+_esc(setor.nome):'';return '<div class="pg"><div class="logo-area">'+_clLogoHTML()+'<div class="empresa-nome">'+_esc(empresa)+'</div><div class="doc-type">P.O.P — Manual de Operação</div></div><div class="titulo-checklist">'+tipoIcon+' Checklist de '+(tipo==='abertura'?'ABERTURA':'FECHAMENTO')+'</div><div class="dept-label">Departamento: <strong>'+_esc(dept.label)+'</strong>'+setorLabel+'</div><div class="info-bar"><div class="info-field"><label>Data</label><span class="info-line"></span></div><div class="info-field"><label>Turno</label><span class="info-line"></span></div><div class="info-field"><label>Responsável</label><span class="info-line"></span></div></div>'+_clBuildTableHTML(itens)+'<div class="assinaturas"><div class="ass-bloco"><label>Assinatura do Responsável</label><div class="ass-line"></div><label>Data</label><div class="ass-line"></div></div><div class="ass-bloco"><label>Visto do Supervisor</label><div class="ass-line"></div><label>Data</label><div class="ass-line"></div></div></div><div class="rodape"><span>'+_esc(empresa)+' · Documento controlado — P.O.P</span><span>Versão: '+today()+'</span></div></div>';}
+function _clPrint(dept,tipo,itens,setor){if(!itens.length){showToast('Adicione pelo menos um item antes de imprimir.','error');return;}var w=window.open('','_blank');if(w){w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Checklist '+dept.label+'</title><style>'+_clPrintCSS()+'</style></head><body>'+_clPageHTML(dept,tipo,itens,setor)+'</body></html>');w.document.close();setTimeout(function(){w.print();},400);}}
+function _clPrintAmbos(dept,abertura,fechamento,setor){if(!abertura.length&&!fechamento.length){showToast('Adicione itens antes de imprimir.','error');return;}var pages='';if(abertura.length)pages+=_clPageHTML(dept,'abertura',abertura,setor);if(fechamento.length){if(abertura.length)pages+='<div style="page-break-before:always;"></div>';pages+=_clPageHTML(dept,'fechamento',fechamento,setor);}var w=window.open('','_blank');if(w){w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Checklists '+dept.label+'</title><style>'+_clPrintCSS()+'</style></head><body>'+pages+'</body></html>');w.document.close();setTimeout(function(){w.print();},400);}}
 function _esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function _manualPrint(artigo,deptLabel){var ed=(state.empresaData||{}),empresa=ed.nome||'Artt Burger';function inl(t){return _esc(t).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');}function toHTML(texto){var html='',lines=texto.split('\n'),inUl=false,inOl=false;function cl(){if(inUl){html+='</ul>';inUl=false;}if(inOl){html+='</ol>';inOl=false;}}lines.forEach(function(l){if(l.startsWith('# ')){cl();html+='<h2>'+inl(l.slice(2))+'</h2>';}else if(l.startsWith('## ')){cl();html+='<h3>'+inl(l.slice(3))+'</h3>';}else if(l.startsWith('> ')){cl();html+='<div class="callout">'+inl(l.slice(2))+'</div>';}else if(l.startsWith('⚠️')){cl();html+='<div class="warning">'+inl(l)+'</div>';}else if(l.startsWith('- ')){if(!inUl){if(inOl){html+='</ol>';inOl=false;}html+='<ul>';inUl=true;}html+='<li>'+inl(l.slice(2))+'</li>';}else if(/^\d+\.\s/.test(l)){if(!inOl){if(inUl){html+='</ul>';inUl=false;}html+='<ol>';inOl=true;}html+='<li>'+inl(l.replace(/^\d+\.\s/,''))+'</li>';}else if(l.trim()==='---'){cl();html+='<hr>';}else if(l.trim()===''){cl();}else{cl();html+='<p>'+inl(l)+'</p>';}});cl();return html;}var w=window.open('','_blank');if(w){w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+artigo.titulo+'</title><style>@page{size:A4 portrait;margin:18mm 16mm;}body{font-family:Arial,sans-serif;max-width:170mm;margin:0 auto;color:#000;line-height:1.6;font-size:10pt;}.header{text-align:center;border-bottom:3px solid #000;padding-bottom:12px;margin-bottom:20px;}.empresa{font-size:8pt;text-transform:uppercase;letter-spacing:0.1em;color:#555;margin-top:4px;}.badges{display:flex;gap:8px;margin:8px 0;font-size:8pt;justify-content:center;}.badge{padding:2px 8px;border:1px solid #000;border-radius:3px;}h1{margin:0 0 8px;font-size:14pt;}h2{font-size:11pt;border-bottom:1px solid #ccc;padding-bottom:4px;margin-top:20px;}h3{font-size:10pt;margin-top:14px;}ul,ol{padding-left:20px}li{margin-bottom:4px}.callout{background:#f0f0f0;border-left:4px solid #666;padding:8px 12px;margin:10px 0;font-style:italic;}.warning{background:#fff3cd;border-left:4px solid #f90;padding:8px 12px;margin:10px 0;font-weight:bold;}hr{border:none;border-top:1px solid #ccc;margin:14px 0;}.footer{margin-top:36px;padding-top:8px;border-top:1px solid #ccc;font-size:7.5pt;color:#777;text-align:center;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body><div class="header">'+_clLogoHTML()+'<div class="empresa">'+_esc(empresa)+' · P.O.P</div><h1>'+_esc(artigo.titulo)+'</h1><div class="badges"><span class="badge">'+_esc(deptLabel)+'</span><span class="badge">'+_esc(artigo.categoria||'')+'</span></div></div>'+toHTML(artigo.conteudo||'')+'<div class="footer">'+_esc(empresa)+' · '+today()+'</div></body></html>');w.document.close();setTimeout(function(){w.print();},400);}}
+
+// ── MODAL SETOR ───────────────────────────────────────────────────────────────
+
+function _setorModal(m) {
+  var isEdit  = !!m.editId;
+  var cls     = state.manualChecklists||{};
+  var clDept  = cls[m.deptId]||{};
+  var setores = clDept.setores||[];
+
+  function salvar(){
+    var nome=((document.getElementById('setor-nome')||{}).value||'').trim();
+    if(!nome){showToast('Digite um nome para o setor','error');return;}
+    var novos, newId;
+    if(isEdit){
+      novos=setores.map(function(s){return s.id===m.editId?Object.assign({},s,{nome:nome}):s;});
+    } else {
+      newId=uid();
+      novos=setores.concat([{id:newId,nome:nome,abertura:[],fechamento:[]}]);
+      _clSelSetor=newId;
+    }
+    var c2=Object.assign({},cls); c2[m.deptId]=Object.assign({},clDept,{setores:novos});
+    lsSet('manualChecklists',c2); setState({manualChecklists:c2,manualSetorModal:null}); scheduleSave();
+    showToast(isEdit?'Setor renomeado!':'Setor criado!','success');
+  }
+
+  var nomeInp=el('input',{id:'setor-nome',type:'text',class:'mop-input',placeholder:'Ex: Frituras, Atendimento, Caixa 1...',value:m.nome||''},[]);
+  nomeInp.onkeydown=function(e){if(e.key==='Enter')salvar();};
+  setTimeout(function(){var e2=document.getElementById('setor-nome');if(e2){e2.focus();e2.select();}},80);
+
+  var overlay=el('div',{class:'modal-overlay',onclick:function(e){if(e.target===overlay)setState({manualSetorModal:null});}},[
+    el('div',{class:'modal-box',style:{maxWidth:'380px'},onclick:function(e){e.stopPropagation();}},[
+      el('div',{class:'modal-header'},[
+        el('h3',{style:{margin:0}},isEdit?'✏️ Renomear Setor':'🏢 Novo Setor'),
+        btn('modal-close','×',function(){setState({manualSetorModal:null});}),
+      ]),
+      el('div',{style:{padding:'20px'}},[
+        el('label',{class:'mop-label'},'Nome do setor'),
+        nomeInp,
+        el('div',{style:{marginTop:'8px',fontSize:'0.78rem',color:'var(--text-muted)'}},'Cada setor terá seu próprio checklist de abertura e fechamento.'),
+      ]),
+      el('div',{class:'modal-footer'},[
+        el('div',{style:{display:'flex',gap:'8px',marginLeft:'auto'}},[
+          btn('btn-secondary','Cancelar',function(){setState({manualSetorModal:null});}),
+          btn('btn-primary',isEdit?'✓ Salvar':'✓ Criar Setor',salvar),
+        ]),
+      ]),
+    ]),
+  ]);
+  return overlay;
+}
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -758,6 +888,15 @@ function _manualPrint(artigo,deptLabel){var ed=(state.empresaData||{}),empresa=e
     '.cl-add-input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:inherit;font-size:0.88rem;outline:none;}',
     '.cl-add-input:focus{border-color:var(--primary);}',
     '.cl-add-btn,.cl-print-btn{font-size:0.82rem!important;padding:6px 12px!important;white-space:nowrap;}',
+    // Setores
+    '.cl-setor-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);flex-wrap:wrap;}',
+    '.cl-setor-tabs{display:flex;gap:6px;flex-wrap:wrap;flex:1;}',
+    '.cl-setor-tab{padding:5px 14px;border-radius:20px;border:1px solid var(--border);cursor:pointer;font-size:0.83rem;font-weight:500;background:var(--surface);color:var(--text-muted);transition:all 0.15s;white-space:nowrap;}',
+    '.cl-setor-tab:hover{border-color:var(--primary);color:var(--primary);}',
+    '.cl-setor-tab.active{background:var(--primary);color:#fff;border-color:var(--primary);}',
+    '.cl-setor-add-btn{padding:5px 12px;border-radius:20px;border:1px dashed var(--border);cursor:pointer;font-size:0.82rem;background:transparent;color:var(--text-muted);transition:all 0.15s;white-space:nowrap;}',
+    '.cl-setor-add-btn:hover{border-color:var(--primary);color:var(--primary);}',
+    '.cl-setor-actions{display:flex;gap:8px;margin-bottom:14px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;flex-wrap:wrap;}',
     // ── Explorer ──
     '.ftree-sidebar{display:flex;flex-direction:column;}',
     '.ftree-item{display:flex;align-items:center;gap:5px;padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--border);font-size:0.83rem;user-select:none;transition:background 0.12s;}',

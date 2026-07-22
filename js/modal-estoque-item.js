@@ -4,7 +4,7 @@ var _eiItemModalId  = null;
 
 function renderEstoqueItemModal() {
   var m = state.estoqueItemModal;
-  if (!m) return null;
+  if (!m) { _eiItemModalId = null; return null; }
 
   var edit   = m.editItem || {};
   var isEdit = !!edit.id;

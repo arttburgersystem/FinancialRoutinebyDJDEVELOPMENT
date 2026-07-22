@@ -47,9 +47,8 @@ input,select,textarea{font-family:inherit;outline:none}
 .nav-section-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 12px 5px;cursor:pointer;user-select:none;gap:6px;}
 .nav-section-hd:hover .nav-section-lbl{opacity:1;}
 .nav-section-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.4px;color:var(--gold);opacity:.65;flex:1;transition:opacity .15s;}
-.nav-section-arrow{font-size:11px;color:var(--text3);flex-shrink:0;transition:transform .2s;line-height:1;}
-.nav-section-arrow.open{transform:rotate(0deg);}
-.nav-section-arrow.closed{transform:rotate(-90deg);}
+.nav-section-arrow{font-size:10px;color:var(--text3);flex-shrink:0;line-height:1;transition:color .15s;}
+.nav-section-hd:hover .nav-section-arrow{color:var(--gold);}
 .nav-section-items{overflow:hidden;}
 .nav-section{padding:6px 14px 4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3)}
 .nav-item{display:flex;align-items:center;gap:10px;padding:8px 14px;color:var(--text2);cursor:pointer;transition:all .15s;font-size:13px;border-left:2px solid transparent}
@@ -577,7 +576,7 @@ var state={
   transacoesCartao: lsGet('transacoesCartao',[]),
   sidebarOpen: false,
   sidebarCollapsed: lsGet('sidebarCollapsed', false),
-  navSectionsCollapsed: lsGet('navSectionsCollapsed', {}),
+  navSectionsCollapsed: lsGet('navSectionsCollapsed', {financeiro:true,planejamento:true,'integração':true,sistema:true,apostas:true}),
   calcOpen: false,
   calOpen: false,
   notaOpen: false,
@@ -1440,7 +1439,7 @@ function renderSidebar(){
       setState({navSectionsCollapsed:nc});
     }});
     hd.appendChild(el('span',{class:'nav-section-lbl'},secLabels[sec]||sec));
-    hd.appendChild(el('span',{class:'nav-section-arrow '+(isCollapsed?'closed':'open')},'▾'));
+    hd.appendChild(el('span',{class:'nav-section-arrow'},isCollapsed?'▲':'▼'));
 
     var itemsWrap=el('div',{class:'nav-section-items',style:{display:isCollapsed?'none':'block'}});
     items.forEach(function(n){

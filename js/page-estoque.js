@@ -529,7 +529,68 @@ function renderProdutoModal() {
     [el('option',{value:''},'— Nenhum —')].concat(
       setores.map(function(s){return el('option',{value:s.id,selected:p.setorImpressao===s.id},s.nome);})));
   var descCardInp = el('textarea',{class:'form-input',rows:'2',placeholder:'Descrição visível no cardápio...',style:{resize:'vertical'},oninput:function(){p.descricaoCard=this.value;}},p.descricaoCard||'');
-  var imgInp = el('input',{class:'form-input',type:'url',placeholder:'https://... URL da foto do item',value:p.imagemUrl||'',oninput:function(){p.imagemUrl=this.value;}});
+  // ── UPLOAD DE IMAGEM DO PRODUTO ──────────────────────────────────────────
+  var _imgPreview = el('div',{style:{
+    width:'110px',height:'110px',borderRadius:'10px',border:'2px dashed var(--border)',
+    background:'var(--bg3)',backgroundSize:'cover',backgroundPosition:'center',
+    display:'flex',alignItems:'center',justifyContent:'center',
+    fontSize:'30px',color:'var(--text3)',flexShrink:'0',cursor:'pointer',overflow:'hidden',
+  }});
+  if(p.imagemUrl){
+    _imgPreview.style.backgroundImage='url("'+p.imagemUrl+'")';
+  } else {
+    _imgPreview.textContent='📷';
+  }
+  var _imgStatus = el('span',{style:{fontSize:'11px',color:'var(--text3)',minHeight:'16px'}},'');
+  var _imgFileInp = el('input',{type:'file',accept:'image/*',style:{display:'none'}},[]);
+  var _imgRemBtn  = el('button',{class:'btn-ghost',style:{fontSize:'11px',padding:'4px 8px',color:'var(--red)',display:p.imagemUrl?'inline-flex':'none'}});
+  _imgRemBtn.textContent='🗑 Remover';
+  _imgRemBtn.onclick=function(e){
+    e.preventDefault();
+    p.imagemUrl='';
+    _imgPreview.style.backgroundImage='';
+    _imgPreview.textContent='📷';
+    _imgRemBtn.style.display='none';
+    _imgFileInp.value='';
+    _imgStatus.textContent='';
+  };
+  _imgFileInp.onchange=function(){
+    var file=this.files[0]; if(!file)return;
+    if(file.size>15*1024*1024){showToast('Arquivo muito grande. Máximo 15 MB.','error');return;}
+    _imgStatus.textContent='⏳ Processando...';
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        var MAX=600; var w=img.width,h=img.height;
+        if(w>MAX||h>MAX){ if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;} }
+        var canvas=document.createElement('canvas');
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        var dataUrl=canvas.toDataURL('image/jpeg',0.8);
+        p.imagemUrl=dataUrl;
+        _imgPreview.style.backgroundImage='url("'+dataUrl+'")';
+        _imgPreview.textContent='';
+        _imgRemBtn.style.display='inline-flex';
+        _imgStatus.textContent='✅ Imagem salva!';
+        setTimeout(function(){_imgStatus.textContent='';},2500);
+      };
+      img.onerror=function(){_imgStatus.textContent='❌ Formato inválido.';};
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  var _imgUploadBtn=el('button',{class:'btn-secondary',style:{fontSize:'12px',padding:'7px 12px'}});
+  _imgUploadBtn.textContent='📁 Escolher foto';
+  _imgUploadBtn.onclick=function(e){e.preventDefault();_imgFileInp.click();};
+  _imgPreview.onclick=function(){_imgFileInp.click();};
+  var imgInp=el('div',{style:{display:'flex',gap:'14px',alignItems:'flex-start'}},[
+    _imgPreview,
+    el('div',{style:{display:'flex',flexDirection:'column',gap:'8px',paddingTop:'2px'}},[
+      el('span',{style:{fontSize:'11px',color:'var(--text3)',lineHeight:'1.6'}},'JPG, PNG ou WebP. Aparece no PDV, cardápio e delivery.'),
+      _imgUploadBtn,_imgFileInp,_imgRemBtn,_imgStatus,
+    ]),
+  ]);
 
   // ── INFORMAÇÕES FISCAIS ────────────────────────────────────────────────────
   var ORIGEM_OPTS=[
@@ -1011,7 +1072,7 @@ function renderProdutoModal() {
           el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}},[
             el('div',{style:{gridColumn:'1/-1'}},fld('Setor de impressão',setorSel)),
             el('div',{style:{gridColumn:'1/-1'}},fld('Descrição no cardápio (opcional)',descCardInp)),
-            el('div',{style:{gridColumn:'1/-1'}},fld('URL da imagem (opcional)',imgInp)),
+            el('div',{style:{gridColumn:'1/-1'}},fld('📷 Foto do produto',imgInp)),
           ]),
         ]) : null,
 

@@ -22,6 +22,7 @@ function _pdvAddItem(prod) {
       id:uid(), prodId:prod.id, nome:prod.nome,
       precoUnit:prod.precoVenda||prod.preco||0,
       qtd:1, obs:'',
+      imagemUrl:prod.imagemUrl||'',
       categoria:prod.categoria||'',
       setorImpressao:prod.setorImpressao||'',
     });
@@ -563,7 +564,11 @@ function renderPDV() {
     carr.forEach(function(item){
       var row=el('div',{style:{borderBottom:'1px solid var(--border)',padding:'8px 10px'}});
 
-      var topRow=el('div',{style:{display:'flex',gap:'6px',alignItems:'flex-start',marginBottom:'5px'}});
+      var topRow=el('div',{style:{display:'flex',gap:'8px',alignItems:'center',marginBottom:'5px'}});
+      var thumbEl=el('div',{style:{width:'40px',height:'40px',borderRadius:'6px',flexShrink:'0',overflow:'hidden',background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px',border:'1px solid var(--border)'}});
+      if(item.imagemUrl){var tImg=el('img',{});tImg.src=item.imagemUrl;tImg.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';thumbEl.appendChild(tImg);}
+      else{thumbEl.textContent='🍔';}
+      topRow.appendChild(thumbEl);
       var nEl=el('div',{style:{flex:'1',fontWeight:'700',fontSize:'12px',lineHeight:'1.3'}},item.nome);
       var pvEl=el('div',{style:{fontWeight:'900',fontSize:'13px',color:'var(--gold)',whiteSpace:'nowrap'}},fmtMoney(item.precoUnit*item.qtd));
       topRow.appendChild(nEl);topRow.appendChild(pvEl);

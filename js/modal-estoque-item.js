@@ -13,9 +13,9 @@ function renderEstoqueItemModal() {
   var _eiCurId = edit.id || '__new__';
   if (_eiCurId !== _eiItemModalId) {
     _eiItemModalId = _eiCurId;
-    var _ftEIInit = (state.fichaTecnicas || []).filter(function(ft) {
+    var _ftEIInit = edit.id ? (state.fichaTecnicas || []).filter(function(ft) {
       return ft.estoqueItemId === edit.id;
-    })[0];
+    })[0] : null;
     _eiIngredientes = _ftEIInit && _ftEIInit.ingredientes
       ? _ftEIInit.ingredientes.map(function(x) { return Object.assign({}, x); })
       : [];

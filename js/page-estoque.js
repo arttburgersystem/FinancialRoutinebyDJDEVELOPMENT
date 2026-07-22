@@ -588,13 +588,21 @@ function renderProdutoModal() {
       }
 
       _pmIngredientes.forEach(function(ing, idx) {
-        // Sempre atualiza custo a partir do custo médio atual do insumo no state (reflete reajustes)
-        if (ing.insumoId) {
-          var _curIns = _pmInsumos.filter(function(x) { return x.id === ing.insumoId; })[0];
+        // Atualiza custo a partir do custo médio atual: busca por ID, fallback por nome
+        if (ing.insumoId || ing.insumoNome) {
+          var _curIns = ing.insumoId ? _pmInsumos.filter(function(x) { return x.id === ing.insumoId; })[0] : null;
+          // Se não encontrou pelo ID ou encontrou com custo=0, tenta pelo nome
+          if ((!_curIns || !(_curIns.custoMedio > 0)) && ing.insumoNome) {
+            var _byNome = _pmInsumos.filter(function(x) {
+              return x.nome.toLowerCase() === ing.insumoNome.toLowerCase() && x.custoMedio > 0;
+            }).sort(function(a, b) { return (b.custoMedio || 0) - (a.custoMedio || 0); });
+            if (_byNome.length) _curIns = _byNome[0];
+          }
           if (_curIns) {
-            ing.custoUnit  = _curIns.custoMedio || 0;
+            ing.insumoId   = _curIns.id;
+            ing.custoUnit  = parseFloat(_curIns.custoMedio) || 0;
             ing.unidade    = _curIns.unidade || ing.unidade || 'un';
-            ing.custoTotal = Math.round((ing.quantidade || 0) * ing.custoUnit * 10000) / 10000;
+            ing.custoTotal = Math.round((parseFloat(ing.quantidade) || 0) * ing.custoUnit * 10000) / 10000;
           }
         }
 
@@ -609,7 +617,9 @@ function renderProdutoModal() {
 
         var qtdInp = el('input', { class: 'form-input', type: 'number', min: '0.001', step: '0.001', value: String(ing.quantidade || 1), style: { fontSize: '12px' } });
         var unidSpan = el('div', { style: { fontSize: '11px', padding: '7px 6px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center', color: 'var(--text3)', whiteSpace: 'nowrap' } }, ing.unidade || '—');
-        var custoSpan = el('div', { style: { fontSize: '12px', padding: '7px 4px', textAlign: 'right', color: 'var(--text2)', fontWeight: '600', whiteSpace: 'nowrap' } }, fmtMoney(ing.custoTotal || 0));
+        var _semCusto = ing.insumoId && !(ing.custoUnit > 0);
+        var custoSpan = el('div', { style: { fontSize: '12px', padding: '7px 4px', textAlign: 'right', color: _semCusto ? 'var(--danger)' : 'var(--text2)', fontWeight: '600', whiteSpace: 'nowrap' } },
+          _semCusto ? '⚠️ sem custo' : fmtMoney(ing.custoTotal || 0));
         var delBtn = el('button', { style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '20px', padding: '0 2px', lineHeight: '1', flexShrink: '0' } }, '×');
         delBtn.onclick = function(e) { e.preventDefault(); _pmIngredientes.splice(idx, 1); _pmRenderIngredientes(); _pmUpdateTotal(); };
 
@@ -636,11 +646,13 @@ function renderProdutoModal() {
               opt.onmousedown = function(e) {
                 e.preventDefault();
                 sd.style.display = 'none';
+                var _custo = parseFloat(x.custoMedio) || 0;
+                var _qtd   = parseFloat(_pmIngredientes[i].quantidade) || 1;
                 _pmIngredientes[i].insumoId   = x.id;
                 _pmIngredientes[i].insumoNome = x.nome;
                 _pmIngredientes[i].unidade    = x.unidade || 'un';
-                _pmIngredientes[i].custoUnit  = x.custoMedio || 0;
-                _pmIngredientes[i].custoTotal = Math.round((_pmIngredientes[i].quantidade || 1) * (x.custoMedio || 0) * 10000) / 10000;
+                _pmIngredientes[i].custoUnit  = _custo;
+                _pmIngredientes[i].custoTotal = Math.round(_qtd * _custo * 10000) / 10000;
                 nd.value = x.nome;
                 ue.textContent = x.unidade || '—';
                 ce.textContent = fmtMoney(_pmIngredientes[i].custoTotal);
@@ -654,13 +666,21 @@ function renderProdutoModal() {
           nd.oninput = function() { _pmIngredientes[i].insumoId = null; _pmIngredientes[i].insumoNome = this.value; _show(_fil(this.value)); };
           nd.onblur  = function() { setTimeout(function() { sd.style.display = 'none'; }, 160); };
           qi.oninput = function() {
-            _pmIngredientes[i].quantidade = parseFloat(this.value) || 0;
-            // Re-busca custo médio atual do insumo para refletir possíveis reajustes
-            var _ingAtual = _pmIngredientes[i].insumoId
-              ? _pmInsumos.filter(function(x) { return x.id === _pmIngredientes[i].insumoId; })[0]
-              : null;
-            if (_ingAtual) { _pmIngredientes[i].custoUnit = _ingAtual.custoMedio || 0; }
-            _pmIngredientes[i].custoTotal = Math.round(_pmIngredientes[i].quantidade * (_pmIngredientes[i].custoUnit || 0) * 10000) / 10000;
+            var _qtd = parseFloat(this.value) || 0;
+            _pmIngredientes[i].quantidade = _qtd;
+            // Re-busca custo atual pelo ID ou nome para refletir reajustes
+            var _ingRef = null;
+            if (_pmIngredientes[i].insumoId) {
+              _ingRef = _pmInsumos.filter(function(x) { return x.id === _pmIngredientes[i].insumoId; })[0];
+            }
+            if ((!_ingRef || !(parseFloat(_ingRef.custoMedio) > 0)) && _pmIngredientes[i].insumoNome) {
+              var _byN = _pmInsumos.filter(function(x) {
+                return x.nome.toLowerCase() === _pmIngredientes[i].insumoNome.toLowerCase() && parseFloat(x.custoMedio) > 0;
+              }).sort(function(a, b) { return (b.custoMedio || 0) - (a.custoMedio || 0); });
+              if (_byN.length) _ingRef = _byN[0];
+            }
+            if (_ingRef) { _pmIngredientes[i].custoUnit = parseFloat(_ingRef.custoMedio) || 0; }
+            _pmIngredientes[i].custoTotal = Math.round(_qtd * (_pmIngredientes[i].custoUnit || 0) * 10000) / 10000;
             ce.textContent = fmtMoney(_pmIngredientes[i].custoTotal);
             _pmUpdateTotal();
           };

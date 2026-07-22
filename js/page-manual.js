@@ -1,7 +1,10 @@
 // ── PAGE MANUAL DE OPERAÇÃO — P.O.P ──────────────────────────────────────────
 
 var _manualBusca = '';
-var _manualDept  = null; // null = todos
+var _manualDept  = null;
+var _manualTab   = 'artigos';   // 'artigos' | 'departamentos'
+var _clSelDept   = 'cozinha';   // dept selecionado na aba Departamentos
+var _clEdits     = {};          // edições em andamento { 'deptId.tipo.idx': texto }
 
 var MANUAL_DEPTS = [
   { id: 'cozinha',      label: '🍔 Cozinha' },
@@ -30,7 +33,50 @@ var MANUAL_CATS = [
 function renderManual() {
   var artigos = (state.manualArtigos || []).filter(function(a) { return a.profile === state.profile; });
 
-  // Filtro de busca
+  // Tabs
+  function mTab(id, label) {
+    return btn('tab-btn' + (_manualTab === id ? ' active' : ''), label, function() {
+      _manualTab = id;
+      setState({});
+    });
+  }
+  var tabsRow = div('tabs-row', [
+    mTab('artigos',       '📝 Artigos & Procedimentos'),
+    mTab('departamentos', '✅ Checklists de Abertura/Fechamento'),
+  ]);
+
+  // Header
+  var header = el('div', { class: 'manual-header' }, [
+    el('div', {}, [
+      el('h2', { style: { margin: '0 0 2px', fontSize: '1.25rem', fontWeight: '700' } }, '📖 Manual de Operação (P.O.P)'),
+      el('p', { style: { margin: '0', fontSize: '0.82rem', color: 'var(--text-muted)' } },
+        'Procedimento Operacional Padrão · ' + artigos.length + ' artigo' + (artigos.length !== 1 ? 's' : '')),
+    ]),
+    _manualTab === 'artigos'
+      ? btn('btn-primary', '+ Novo Artigo', function() {
+          setState({ manualModal: { novo: true, departamento: _manualDept || 'cozinha', categoria: 'Procedimento Operacional', titulo: '', conteudo: '' } });
+        })
+      : null,
+  ].filter(Boolean));
+
+  var wrap = div('page-section', [header, tabsRow]);
+
+  if (_manualTab === 'artigos') {
+    wrap.appendChild(_manualArtigosTab(artigos));
+  } else {
+    wrap.appendChild(_manualDeptTab());
+  }
+
+  if (state.manualModal) {
+    wrap.appendChild(_manualModal(state.manualModal));
+  }
+
+  return wrap;
+}
+
+// ── ABA: ARTIGOS ──────────────────────────────────────────────────────────────
+
+function _manualArtigosTab(artigos) {
   var filtrados = artigos;
   if (_manualBusca) {
     var q = _manualBusca.toLowerCase();
@@ -44,85 +90,283 @@ function renderManual() {
     filtrados = filtrados.filter(function(a) { return a.departamento === _manualDept; });
   }
 
-  // Sidebar — departamentos + artigos
+  var buscaInp = el('input', {
+    type: 'search', placeholder: '🔍 Buscar procedimentos...', value: _manualBusca, class: 'manual-search',
+  }, []);
+  buscaInp.oninput = function() { _manualBusca = this.value; setState({}); };
+
   var sidebarItems = [];
   MANUAL_DEPTS.forEach(function(dept) {
     var itens = filtrados.filter(function(a) { return a.departamento === dept.id; });
     if (_manualBusca && !itens.length) return;
-
     var deptBtn = el('div', {
       class: 'manual-dept-hdr' + (_manualDept === dept.id ? ' active' : ''),
-      onclick: function() {
-        _manualDept = _manualDept === dept.id ? null : dept.id;
-        setState({});
-      },
+      onclick: function() { _manualDept = _manualDept === dept.id ? null : dept.id; setState({}); },
     }, [
       el('span', {}, dept.label),
       el('span', { class: 'manual-dept-count' }, String(artigos.filter(function(a) { return a.departamento === dept.id; }).length)),
     ]);
     sidebarItems.push(deptBtn);
-
     if (_manualDept === dept.id || _manualBusca) {
       itens.forEach(function(a) {
         var isSelected = state.manualSel === a.id;
-        var itemEl = el('div', {
+        sidebarItems.push(el('div', {
           class: 'manual-article-link' + (isSelected ? ' active' : ''),
           onclick: function() { setState({ manualSel: a.id }); },
         }, [
           el('span', { class: 'manual-link-cat' }, a.categoria || ''),
           el('span', { class: 'manual-link-titulo' }, a.titulo || ''),
-        ]);
-        sidebarItems.push(itemEl);
+        ]));
       });
     }
   });
 
   if (!sidebarItems.length) {
     sidebarItems.push(el('div', { style: { padding: '20px 12px', color: 'var(--text-muted)', fontSize: '0.83rem' } },
-      _manualBusca ? 'Nenhum resultado para "' + _manualBusca + '"' : 'Nenhum artigo criado ainda.'));
+      _manualBusca ? 'Nenhum resultado.' : 'Nenhum artigo criado ainda.'));
   }
 
-  var sidebar = el('div', { class: 'manual-sidebar' }, sidebarItems);
-
-  // Conteúdo — artigo selecionado ou empty state
   var sel = state.manualSel ? artigos.find(function(a) { return a.id === state.manualSel; }) : null;
-  var mainContent = sel ? _manualViewArticle(sel) : _manualEmptyState();
 
-  var layout = el('div', { class: 'manual-layout' }, [sidebar, mainContent]);
-
-  // Header
-  var buscaInp = el('input', {
-    type: 'search',
-    placeholder: '🔍 Buscar procedimentos...',
-    value: _manualBusca,
-    class: 'manual-search',
-  }, []);
-  buscaInp.oninput = function() { _manualBusca = this.value; setState({}); };
-
-  var header = el('div', { class: 'manual-header' }, [
-    el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' } }, [
-      el('div', {}, [
-        el('h2', { style: { margin: '0 0 2px', fontSize: '1.25rem', fontWeight: '700' } }, '📖 Manual de Operação'),
-        el('p', { style: { margin: '0', fontSize: '0.82rem', color: 'var(--text-muted)' } },
-          artigos.length + ' procedimento' + (artigos.length !== 1 ? 's' : '') + ' · P.O.P — Procedimento Operacional Padrão'),
-      ]),
-      buscaInp,
+  var wrap = el('div', {}, [
+    el('div', { style: { marginBottom: '10px' } }, [buscaInp]),
+    el('div', { class: 'manual-layout' }, [
+      el('div', { class: 'manual-sidebar' }, sidebarItems),
+      sel ? _manualViewArticle(sel) : _manualEmptyState(),
     ]),
-    btn('btn-primary', '+ Novo Artigo', function() {
-      setState({ manualModal: { novo: true, departamento: _manualDept || 'cozinha', categoria: 'Procedimento Operacional', titulo: '', conteudo: '' } });
-    }),
   ]);
-
-  var wrap = div('page-section', [header, layout]);
-
-  // Modal de edição
-  if (state.manualModal) {
-    var modal = _manualModal(state.manualModal);
-    wrap.appendChild(modal);
-  }
-
   return wrap;
 }
+
+// ── ABA: DEPARTAMENTOS / CHECKLISTS ──────────────────────────────────────────
+
+function _manualDeptTab() {
+  var cls = state.manualChecklists || {};
+  var dept = MANUAL_DEPTS.find(function(d) { return d.id === _clSelDept; }) || MANUAL_DEPTS[0];
+
+  // Sidebar de departamentos
+  var sideItems = MANUAL_DEPTS.map(function(d) {
+    var clDept = cls[d.id] || {};
+    var totalA = (clDept.abertura  || []).length;
+    var totalF = (clDept.fechamento || []).length;
+    var isActive = _clSelDept === d.id;
+    return el('div', {
+      class: 'manual-dept-hdr' + (isActive ? ' active' : ''),
+      onclick: function() { _clSelDept = d.id; setState({}); },
+    }, [
+      el('span', {}, d.label),
+      el('span', { class: 'manual-dept-count' }, totalA + '/' + totalF),
+    ]);
+  });
+
+  var clDept  = cls[dept.id] || {};
+  var abertura  = clDept.abertura  || [];
+  var fechamento = clDept.fechamento || [];
+
+  function salvarTipo(tipo, itens) {
+    var novo = Object.assign({}, cls);
+    if (!novo[dept.id]) novo[dept.id] = {};
+    novo[dept.id] = Object.assign({}, novo[dept.id]);
+    novo[dept.id][tipo] = itens;
+    lsSet('manualChecklists', novo);
+    setState({ manualChecklists: novo });
+    scheduleSave();
+  }
+
+  function addItem(tipo, itens) {
+    var txt = (document.getElementById('cl-add-' + tipo) || {}).value || '';
+    if (!txt.trim()) return;
+    var novaLista = itens.concat([{ id: uid(), texto: txt.trim() }]);
+    salvarTipo(tipo, novaLista);
+  }
+
+  function removeItem(tipo, itens, idx) {
+    var novaLista = itens.filter(function(_, i) { return i !== idx; });
+    salvarTipo(tipo, novaLista);
+  }
+
+  function saveEdits(tipo, itens) {
+    var novaLista = itens.map(function(item, i) {
+      var key = dept.id + '.' + tipo + '.' + i;
+      return _clEdits[key] !== undefined
+        ? Object.assign({}, item, { texto: _clEdits[key] })
+        : item;
+    });
+    // Limpa edições desse bloco
+    itens.forEach(function(_, i) { delete _clEdits[dept.id + '.' + tipo + '.' + i]; });
+    salvarTipo(tipo, novaLista);
+  }
+
+  function buildSection(tipo, itens, corLabel, icon) {
+    var rows = itens.map(function(item, i) {
+      var key = dept.id + '.' + tipo + '.' + i;
+      var inp = el('input', {
+        type: 'text',
+        value: item.texto || '',
+        class: 'cl-item-input',
+        placeholder: 'Descrição da tarefa...',
+      }, []);
+      inp.oninput = function() { _clEdits[key] = this.value; };
+      inp.onblur  = function() { saveEdits(tipo, itens); };
+
+      var delBtn = el('button', { class: 'cl-del-btn', type: 'button', title: 'Remover' }, '✕');
+      delBtn.onmousedown = function(e) { e.preventDefault(); }; // evita blur antes do click
+      delBtn.onclick = function() { removeItem(tipo, itens, i); };
+
+      return el('div', { class: 'cl-item-row' }, [
+        el('span', { class: 'cl-num' }, String(i + 1)),
+        el('span', { class: 'cl-check-box' }, '☐'),
+        inp,
+        delBtn,
+      ]);
+    });
+
+    // Linha de adicionar
+    var addInp = el('input', {
+      id: 'cl-add-' + tipo, type: 'text', class: 'cl-add-input',
+      placeholder: 'Nova tarefa... (Enter para adicionar)',
+    }, []);
+    addInp.onkeydown = function(e) { if (e.key === 'Enter') { addItem(tipo, itens); } };
+    var addBtn = btn('btn-secondary cl-add-btn', '+ Adicionar', function() { addItem(tipo, itens); });
+
+    return el('div', { class: 'cl-section' }, [
+      el('div', { class: 'cl-section-header' }, [
+        el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
+          el('span', { class: 'cl-section-icon' }, icon),
+          el('h3', { class: 'cl-section-title', style: { color: corLabel } }, tipo === 'abertura' ? 'Checklist de Abertura' : 'Checklist de Fechamento'),
+          el('span', { class: 'manual-dept-count' }, String(itens.length) + ' iten' + (itens.length !== 1 ? 's' : 's')),
+        ]),
+        el('div', { style: { display: 'flex', gap: '8px' } }, [
+          btn('btn-secondary cl-print-btn', '🖨️ Imprimir PDF', function() {
+            _clPrint(dept, tipo, itens);
+          }),
+        ]),
+      ]),
+      rows.length ? el('div', { class: 'cl-items' }, rows) : el('div', { class: 'cl-empty-hint' }, 'Nenhuma tarefa ainda. Adicione a primeira abaixo.'),
+      el('div', { class: 'cl-add-row' }, [addInp, addBtn]),
+    ]);
+  }
+
+  var btnPrintAmbos = btn('btn-primary', '🖨️ Imprimir Abertura + Fechamento', function() {
+    _clPrintAmbos(dept, abertura, fechamento);
+  });
+
+  var mainContent = el('div', { class: 'cl-main' }, [
+    el('div', { class: 'cl-dept-title' }, [
+      el('h2', { style: { margin: '0 0 4px', fontSize: '1.1rem', fontWeight: '700' } }, dept.label),
+      el('p', { style: { margin: '0', fontSize: '0.82rem', color: 'var(--text-muted)' } },
+        abertura.length + ' itens de abertura · ' + fechamento.length + ' itens de fechamento'),
+      el('div', { style: { marginTop: '10px' } }, [btnPrintAmbos]),
+    ]),
+    buildSection('abertura',   abertura,   'var(--success,#22a047)', '🌅'),
+    buildSection('fechamento', fechamento, 'var(--primary)',          '🌙'),
+  ]);
+
+  return el('div', { class: 'manual-layout', style: { minHeight: '560px' } }, [
+    el('div', { class: 'manual-sidebar' }, sideItems),
+    mainContent,
+  ]);
+}
+
+// ── IMPRESSÃO CHECKLIST ───────────────────────────────────────────────────────
+
+function _clLogoHTML() {
+  var ed = state.empresaData || {};
+  var logo = ed.logo || ed.logoUrl || '';
+  if (logo) return '<img src="' + logo + '" style="max-height:80px;max-width:200px;object-fit:contain;" alt="Logo">';
+  var nome = ed.nome || 'Artt Burger';
+  return '<div style="font-size:1.8rem;font-weight:900;letter-spacing:-0.03em;">' + nome + '</div>';
+}
+
+function _clPrintCSS() {
+  return [
+    '@page{size:A4 portrait;margin:18mm 16mm;}',
+    'body{font-family:Arial,sans-serif;color:#000;font-size:10pt;line-height:1.4;margin:0;padding:0;}',
+    '.pg{max-width:170mm;margin:0 auto;}',
+    '.logo-area{text-align:center;padding-bottom:10px;border-bottom:3px solid #000;margin-bottom:12px;}',
+    '.empresa-nome{font-size:9pt;text-transform:uppercase;letter-spacing:0.12em;color:#333;margin-top:4px;}',
+    '.doc-type{font-size:7pt;color:#666;}',
+    '.titulo-checklist{text-align:center;font-size:14pt;font-weight:900;text-transform:uppercase;letter-spacing:0.06em;margin:14px 0 4px;}',
+    '.dept-label{text-align:center;font-size:10pt;color:#333;margin-bottom:12px;}',
+    '.info-bar{display:flex;gap:16px;border:1px solid #000;border-radius:4px;padding:8px 12px;margin-bottom:12px;font-size:9pt;}',
+    '.info-field{flex:1;}',
+    '.info-field label{font-size:7.5pt;text-transform:uppercase;letter-spacing:0.06em;color:#555;display:block;margin-bottom:2px;}',
+    '.info-line{border-bottom:1px solid #777;min-height:18px;display:block;}',
+    'table{width:100%;border-collapse:collapse;margin-bottom:14px;}',
+    'thead th{background:#000;color:#fff;padding:5px 8px;font-size:8.5pt;text-align:left;}',
+    'thead th.c{text-align:center;}',
+    'tbody tr{border-bottom:1px solid #ccc;}',
+    'tbody tr:nth-child(even){background:#f5f5f5;}',
+    'tbody td{padding:5px 8px;font-size:9pt;vertical-align:middle;}',
+    'td.num{width:24px;text-align:center;color:#555;font-size:8pt;}',
+    'td.chk{width:26px;text-align:center;font-size:12pt;}',
+    '.assinaturas{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px;padding-top:12px;border-top:1px solid #ccc;}',
+    '.ass-bloco label{font-size:7.5pt;text-transform:uppercase;letter-spacing:0.06em;color:#555;display:block;margin-bottom:2px;}',
+    '.ass-line{border-bottom:1px solid #777;margin-bottom:10px;min-height:22px;}',
+    '.rodape{margin-top:18px;padding-top:8px;border-top:1px solid #ccc;font-size:7.5pt;color:#888;display:flex;justify-content:space-between;}',
+    '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}',
+  ].join('');
+}
+
+function _clBuildTableHTML(itens) {
+  if (!itens.length) return '<p style="color:#999;text-align:center;">Nenhuma tarefa cadastrada.</p>';
+  var rows = itens.map(function(item, i) {
+    return '<tr><td class="num">' + (i + 1) + '</td><td>' + _esc(item.texto || '') + '</td><td class="chk">☐</td></tr>';
+  }).join('');
+  return '<table><thead><tr><th style="width:28px;" class="c">#</th><th>Tarefa</th><th style="width:36px;" class="c">✓</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+function _clPageHTML(dept, tipo, itens) {
+  var ed      = state.empresaData || {};
+  var empresa = ed.nome || 'Artt Burger';
+  var tipoLabel = tipo === 'abertura' ? 'ABERTURA' : 'FECHAMENTO';
+  var tipoIcon  = tipo === 'abertura' ? '🌅' : '🌙';
+  return '<div class="pg">' +
+    '<div class="logo-area">' + _clLogoHTML() +
+    '<div class="empresa-nome">' + _esc(empresa) + '</div>' +
+    '<div class="doc-type">P.O.P — Manual de Operação</div>' +
+    '</div>' +
+    '<div class="titulo-checklist">' + tipoIcon + ' Checklist de ' + tipoLabel + '</div>' +
+    '<div class="dept-label">Departamento: <strong>' + _esc(dept.label) + '</strong></div>' +
+    '<div class="info-bar">' +
+    '<div class="info-field"><label>Data</label><span class="info-line"></span></div>' +
+    '<div class="info-field"><label>Turno</label><span class="info-line"></span></div>' +
+    '<div class="info-field"><label>Responsável</label><span class="info-line"></span></div>' +
+    '</div>' +
+    _clBuildTableHTML(itens) +
+    '<div class="assinaturas">' +
+    '<div class="ass-bloco"><label>Assinatura do Responsável</label><div class="ass-line"></div><label>Data</label><div class="ass-line"></div></div>' +
+    '<div class="ass-bloco"><label>Visto do Supervisor</label><div class="ass-line"></div><label>Data</label><div class="ass-line"></div></div>' +
+    '</div>' +
+    '<div class="rodape"><span>' + _esc(empresa) + ' · Documento controlado — P.O.P</span><span>Versão: ' + today() + '</span></div>' +
+    '</div>';
+}
+
+function _clPrint(dept, tipo, itens) {
+  if (!itens.length) { showToast('Adicione pelo menos um item antes de imprimir.', 'error'); return; }
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Checklist ' + dept.label + '</title>' +
+    '<style>' + _clPrintCSS() + '</style></head><body>' +
+    _clPageHTML(dept, tipo, itens) +
+    '</body></html>';
+  var w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); setTimeout(function() { w.print(); }, 400); }
+}
+
+function _clPrintAmbos(dept, abertura, fechamento) {
+  if (!abertura.length && !fechamento.length) { showToast('Adicione itens antes de imprimir.', 'error'); return; }
+  var pages = '';
+  if (abertura.length)  pages += _clPageHTML(dept, 'abertura',   abertura);
+  if (fechamento.length) {
+    if (abertura.length) pages += '<div style="page-break-before:always;"></div>';
+    pages += _clPageHTML(dept, 'fechamento', fechamento);
+  }
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Checklists ' + dept.label + '</title>' +
+    '<style>' + _clPrintCSS() + '</style></head><body>' + pages + '</body></html>';
+  var w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); setTimeout(function() { w.print(); }, 400); }
+}
+
+function _esc(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ── EMPTY STATE ───────────────────────────────────────────────────────────────
 
@@ -131,7 +375,7 @@ function _manualEmptyState() {
     el('div', { style: { fontSize: '3rem', marginBottom: '12px' } }, '📖'),
     el('h3', { style: { margin: '0 0 8px', fontWeight: '600' } }, 'Comece a construir o seu Manual'),
     el('p', { style: { margin: '0 0 20px', color: 'var(--text-muted)', maxWidth: '380px', lineHeight: '1.6' } },
-      'Documente cada procedimento do negócio — desde como operar um equipamento até o padrão de atendimento ao cliente. Essencial para treinamentos, filiais e franquias.'),
+      'Documente cada procedimento do negócio. Essencial para treinamentos, filiais e franquias.'),
     el('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', maxWidth: '320px' } }, [
       _dica('🍔', 'Como preparar cada produto do cardápio'),
       _dica('🛎️', 'Script de atendimento ao cliente'),
@@ -149,8 +393,7 @@ function _manualEmptyState() {
 
 function _dica(icon, texto) {
   return el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', padding: '6px 10px', background: 'var(--surface)', borderRadius: '6px' } }, [
-    el('span', {}, icon),
-    el('span', {}, texto),
+    el('span', {}, icon), el('span', {}, texto),
   ]);
 }
 
@@ -159,7 +402,6 @@ function _dica(icon, texto) {
 function _manualViewArticle(artigo) {
   var dept = MANUAL_DEPTS.find(function(d) { return d.id === artigo.departamento; });
   var deptLabel = dept ? dept.label : artigo.departamento;
-
   var rendered = _renderMarkdown(artigo.conteudo || '');
 
   var header = el('div', { class: 'manual-article-header' }, [
@@ -171,40 +413,28 @@ function _manualViewArticle(artigo) {
     el('div', { class: 'manual-article-meta' }, [
       artigo.criadoEm ? el('span', {}, '📅 Criado em ' + artigo.criadoEm) : null,
       artigo.atualizadoEm && artigo.atualizadoEm !== artigo.criadoEm
-        ? el('span', {}, ' · Atualizado em ' + artigo.atualizadoEm)
-        : null,
+        ? el('span', {}, ' · Atualizado em ' + artigo.atualizadoEm) : null,
     ].filter(Boolean)),
   ]);
 
   var actions = el('div', { class: 'manual-article-actions' }, [
-    btn('btn-secondary', '✏️ Editar', function() {
-      setState({ manualModal: Object.assign({}, artigo) });
-    }),
+    btn('btn-secondary', '✏️ Editar', function() { setState({ manualModal: Object.assign({}, artigo) }); }),
     btn('btn-danger-outline', '🗑️ Excluir', function() {
       if (!confirm('Excluir "' + artigo.titulo + '"?')) return;
       var arr = (state.manualArtigos || []).filter(function(a) { return a.id !== artigo.id; });
-      lsSet('manualArtigos', arr);
-      setState({ manualArtigos: arr, manualSel: null });
-      scheduleSave();
+      lsSet('manualArtigos', arr); setState({ manualArtigos: arr, manualSel: null }); scheduleSave();
       showToast('Artigo excluído', 'error');
     }),
-    btn('btn-secondary', '🖨️ Imprimir', function() {
-      _manualPrint(artigo, deptLabel);
-    }),
+    btn('btn-secondary', '🖨️ Imprimir', function() { _manualPrint(artigo, deptLabel); }),
   ]);
 
-  return el('div', { class: 'manual-content-area' }, [
-    header,
-    actions,
-    el('div', { class: 'manual-article-body' }, [rendered]),
-  ]);
+  return el('div', { class: 'manual-content-area' }, [header, actions, el('div', { class: 'manual-article-body' }, [rendered])]);
 }
 
 // ── RENDER MARKDOWN SIMPLES ───────────────────────────────────────────────────
 
 function _renderMarkdown(texto) {
   if (!texto) return el('p', { style: { color: 'var(--text-muted)' } }, 'Nenhum conteúdo.');
-
   var linhas = texto.split('\n');
   var blocos = [];
   var listaAtual = null;
@@ -214,62 +444,35 @@ function _renderMarkdown(texto) {
   }
 
   function inlineFormat(txt) {
-    // **bold**
     var span = document.createElement('span');
     var parts = txt.split(/(\*\*[^*]+\*\*)/g);
     parts.forEach(function(p) {
       if (p.startsWith('**') && p.endsWith('**')) {
-        var b = document.createElement('strong');
-        b.textContent = p.slice(2, -2);
-        span.appendChild(b);
-      } else {
-        span.appendChild(document.createTextNode(p));
-      }
+        var b = document.createElement('strong'); b.textContent = p.slice(2, -2); span.appendChild(b);
+      } else { span.appendChild(document.createTextNode(p)); }
     });
     return span;
   }
 
   linhas.forEach(function(linha) {
-    if (linha.startsWith('# ')) {
-      flush();
-      blocos.push(el('h2', { class: 'manual-h1' }, linha.slice(2)));
-    } else if (linha.startsWith('## ')) {
-      flush();
-      blocos.push(el('h3', { class: 'manual-h2' }, linha.slice(3)));
-    } else if (linha.startsWith('### ')) {
-      flush();
-      blocos.push(el('h4', { class: 'manual-h3' }, linha.slice(4)));
-    } else if (linha.startsWith('> ')) {
-      flush();
-      blocos.push(el('div', { class: 'manual-callout' }, [inlineFormat(linha.slice(2))]));
-    } else if (linha.startsWith('⚠️') || linha.startsWith('ATENÇÃO:') || linha.startsWith('⚠ ')) {
-      flush();
-      blocos.push(el('div', { class: 'manual-warning' }, [inlineFormat(linha)]));
+    if (linha.startsWith('# '))          { flush(); blocos.push(el('h2', { class: 'manual-h1' }, linha.slice(2))); }
+    else if (linha.startsWith('## '))    { flush(); blocos.push(el('h3', { class: 'manual-h2' }, linha.slice(3))); }
+    else if (linha.startsWith('### '))   { flush(); blocos.push(el('h4', { class: 'manual-h3' }, linha.slice(4))); }
+    else if (linha.startsWith('> '))     { flush(); blocos.push(el('div', { class: 'manual-callout' }, [inlineFormat(linha.slice(2))])); }
+    else if (linha.startsWith('⚠️') || linha.startsWith('ATENÇÃO:') || linha.startsWith('⚠ ')) {
+      flush(); blocos.push(el('div', { class: 'manual-warning' }, [inlineFormat(linha)]));
     } else if (linha.startsWith('- ') || linha.startsWith('• ')) {
       if (!listaAtual) listaAtual = [];
-      var li = el('li', {}, [inlineFormat(linha.slice(2))]);
-      listaAtual.push(li);
+      listaAtual.push(el('li', {}, [inlineFormat(linha.slice(2))]));
     } else if (/^\d+\.\s/.test(linha)) {
-      flush();
-      if (!listaAtual) listaAtual = [];
-      var li2 = el('li', { class: 'manual-ol-item' }, [inlineFormat(linha.replace(/^\d+\.\s/, ''))]);
-      listaAtual.push(li2);
-    } else if (linha.trim() === '') {
-      flush();
-      blocos.push(el('div', { style: { height: '8px' } }, []));
-    } else if (linha.trim() === '---') {
-      flush();
-      blocos.push(el('hr', { class: 'manual-hr' }, []));
-    } else {
-      flush();
-      var p = el('p', { class: 'manual-p' }, [inlineFormat(linha)]);
-      blocos.push(p);
-    }
+      flush(); if (!listaAtual) listaAtual = [];
+      listaAtual.push(el('li', { class: 'manual-ol-item' }, [inlineFormat(linha.replace(/^\d+\.\s/, ''))]));
+    } else if (linha.trim() === '') { flush(); blocos.push(el('div', { style: { height: '8px' } }, [])); }
+    else if (linha.trim() === '---') { flush(); blocos.push(el('hr', { class: 'manual-hr' }, [])); }
+    else { flush(); blocos.push(el('p', { class: 'manual-p' }, [inlineFormat(linha)])); }
   });
   flush();
-
-  var container = el('div', { class: 'manual-rendered' }, blocos);
-  return container;
+  return el('div', { class: 'manual-rendered' }, blocos);
 }
 
 // ── MODAL DE EDIÇÃO ───────────────────────────────────────────────────────────
@@ -278,131 +481,90 @@ function _manualModal(artigo) {
   var isNovo = !!artigo.novo;
 
   function salvar() {
-    var titulo    = (document.getElementById('mop-titulo') || {}).value || '';
-    var dept      = (document.getElementById('mop-dept') || {}).value || 'geral';
-    var cat       = (document.getElementById('mop-cat') || {}).value || '';
-    var conteudo  = (document.getElementById('mop-conteudo') || {}).value || '';
-
+    var titulo   = (document.getElementById('mop-titulo')   || {}).value || '';
+    var dept     = (document.getElementById('mop-dept')     || {}).value || 'geral';
+    var cat      = (document.getElementById('mop-cat')      || {}).value || '';
+    var conteudo = (document.getElementById('mop-conteudo') || {}).value || '';
     if (!titulo.trim()) { showToast('Informe o título do artigo', 'error'); return; }
-
     var novo = Object.assign({}, artigo, {
-      id:          isNovo ? uid() : artigo.id,
-      profile:     state.profile,
-      titulo:      titulo.trim(),
-      departamento: dept,
-      categoria:   cat,
-      conteudo:    conteudo,
-      criadoEm:   isNovo ? today() : (artigo.criadoEm || today()),
-      atualizadoEm: today(),
+      id: isNovo ? uid() : artigo.id, profile: state.profile,
+      titulo: titulo.trim(), departamento: dept, categoria: cat, conteudo: conteudo,
+      criadoEm: isNovo ? today() : (artigo.criadoEm || today()), atualizadoEm: today(),
     });
     delete novo.novo;
-
     var arr = isNovo
       ? (state.manualArtigos || []).concat([novo])
       : (state.manualArtigos || []).map(function(a) { return a.id === novo.id ? novo : a; });
-
     lsSet('manualArtigos', arr);
     setState({ manualArtigos: arr, manualModal: null, manualSel: novo.id });
     scheduleSave();
     showToast(isNovo ? 'Artigo criado!' : 'Artigo atualizado!', 'success');
   }
 
-  // Toolbar de formatação
   function insText(antes, depois) {
-    var ta = document.getElementById('mop-conteudo');
-    if (!ta) return;
+    var ta = document.getElementById('mop-conteudo'); if (!ta) return;
     var s = ta.selectionStart, e = ta.selectionEnd;
     var sel = ta.value.slice(s, e) || 'texto';
     var ins = antes + sel + (depois || '');
     ta.value = ta.value.slice(0, s) + ins + ta.value.slice(e);
-    ta.focus();
-    ta.selectionStart = s + antes.length;
-    ta.selectionEnd   = s + antes.length + sel.length;
+    ta.focus(); ta.selectionStart = s + antes.length; ta.selectionEnd = s + antes.length + sel.length;
   }
 
   function insLinha(prefix) {
-    var ta = document.getElementById('mop-conteudo');
-    if (!ta) return;
+    var ta = document.getElementById('mop-conteudo'); if (!ta) return;
     var s = ta.selectionStart;
     var antes = ta.value.lastIndexOf('\n', s - 1) + 1;
     var linha = ta.value.slice(antes, s);
     if (!linha.startsWith(prefix)) {
       ta.value = ta.value.slice(0, antes) + prefix + ta.value.slice(antes);
-      ta.focus();
-      ta.selectionStart = ta.selectionEnd = s + prefix.length;
+      ta.focus(); ta.selectionStart = ta.selectionEnd = s + prefix.length;
     }
   }
 
   var toolbar = el('div', { class: 'mop-toolbar' }, [
-    _toolBtn('H1', function() { insLinha('# '); },   '# Título de seção'),
-    _toolBtn('H2', function() { insLinha('## '); },  '## Subtítulo'),
-    _toolBtn('B',  function() { insText('**', '**'); }, 'Negrito'),
-    _toolBtn('—',  function() { insLinha('- '); },   '- Item de lista'),
-    _toolBtn('1.', function() {
-      var ta = document.getElementById('mop-conteudo');
-      if (!ta) return;
-      var s = ta.selectionStart;
-      var antes = ta.value.lastIndexOf('\n', s - 1) + 1;
-      ta.value = ta.value.slice(0, antes) + '1. ' + ta.value.slice(antes);
-      ta.focus();
-    }, 'Lista numerada'),
-    _toolBtn('💡', function() { insLinha('> '); },   '> Observação / dica'),
-    _toolBtn('⚠️', function() {
-      var ta = document.getElementById('mop-conteudo');
-      if (!ta) return;
-      var s = ta.selectionStart;
-      var ins = '\n⚠️ ATENÇÃO: ';
+    _toolBtn('H1',  function() { insLinha('# '); },    '# Título'),
+    _toolBtn('H2',  function() { insLinha('## '); },   '## Subtítulo'),
+    _toolBtn('B',   function() { insText('**','**'); }, 'Negrito'),
+    _toolBtn('—',   function() { insLinha('- '); },    '- Lista'),
+    _toolBtn('1.',  function() {
+      var ta = document.getElementById('mop-conteudo'); if (!ta) return;
+      var s = ta.selectionStart; var a = ta.value.lastIndexOf('\n', s - 1) + 1;
+      ta.value = ta.value.slice(0, a) + '1. ' + ta.value.slice(a); ta.focus();
+    }, 'Numerada'),
+    _toolBtn('💡',  function() { insLinha('> '); },    '> Observação'),
+    _toolBtn('⚠️',  function() {
+      var ta = document.getElementById('mop-conteudo'); if (!ta) return;
+      var s = ta.selectionStart; var ins = '\n⚠️ ATENÇÃO: ';
       ta.value = ta.value.slice(0, s) + ins + ta.value.slice(s);
-      ta.focus();
-      ta.selectionStart = ta.selectionEnd = s + ins.length;
-    }, 'Aviso de atenção'),
+      ta.focus(); ta.selectionStart = ta.selectionEnd = s + ins.length;
+    }, 'Aviso'),
     _toolBtn('---', function() {
-      var ta = document.getElementById('mop-conteudo');
-      if (!ta) return;
-      var s = ta.selectionStart;
-      var ins = '\n---\n';
+      var ta = document.getElementById('mop-conteudo'); if (!ta) return;
+      var s = ta.selectionStart; var ins = '\n---\n';
       ta.value = ta.value.slice(0, s) + ins + ta.value.slice(s);
-      ta.focus();
-      ta.selectionStart = ta.selectionEnd = s + ins.length;
+      ta.focus(); ta.selectionStart = ta.selectionEnd = s + ins.length;
     }, 'Separador'),
   ]);
 
-  // Selects de dept e categoria
   var deptSel = el('select', { id: 'mop-dept', class: 'mop-input' },
-    MANUAL_DEPTS.map(function(d) { return el('option', { value: d.id }, d.label); })
-  );
+    MANUAL_DEPTS.map(function(d) { return el('option', { value: d.id }, d.label); }));
   deptSel.value = artigo.departamento || 'cozinha';
 
   var catSel = el('select', { id: 'mop-cat', class: 'mop-input' },
-    MANUAL_CATS.map(function(c) { return el('option', { value: c }, c); })
-  );
+    MANUAL_CATS.map(function(c) { return el('option', { value: c }, c); }));
   catSel.value = artigo.categoria || 'Procedimento Operacional';
 
-  var tituloInp = el('input', {
-    id: 'mop-titulo', type: 'text', placeholder: 'Título do procedimento...',
-    value: artigo.titulo || '',
-    class: 'mop-input mop-titulo',
-  }, []);
-
-  var conteudoTa = el('textarea', {
-    id: 'mop-conteudo',
-    class: 'mop-textarea',
-    placeholder: _manualPlaceholder(),
-    rows: 18,
-  }, []);
+  var tituloInp = el('input', { id: 'mop-titulo', type: 'text', placeholder: 'Título do procedimento...', value: artigo.titulo || '', class: 'mop-input mop-titulo' }, []);
+  var conteudoTa = el('textarea', { id: 'mop-conteudo', class: 'mop-textarea', placeholder: _manualPlaceholder(), rows: 18 }, []);
   conteudoTa.value = artigo.conteudo || '';
 
   var guia = el('details', { class: 'mop-guide' }, [
     el('summary', {}, '📝 Dicas de formatação'),
     el('div', { class: 'mop-guide-body' }, [
-      _guideRow('# Título',      'Seção principal'),
-      _guideRow('## Subtítulo',  'Subseção'),
-      _guideRow('**negrito**',   'Texto em negrito'),
-      _guideRow('- item',        'Item de lista'),
-      _guideRow('1. passo',      'Lista numerada'),
-      _guideRow('> dica',        'Observação destacada'),
-      _guideRow('⚠️ ATENÇÃO:',    'Aviso importante'),
-      _guideRow('---',           'Linha separadora'),
+      _guideRow('# Título', 'Seção'), _guideRow('## Subtítulo', 'Subseção'),
+      _guideRow('**negrito**', 'Negrito'), _guideRow('- item', 'Lista'),
+      _guideRow('1. passo', 'Numerada'), _guideRow('> dica', 'Observação'),
+      _guideRow('⚠️ ATENÇÃO:', 'Aviso'), _guideRow('---', 'Separador'),
     ]),
   ]);
 
@@ -416,32 +578,21 @@ function _manualModal(artigo) {
       ]),
       el('div', { class: 'mop-form' }, [
         el('div', { class: 'mop-row2' }, [
-          el('div', {}, [
-            el('label', { class: 'mop-label' }, 'Departamento'),
-            deptSel,
-          ]),
-          el('div', {}, [
-            el('label', { class: 'mop-label' }, 'Categoria'),
-            catSel,
-          ]),
+          el('div', {}, [el('label', { class: 'mop-label' }, 'Departamento'), deptSel]),
+          el('div', {}, [el('label', { class: 'mop-label' }, 'Categoria'), catSel]),
         ]),
-        el('label', { class: 'mop-label' }, 'Título'),
-        tituloInp,
+        el('label', { class: 'mop-label' }, 'Título'), tituloInp,
         el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', marginBottom: '4px' } }, [
-          el('label', { class: 'mop-label', style: { margin: 0 } }, 'Conteúdo'),
-          toolbar,
+          el('label', { class: 'mop-label', style: { margin: 0 } }, 'Conteúdo'), toolbar,
         ]),
-        conteudoTa,
-        guia,
+        conteudoTa, guia,
       ]),
       el('div', { class: 'modal-footer' }, [
         !isNovo ? btn('btn-danger-outline', '🗑️ Excluir', function() {
           if (!confirm('Excluir "' + artigo.titulo + '"?')) return;
           var arr = (state.manualArtigos || []).filter(function(a) { return a.id !== artigo.id; });
-          lsSet('manualArtigos', arr);
-          setState({ manualArtigos: arr, manualModal: null, manualSel: null });
-          scheduleSave();
-          showToast('Artigo excluído', 'error');
+          lsSet('manualArtigos', arr); setState({ manualArtigos: arr, manualModal: null, manualSel: null });
+          scheduleSave(); showToast('Artigo excluído', 'error');
         }) : null,
         el('div', { style: { display: 'flex', gap: '8px', marginLeft: 'auto' } }, [
           btn('btn-secondary', 'Cancelar', function() { setState({ manualModal: null }); }),
@@ -450,78 +601,60 @@ function _manualModal(artigo) {
       ].filter(Boolean)),
     ]),
   ]);
-
   return overlay;
 }
 
 function _toolBtn(label, onclick, title) {
   var b = el('button', { class: 'mop-tool', title: title || label, type: 'button' }, label);
-  b.onclick = onclick;
-  return b;
+  b.onclick = onclick; return b;
 }
 
 function _guideRow(syntax, desc) {
-  return el('div', { class: 'mop-guide-row' }, [
-    el('code', {}, syntax),
-    el('span', {}, desc),
-  ]);
+  return el('div', { class: 'mop-guide-row' }, [el('code', {}, syntax), el('span', {}, desc)]);
 }
 
 function _manualPlaceholder() {
-  return '# Como operar a fritadeira\n\n## Antes de ligar\n- Verifique se o óleo está no nível correto\n- Limpe o cesto com pano seco\n\n## Ligando o equipamento\n1. Gire o botão para a temperatura desejada (180°C para batatas)\n2. Aguarde o indicador luminoso apagar (aprox. 5 min)\n\n> Nunca coloque alimentos molhados na fritadeira\n\n⚠️ ATENÇÃO: Trocar o óleo a cada 2 dias ou quando escurecer\n\n## Desligamento\n- Desligue 30 min antes do fechamento\n- Filtre o óleo após esfriar completamente';
+  return '# Como operar a fritadeira\n\n## Antes de ligar\n- Verifique se o óleo está no nível correto\n\n## Ligando o equipamento\n1. Gire o botão para 180°C\n2. Aguarde o indicador apagar (≈5 min)\n\n> Nunca coloque alimentos molhados\n\n⚠️ ATENÇÃO: Trocar óleo a cada 2 dias\n\n## Desligamento\n- Desligue 30 min antes do fechamento';
 }
 
-// ── IMPRESSÃO ─────────────────────────────────────────────────────────────────
+// ── IMPRESSÃO ARTIGO ──────────────────────────────────────────────────────────
 
 function _manualPrint(artigo, deptLabel) {
   var empresa = (state.empresaData || {}).nome || 'Artt Burger';
   var conteudo = _manualMarkdownToHTML(artigo.conteudo || '');
+  var logo = _clLogoHTML();
   var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + artigo.titulo + '</title>' +
-    '<style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;color:#000;line-height:1.6}' +
-    '.header{border-bottom:3px solid #000;padding-bottom:12px;margin-bottom:24px}' +
-    '.empresa{font-size:0.8rem;text-transform:uppercase;letter-spacing:0.1em;color:#555}' +
-    '.badges{display:flex;gap:8px;margin:8px 0;font-size:0.8rem}' +
-    '.badge{padding:2px 8px;border:1px solid #000;border-radius:3px}' +
-    'h1{margin:0 0 8px;font-size:1.5rem}' +
-    'h2{font-size:1.1rem;border-bottom:1px solid #ccc;padding-bottom:4px;margin-top:24px}' +
-    'h3{font-size:1rem;margin-top:16px}' +
+    '<style>@page{size:A4 portrait;margin:18mm 16mm;}body{font-family:Arial,sans-serif;max-width:170mm;margin:0 auto;color:#000;line-height:1.6;font-size:10pt;}' +
+    '.header{border-bottom:3px solid #000;padding-bottom:12px;margin-bottom:20px;text-align:center;}' +
+    '.empresa{font-size:8pt;text-transform:uppercase;letter-spacing:0.1em;color:#555;margin-top:4px;}' +
+    '.badges{display:flex;gap:8px;margin:8px 0;font-size:8pt;justify-content:center;}' +
+    '.badge{padding:2px 8px;border:1px solid #000;border-radius:3px;}' +
+    'h1{margin:0 0 8px;font-size:14pt;}h2{font-size:11pt;border-bottom:1px solid #ccc;padding-bottom:4px;margin-top:20px;}h3{font-size:10pt;margin-top:14px;}' +
     'ul,ol{padding-left:20px}li{margin-bottom:4px}' +
-    '.callout{background:#f0f0f0;border-left:4px solid #666;padding:10px 14px;margin:12px 0;font-style:italic}' +
-    '.warning{background:#fff3cd;border-left:4px solid #f90;padding:10px 14px;margin:12px 0;font-weight:bold}' +
-    'hr{border:none;border-top:1px solid #ccc;margin:16px 0}' +
-    '.footer{margin-top:40px;padding-top:12px;border-top:1px solid #ccc;font-size:0.75rem;color:#777;text-align:center}' +
-    '@media print{body{margin:20mm}}</style></head><body>' +
-    '<div class="header">' +
-    '<div class="empresa">📋 P.O.P — ' + empresa + '</div>' +
-    '<h1>' + artigo.titulo + '</h1>' +
-    '<div class="badges"><span class="badge">' + deptLabel + '</span><span class="badge">' + (artigo.categoria || '') + '</span></div>' +
-    '<div style="font-size:0.8rem;color:#555">Criado em ' + (artigo.criadoEm || '') + (artigo.atualizadoEm && artigo.atualizadoEm !== artigo.criadoEm ? ' · Atualizado em ' + artigo.atualizadoEm : '') + '</div>' +
-    '</div>' +
-    conteudo +
-    '<div class="footer">Documento gerado pelo sistema Financial Routine · ' + empresa + '</div>' +
-    '</body></html>';
-
+    '.callout{background:#f0f0f0;border-left:4px solid #666;padding:8px 12px;margin:10px 0;font-style:italic;}' +
+    '.warning{background:#fff3cd;border-left:4px solid #f90;padding:8px 12px;margin:10px 0;font-weight:bold;}' +
+    'hr{border:none;border-top:1px solid #ccc;margin:14px 0;}' +
+    '.footer{margin-top:36px;padding-top:8px;border-top:1px solid #ccc;font-size:7.5pt;color:#777;text-align:center;}' +
+    '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>' +
+    '<div class="header">' + logo +
+    '<div class="empresa">' + _esc(empresa) + ' · P.O.P — Procedimento Operacional Padrão</div>' +
+    '<h1>' + _esc(artigo.titulo) + '</h1>' +
+    '<div class="badges"><span class="badge">' + _esc(deptLabel) + '</span><span class="badge">' + _esc(artigo.categoria || '') + '</span></div>' +
+    '<div style="font-size:7.5pt;color:#555">Criado em ' + (artigo.criadoEm || '') + (artigo.atualizadoEm && artigo.atualizadoEm !== artigo.criadoEm ? ' · Atualizado em ' + artigo.atualizadoEm : '') + '</div>' +
+    '</div>' + conteudo +
+    '<div class="footer">' + _esc(empresa) + ' · Documento controlado · ' + today() + '</div></body></html>';
   var w = window.open('', '_blank');
-  if (w) { w.document.write(html); w.document.close(); w.print(); }
+  if (w) { w.document.write(html); w.document.close(); setTimeout(function() { w.print(); }, 400); }
 }
 
 function _manualMarkdownToHTML(texto) {
-  var html = '';
-  var linhas = texto.split('\n');
-  var inUl = false, inOl = false;
-
-  function closeList() {
-    if (inUl) { html += '</ul>'; inUl = false; }
-    if (inOl) { html += '</ol>'; inOl = false; }
-  }
-
-  function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-  function inl(t) { return esc(t).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>'); }
-
+  var html = ''; var linhas = texto.split('\n'); var inUl = false, inOl = false;
+  function closeList() { if (inUl) { html += '</ul>'; inUl = false; } if (inOl) { html += '</ol>'; inOl = false; } }
+  function inl(t) { return _esc(t).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>'); }
   linhas.forEach(function(l) {
-    if (l.startsWith('# '))       { closeList(); html += '<h2>' + inl(l.slice(2)) + '</h2>'; }
-    else if (l.startsWith('## ')) { closeList(); html += '<h3>' + inl(l.slice(3)) + '</h3>'; }
-    else if (l.startsWith('### ')){ closeList(); html += '<h4>' + inl(l.slice(4)) + '</h4>'; }
+    if (l.startsWith('# '))       { closeList(); html += '<h2>'  + inl(l.slice(2))  + '</h2>'; }
+    else if (l.startsWith('## ')) { closeList(); html += '<h3>'  + inl(l.slice(3))  + '</h3>'; }
+    else if (l.startsWith('### ')){ closeList(); html += '<h4>'  + inl(l.slice(4))  + '</h4>'; }
     else if (l.startsWith('> '))  { closeList(); html += '<div class="callout">' + inl(l.slice(2)) + '</div>'; }
     else if (l.startsWith('⚠️') || l.startsWith('⚠ ') || l.startsWith('ATENÇÃO:')) { closeList(); html += '<div class="warning">' + inl(l) + '</div>'; }
     else if (l.startsWith('- ') || l.startsWith('• ')) {
@@ -529,21 +662,23 @@ function _manualMarkdownToHTML(texto) {
       html += '<li>' + inl(l.slice(2)) + '</li>';
     } else if (/^\d+\.\s/.test(l)) {
       if (!inOl) { if (inUl) { html += '</ul>'; inUl = false; } html += '<ol>'; inOl = true; }
-      html += '<li>' + inl(l.replace(/^\d+\.\s/, '')) + '</li>';
+      html += '<li>' + inl(l.replace(/^\d+\.\s/,'')) + '</li>';
     } else if (l.trim() === '---') { closeList(); html += '<hr>'; }
-    else if (l.trim() === '')     { closeList(); }
-    else                          { closeList(); html += '<p>' + inl(l) + '</p>'; }
+    else if (l.trim() === '')      { closeList(); }
+    else                           { closeList(); html += '<p>' + inl(l) + '</p>'; }
   });
-  closeList();
-  return html;
+  closeList(); return html;
 }
 
 // ── CSS INJETADO ──────────────────────────────────────────────────────────────
 
 (function() {
+  if (document.getElementById('manual-styles')) return;
   var style = document.createElement('style');
+  style.id = 'manual-styles';
   style.textContent = [
-    '.manual-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;flex-wrap:wrap;}',
+    // Layout geral
+    '.manual-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px;flex-wrap:wrap;}',
     '.manual-search{padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:inherit;font-size:0.88rem;width:220px;outline:none;}',
     '.manual-search:focus{border-color:var(--primary);}',
     '.manual-layout{display:grid;grid-template-columns:240px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;min-height:520px;}',
@@ -573,11 +708,30 @@ function _manualMarkdownToHTML(texto) {
     '.manual-p{margin:0 0 10px;}',
     '.manual-list{margin:4px 0 10px;padding-left:20px;}',
     '.manual-list li{margin-bottom:4px;}',
-    '.manual-ol-item{margin-bottom:4px;}',
     '.manual-callout{background:rgba(var(--primary-rgb,0,120,255),0.07);border-left:4px solid var(--primary);padding:10px 14px;border-radius:0 6px 6px 0;margin:10px 0;font-style:italic;font-size:0.9rem;}',
     '.manual-warning{background:rgba(255,180,0,0.1);border-left:4px solid #f90;padding:10px 14px;border-radius:0 6px 6px 0;margin:10px 0;font-weight:600;font-size:0.9rem;}',
     '.manual-hr{border:none;border-top:1px solid var(--border);margin:16px 0;}',
-    // Modal
+    // Checklist / Departamentos
+    '.cl-main{padding:20px 24px;overflow-y:auto;flex:1;}',
+    '.cl-dept-title{margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);}',
+    '.cl-section{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;}',
+    '.cl-section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;}',
+    '.cl-section-icon{font-size:1.3rem;}',
+    '.cl-section-title{margin:0;font-size:1rem;font-weight:700;}',
+    '.cl-items{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}',
+    '.cl-item-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;background:var(--bg);border:1px solid var(--border);}',
+    '.cl-num{min-width:22px;text-align:center;font-size:0.75rem;color:var(--text-muted);font-weight:600;}',
+    '.cl-check-box{font-size:1rem;color:var(--text-muted);flex-shrink:0;}',
+    '.cl-item-input{flex:1;border:none;background:transparent;color:inherit;font-size:0.9rem;outline:none;padding:2px 0;}',
+    '.cl-del-btn{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.85rem;padding:2px 6px;border-radius:4px;flex-shrink:0;line-height:1;}',
+    '.cl-del-btn:hover{background:rgba(220,50,50,0.1);color:#dc3232;}',
+    '.cl-empty-hint{padding:16px;text-align:center;color:var(--text-muted);font-size:0.85rem;font-style:italic;}',
+    '.cl-add-row{display:flex;gap:8px;align-items:center;margin-top:8px;}',
+    '.cl-add-input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:inherit;font-size:0.88rem;outline:none;}',
+    '.cl-add-input:focus{border-color:var(--primary);}',
+    '.cl-add-btn{white-space:nowrap;font-size:0.82rem!important;padding:6px 12px!important;}',
+    '.cl-print-btn{font-size:0.82rem!important;padding:5px 12px!important;}',
+    // Modal artigo
     '.mop-modal{max-width:780px;width:95vw;max-height:92vh;display:flex;flex-direction:column;}',
     '.mop-form{flex:1;overflow-y:auto;padding:0 2px;}',
     '.mop-label{display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;margin-top:12px;}',
@@ -595,7 +749,7 @@ function _manualMarkdownToHTML(texto) {
     '.mop-guide-body{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-top:8px;padding:10px;background:var(--surface);border-radius:6px;}',
     '.mop-guide-row{display:flex;gap:8px;align-items:center;}',
     '.mop-guide-row code{background:var(--border);padding:1px 6px;border-radius:3px;font-size:0.78rem;white-space:nowrap;}',
-    '@media(max-width:600px){.manual-layout{grid-template-columns:1fr;}.manual-sidebar{border-right:none;border-bottom:1px solid var(--border);max-height:200px;}.mop-row2{grid-template-columns:1fr;}.mop-guide-body{grid-template-columns:1fr;}}',
+    '@media(max-width:600px){.manual-layout{grid-template-columns:1fr;}.manual-sidebar{border-right:none;border-bottom:1px solid var(--border);max-height:200px;}.mop-row2{grid-template-columns:1fr;}.mop-guide-body{grid-template-columns:1fr;}.cl-section-header{flex-direction:column;align-items:flex-start;}}',
   ].join('');
   document.head.appendChild(style);
 })();

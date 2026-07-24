@@ -725,6 +725,17 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
   box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'18px'}},
     isFechamento?'Conte as cédulas e moedas do caixa':'Conte as cédulas e moedas do caixa — padrão: '+fmtMoney(_CX_ABERTURA_PADRAO)));
 
+  // No ato do fechamento, o dev já pode importar o extrato/resumo da Stone
+  // pra conferir crédito/débito/pix antes de bater o martelo na contagem.
+  if(isFechamento&&_cxIsDev(session)){
+    var stoneBtnFech=el('button',{type:'button',style:{
+      width:'100%',background:'#0f766e',color:'#fff',border:'none',borderRadius:'10px',
+      padding:'12px',cursor:'pointer',fontSize:'13px',fontWeight:'700',marginBottom:'16px',
+    }},'💳 Importar Extrato Stone para conferência');
+    stoneBtnFech.onclick=function(){setState({cxStoneModal:{}});};
+    box.appendChild(stoneBtnFech);
+  }
+
   function calcTotal(){
     var t=0;
     _CEDULAS.forEach(function(c){t+=(parseInt(qtds[c.val.toFixed(2)])||0)*c.val;});
@@ -2076,13 +2087,6 @@ function _cxRenderImportVendasModal(session){
       box.appendChild(el('div',{style:{fontSize:'11px',color:'#64748b',marginBottom:'10px',lineHeight:'1.6'}},
         '⚠ Ao clicar em Concluir, os '+pendentes+' pedido(s) ainda pendente(s) serão lançados automaticamente no caixa com os dados sugeridos, para você conferir depois no fechamento do caixa.'));
     }
-
-    var stoneBtn=el('button',{type:'button',style:{
-      width:'100%',background:'#0f766e',color:'#fff',border:'none',borderRadius:'10px',
-      padding:'12px',cursor:'pointer',fontSize:'13px',fontWeight:'700',marginBottom:'10px',
-    }},'💳 Conferir Extrato Stone (Crédito/Débito/Pix)');
-    stoneBtn.onclick=function(){setState({cxStoneModal:{}});};
-    box.appendChild(stoneBtn);
 
     var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
     var trocarBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'← Trocar arquivo');

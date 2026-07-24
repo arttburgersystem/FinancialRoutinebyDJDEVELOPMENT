@@ -15,7 +15,14 @@ function _cxDiaPorData(dt){
   return aberto||todos[todos.length-1];
 }
 function _cxDiaAtual(){
-  return _cxDiaPorData(today());
+  return _cxDiaPorData(_cxDataAtiva());
+}
+
+// Data em que o kiosk está "operando". Normalmente é hoje; só o Desenvolvedor
+// pode trocar (modo retroativo, ex: lançar comandas físicas de um dia perdido).
+// Não é persistido -- sempre volta pra hoje ao recarregar o app.
+function _cxDataAtiva(){
+  return (state.cxSession&&_cxIsDev(state.cxSession)&&state.cxDataTrabalho)||today();
 }
 
 // Processa uma tecla do teclado numérico do PIN (clique no botão ou teclado físico)
@@ -210,11 +217,18 @@ function renderCaixaDiario(){
     userBtn.onclick=function(){setState({cxPickerOpen:!pickerOpen});};
     hdr.appendChild(userBtn);
     if(_cxIsDev(session)){
+      var retroAtivo=state.cxDataTrabalho&&state.cxDataTrabalho!==today();
+      var retroBtn=el('button',{title:'Lançamento retroativo (data passada)',style:{
+        background:retroAtivo?'#fbbf24':'#334155',color:retroAtivo?'#1e293b':'#f1f5f9',border:'none',borderRadius:'10px',
+        padding:'10px 14px',cursor:'pointer',fontSize:'16px',flexShrink:'0',fontWeight:'800',
+      }},'🕓');
+      retroBtn.onclick=function(){setState({cxPickerOpen:false,cxRetroModal:{data:state.cxDataTrabalho||today()}});};
+      hdr.appendChild(retroBtn);
       var relBtn=el('button',{title:'Relatório de vendas (PDF)',style:{
         background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'10px',
         padding:'10px 14px',cursor:'pointer',fontSize:'16px',flexShrink:'0',
       }},'📄');
-      relBtn.onclick=function(){setState({cxPickerOpen:false,cxRelatorioModal:{data:today()}});};
+      relBtn.onclick=function(){setState({cxPickerOpen:false,cxRelatorioModal:{data:_cxDataAtiva()}});};
       hdr.appendChild(relBtn);
       var gearBtn=el('button',{title:'Gerenciar formas de pagamento',style:{
         background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'10px',
@@ -230,11 +244,11 @@ function renderCaixaDiario(){
   }},session?'⬅ Sair':'✕ Fechar');
   exitBtn.onclick=function(){
     if(session){
-      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null});
+      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null});
     } else if(window.DJF_KIOSK_BOOT && typeof lockApp==='function'){
       lockApp();
     } else {
-      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null});
+      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null});
     }
   };
   hdr.appendChild(exitBtn);
@@ -341,8 +355,18 @@ function renderCaixaDiario(){
   var saldoFisicoEsperado = aberturaTotal+totalDinheiroFisico-totalSaidas;
 
   var mainArea=el('div',{style:{flex:'1',overflowY:'auto',padding:'20px'}});
+  var dataAtiva=_cxDataAtiva();
+  var _dtDisp=typeof fmtDate==='function'?fmtDate(dataAtiva):dataAtiva;
+  var _isRetro=dataAtiva!==today();
   mainArea.appendChild(el('div',{style:{fontSize:'14px',color:'#94a3b8',marginBottom:'16px',fontWeight:'700'}},
-    '📅 '+(typeof fmtDate==='function'?fmtDate(today()):today())));
+    '📅 '+_dtDisp));
+  if(_isRetro){
+    mainArea.appendChild(el('div',{style:{
+      background:'rgba(251,191,36,.15)',border:'1px solid rgba(251,191,36,.4)',color:'#fbbf24',
+      borderRadius:'10px',padding:'10px 14px',marginBottom:'16px',fontSize:'13px',fontWeight:'700',
+      display:'flex',alignItems:'center',gap:'8px',
+    }},'⚠ Modo retroativo — lançando dados de '+_dtDisp+', não de hoje.'));
+  }
 
   if(!dia||dia.status!=='aberto'){
     if(dia&&dia.status==='fechado'){
@@ -451,6 +475,7 @@ function renderCaixaDiario(){
   if(formasModal)root.appendChild(_cxRenderFormasModal());
   if(state.cxKpiDetalhe)root.appendChild(_cxRenderKpiModal(state.cxKpiDetalhe,dia,movs,aberturaTotal,totalEntradas,totalSaidas,totalDinheiroFisico,saldoFisicoEsperado));
   if(state.cxRelatorioModal)root.appendChild(_cxRenderRelatorioFiltroModal());
+  if(state.cxRetroModal)root.appendChild(_cxRenderRetroModal());
   }
 
   // ── PIN overlay: usado tanto no login inicial quanto ao trocar de usuário ──
@@ -600,7 +625,7 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
     isFechamento?'🔒 Confirmar Fechamento':'🔓 Confirmar Abertura');
   confirmBtn.onclick=function(){
     var total=calcTotal();
-    var pf=state.profile, dt=today(), agora=new Date();
+    var pf=state.profile, dt=_cxDataAtiva(), agora=new Date();
     var horario=agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     var dias=(state.caixaDiario||[]).slice();
     if(isFechamento){
@@ -666,7 +691,7 @@ function _cxRenderSaidaModal(m,session){
     var diaAtual=_cxDiaAtual();
     var agora=new Date();
     var novo={
-      id:uid(),profile:state.profile,data:today(),diaId:diaAtual?diaAtual.id:null,
+      id:uid(),profile:state.profile,data:_cxDataAtiva(),diaId:diaAtual?diaAtual.id:null,
       tipo:'saida',descricao:desc,valor:val,
       funcId:session.funcId,funcNome:session.funcNome,
       horario:agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),
@@ -926,7 +951,7 @@ function _cxRenderEntradaModal(m,session){
     var diaAtual=_cxDiaAtual();
     var agora=new Date();
     var novo={
-      id:uid(),profile:state.profile,data:today(),diaId:diaAtual?diaAtual.id:null,tipo:'entrada',
+      id:uid(),profile:state.profile,data:_cxDataAtiva(),diaId:diaAtual?diaAtual.id:null,tipo:'entrada',
       canal:m.canal,identificacao:(m.identificacao||'').trim(),
       plataforma:m.canal==='delivery'?m.plataforma:'',tipoPedidoYooga:m.tipoPedidoYooga||'',taxaPlataforma:taxaPlataforma,
       pagamentos:pags,valor:totalVenda,totalPago:totalPago,troco:troco,falta:falta,
@@ -1160,6 +1185,52 @@ function _cxRenderKpiModal(tipo,dia,movs,aberturaTotal,totalEntradas,totalSaidas
 }
 
 // ── MODAL: filtrar a data antes de gerar o relatório ─────────────────────────
+// ── MODAL: ativar/desativar lançamento retroativo (somente Desenvolvedor) ───
+function _cxRenderRetroModal(){
+  var m=state.cxRetroModal;
+  if(!m)return null;
+  if(!_cxIsDev(state.cxSession)){setState({cxRetroModal:null});return null;}
+
+  var ov=el('div',{style:{
+    position:'absolute',inset:'0',background:'rgba(0,0,0,.85)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:'350',padding:'20px',
+  }});
+  var box=el('div',{style:{
+    background:'#1e293b',borderRadius:'20px',padding:'26px 24px',
+    width:'340px',maxWidth:'94vw',border:'2px solid #334155',
+  }});
+  box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center'}},'🕓 Lançamento Retroativo'));
+  box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'20px',lineHeight:'1.6'}},
+    'Escolha uma data passada pra lançar vendas/saídas de comandas físicas que ficaram de fora no dia. Só o Desenvolvedor vê essa opção.'));
+
+  box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Data de trabalho'));
+  var dataInp=el('input',{type:'date',value:m.data||today(),max:today(),
+    style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'16px',fontWeight:'700',textAlign:'center',marginBottom:'20px'}});
+  dataInp.oninput=function(){m.data=dataInp.value;};
+  box.appendChild(dataInp);
+
+  var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'10px'}});
+  var cancelBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
+  cancelBtn.onclick=function(){setState({cxRetroModal:null});};
+  var confirmBtn=el('button',{style:{background:'#fbbf24',color:'#1e293b',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'🕓 Ativar');
+  confirmBtn.onclick=function(){
+    var dt=dataInp.value||today();
+    setState({cxDataTrabalho:dt===today()?null:dt,cxRetroModal:null});
+    showToast(dt===today()?'Voltou ao modo normal (hoje)':'Modo retroativo ativado para '+fmtDate(dt),dt===today()?'success':'info');
+  };
+  actsRow.appendChild(cancelBtn);actsRow.appendChild(confirmBtn);
+  box.appendChild(actsRow);
+
+  if(state.cxDataTrabalho){
+    var hojeBtn=el('button',{style:{width:'100%',background:'transparent',color:'#64748b',border:'1px solid #334155',borderRadius:'10px',padding:'10px',cursor:'pointer',fontSize:'12px',fontWeight:'700'}},'↩ Voltar para hoje ('+fmtDate(today())+')');
+    hojeBtn.onclick=function(){setState({cxDataTrabalho:null,cxRetroModal:null});showToast('Voltou ao modo normal (hoje)','success');};
+    box.appendChild(hojeBtn);
+  }
+
+  ov.appendChild(box);
+  return ov;
+}
+
 function _cxRenderRelatorioFiltroModal(){
   var m=state.cxRelatorioModal;
   if(!m)return null;

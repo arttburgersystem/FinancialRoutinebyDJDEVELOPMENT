@@ -536,8 +536,8 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
   }});
   var box=el('div',{style:{
     background:'#1e293b',borderRadius:'20px',padding:'26px 24px',
-    width:'380px',maxWidth:'94vw',border:'2px solid #334155',
-    maxHeight:'90vh',overflowY:'auto',
+    width:'660px',maxWidth:'96vw',border:'2px solid #334155',
+    maxHeight:'92vh',overflowY:'auto',
   }});
   box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center'}},
     isFechamento?'🔒 Contagem de Fechamento':'🔓 Contagem de Abertura'));
@@ -551,20 +551,23 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
   }
   var totalEl=el('div',{style:{fontSize:'26px',fontWeight:'900',color:'#fbbf24',textAlign:'right'}},fmtMoney(calcTotal()));
 
+  // Modo paisagem: grade de cédulas/moedas lado a lado em vez de lista vertical
+  var cedGrid=el('div',{style:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'10px',marginBottom:'8px'}});
   _CEDULAS.forEach(function(c){
     var key=c.val.toFixed(2);
     var inp=el('input',{type:'number',min:'0',inputmode:'numeric',value:qtds[key]||'',placeholder:'0',
-      style:{width:'70px',padding:'8px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',textAlign:'center',fontSize:'15px'}});
+      style:{width:'100%',boxSizing:'border-box',padding:'8px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',textAlign:'center',fontSize:'15px',fontWeight:'700'}});
     inp.oninput=function(){
       qtds[key]=parseInt(inp.value)||0;
       m.qtds=qtds;
       totalEl.textContent=fmtMoney(calcTotal());
     };
-    box.appendChild(el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #334155'}},[
-      el('span',{style:{fontSize:'14px',fontWeight:'700'}},c.label),
+    cedGrid.appendChild(el('div',{style:{background:'#0f172a',border:'1px solid #334155',borderRadius:'10px',padding:'8px 10px'}},[
+      el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'5px',textAlign:'center'}},c.label),
       inp,
     ]));
   });
+  box.appendChild(cedGrid);
 
   box.appendChild(el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0 6px',marginTop:'8px',borderTop:'2px solid #334155'}},[
     el('span',{style:{fontSize:'13px',fontWeight:'700',color:'#94a3b8'}},'TOTAL CONTADO'),

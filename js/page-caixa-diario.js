@@ -1640,11 +1640,22 @@ function _cxMaskCPF(v){
   return v;
 }
 
+// O programa roda SOMENTE como cashback (sem carimbos/recompensa por selo).
+// Garante que a config compartilhada com o admin reflita isso.
+function _cxFidGarantirCashback(){
+  var atual=state.fidelidadeConfig||{};
+  if(atual.cashbackAtivo===true)return;
+  var novaCfg=Object.assign({},_cxFidCfg(),{cashbackAtivo:true});
+  lsSet('fidelidadeConfig',novaCfg);
+  state.fidelidadeConfig=novaCfg;
+}
+
 function _cxRenderFidelidadeTab(session){
+  _cxFidGarantirCashback();
   var cfg=_cxFidCfg();
   var wrap=el('div',{});
-  wrap.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',color:'#c9a84c',marginBottom:'4px'}},'🎖 '+cfg.nomePrograma));
-  wrap.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',marginBottom:'18px'}},'Cadastre e pontue clientes na hora — mesmo banco de dados do sistema principal'));
+  wrap.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',color:'#c9a84c',marginBottom:'4px'}},'💰 '+cfg.nomePrograma+' — Cashback'));
+  wrap.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',marginBottom:'18px'}},'Cadastre clientes e credite cashback nas vendas — mesmo banco de dados do sistema principal'));
 
   if(!cfg.ativo){
     wrap.appendChild(el('div',{style:{fontSize:'13px',color:'#fbbf24',background:'rgba(251,191,36,.12)',border:'1px solid rgba(251,191,36,.3)',borderRadius:'10px',padding:'14px'}},
@@ -1691,21 +1702,18 @@ function _cxFidBuscaArea(){
 
   var lista=el('div',{});
   filtrados.slice(0,40).forEach(function(c){
-    var tier=_cxFidTier(c.carimbosTotal||0);
     var row=el('div',{style:{
       display:'flex',alignItems:'center',gap:'12px',padding:'12px 16px',
       background:'#1e293b',border:'1px solid #334155',borderRadius:'12px',marginBottom:'8px',cursor:'pointer',
     }});
     row.onmouseenter=function(){row.style.borderColor='#c9a84c';};
     row.onmouseleave=function(){row.style.borderColor='#334155';};
-    row.appendChild(el('div',{style:{fontSize:'26px'}},tier.emoji||'⭐'));
+    row.appendChild(el('div',{style:{fontSize:'26px'}},'👤'));
     row.appendChild(el('div',{style:{flex:'1',minWidth:'0'}},[
       el('div',{style:{fontSize:'14px',fontWeight:'700'}},c.nome),
-      el('div',{style:{fontSize:'11px',color:'#64748b'}},(c.telefone||'—')+' · '+(tier.label||'')+' · '+(c.carimbosAtuais||0)+' carimbos'),
+      el('div',{style:{fontSize:'11px',color:'#64748b'}},c.telefone||'—'),
     ]));
-    if((c.cashbackSaldo||0)>0){
-      row.appendChild(el('div',{style:{fontSize:'13px',fontWeight:'800',color:'#4ade80'}},fmtMoney(c.cashbackSaldo)));
-    }
+    row.appendChild(el('div',{style:{fontSize:'13px',fontWeight:'800',color:(c.cashbackSaldo||0)>0?'#4ade80':'#64748b'}},fmtMoney(c.cashbackSaldo||0)));
     row.appendChild(el('div',{style:{color:'#64748b',fontSize:'18px'}},'›'));
     !function(id){row.onclick=function(){setState({cxFidCliente:id});};}(c.id);
     lista.appendChild(row);
@@ -1715,69 +1723,28 @@ function _cxFidBuscaArea(){
 }
 
 function _cxFidClienteCard(c,cfg,session){
-  var tier=_cxFidTier(c.carimbosTotal||0);
   var wrap=el('div',{style:{maxWidth:'480px',margin:'0 auto'}});
 
   var voltarBtn=el('button',{style:{background:'none',border:'none',color:'#94a3b8',cursor:'pointer',fontSize:'13px',fontWeight:'700',marginBottom:'14px',padding:'0'}},'← Voltar à busca');
   voltarBtn.onclick=function(){setState({cxFidCliente:null});};
   wrap.appendChild(voltarBtn);
 
-  var card=el('div',{style:{background:'#1e293b',border:'2px solid '+(tier.cor||'#c9a84c'),borderRadius:'18px',padding:'22px',marginBottom:'16px',textAlign:'center'}});
-  card.appendChild(el('div',{style:{fontSize:'44px',marginBottom:'6px'}},tier.emoji||'⭐'));
+  var card=el('div',{style:{background:'#1e293b',border:'2px solid #c9a84c',borderRadius:'18px',padding:'22px',marginBottom:'16px',textAlign:'center'}});
+  card.appendChild(el('div',{style:{fontSize:'44px',marginBottom:'6px'}},'👤'));
   card.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800'}},c.nome));
-  card.appendChild(el('div',{style:{fontSize:'12px',color:tier.cor||'#c9a84c',fontWeight:'700',marginBottom:'4px'}},tier.label||''));
   card.appendChild(el('div',{style:{fontSize:'12px',color:'#64748b'}},(c.telefone||'—')+(c.cpf?' · '+c.cpf:'')));
 
-  var carimbosAtuais=c.carimbosAtuais||0;
-  var meta=cfg.carimbosParaRecompensar||10;
-  var pct=Math.min(100,Math.round((carimbosAtuais/meta)*100));
-  var barraWrap=el('div',{style:{marginTop:'16px'}});
-  barraWrap.appendChild(el('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'11px',color:'#94a3b8',marginBottom:'4px'}},[
-    el('span',{},'Carimbos'),el('span',{},carimbosAtuais+' / '+meta),
+  card.appendChild(el('div',{style:{marginTop:'18px',paddingTop:'16px',borderTop:'1px solid #334155'}},[
+    el('div',{style:{fontSize:'11px',color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:'4px'}},'Saldo de cashback'),
+    el('div',{style:{fontSize:'32px',fontWeight:'900',color:'#4ade80'}},fmtMoney(c.cashbackSaldo||0)),
+    el('div',{style:{fontSize:'11px',color:'#64748b',marginTop:'4px'}},'Total já gerado: '+fmtMoney(c.cashbackTotal||0)),
   ]));
-  var barraBg=el('div',{style:{background:'#0f172a',borderRadius:'20px',height:'10px',overflow:'hidden'}});
-  barraBg.appendChild(el('div',{style:{background:tier.cor||'#c9a84c',height:'100%',width:pct+'%'}}));
-  barraWrap.appendChild(barraBg);
-  card.appendChild(barraWrap);
-
-  if(cfg.cashbackAtivo){
-    card.appendChild(el('div',{style:{marginTop:'14px',fontSize:'13px',color:'#94a3b8'}},[
-      'Cashback disponível: ',el('span',{style:{color:'#4ade80',fontWeight:'800'}},fmtMoney(c.cashbackSaldo||0)),
-    ]));
-  }
   wrap.appendChild(card);
 
   var acoes=el('div',{});
-  var carimbarBtn=el('button',{style:{width:'100%',background:'#16a34a',color:'#fff',border:'none',borderRadius:'12px',padding:'16px',cursor:'pointer',fontSize:'15px',fontWeight:'800',marginBottom:'10px'}},'⭐ Registrar Venda / Carimbo');
-  carimbarBtn.onclick=function(){setState({cxFidCarimboModal:{clienteId:c.id,qtd:1,valorPedido:'',obs:''}});};
+  var carimbarBtn=el('button',{style:{width:'100%',background:'#16a34a',color:'#fff',border:'none',borderRadius:'12px',padding:'16px',cursor:'pointer',fontSize:'15px',fontWeight:'800',marginBottom:'10px'}},'💰 Registrar Venda (gerar cashback)');
+  carimbarBtn.onclick=function(){setState({cxFidCarimboModal:{clienteId:c.id,valorPedido:'',obs:''}});};
   acoes.appendChild(carimbarBtn);
-
-  if(carimbosAtuais>=meta){
-    var resgatarBtn=el('button',{style:{width:'100%',background:'#c9a84c',color:'#1e293b',border:'none',borderRadius:'12px',padding:'14px',cursor:'pointer',fontSize:'14px',fontWeight:'800',marginBottom:'10px'}},'🎁 Resgatar Recompensa: '+(cfg.descricaoRecompensa||'Recompensa'));
-    resgatarBtn.onclick=function(){
-      if(!confirm('Confirmar resgate de "'+(cfg.descricaoRecompensa||'recompensa')+'" para '+c.nome+'?'))return;
-      var pf=state.profile;
-      var clientes=(state.clientes||[]).slice();
-      for(var i=0;i<clientes.length;i++){
-        if(clientes[i].id===c.id&&clientes[i].profile===pf){
-          clientes[i]=Object.assign({},clientes[i]);
-          clientes[i].carimbosAtuais=Math.max(0,(clientes[i].carimbosAtuais||0)-meta);
-          clientes[i].cartoesResgatados=(clientes[i].cartoesResgatados||0)+1;
-          break;
-        }
-      }
-      var logs=(state.fidelidadeLog||[]).concat([{
-        id:uid(),clienteId:c.id,clienteNome:c.nome,profile:pf,
-        tipo:'resgate',quantidade:meta,obs:'Resgatado no Caixa Diário por '+(session?session.funcNome:''),
-        data:new Date().toISOString(),
-      }]);
-      lsSet('clientes',clientes);lsSet('fidelidadeLog',logs);
-      setState({clientes:clientes,fidelidadeLog:logs});
-      scheduleSave();
-      showToast('Recompensa resgatada para '+c.nome+'! 🎁','success');
-    };
-    acoes.appendChild(resgatarBtn);
-  }
 
   if(cfg.cashbackAtivo&&(c.cashbackSaldo||0)>=(cfg.cashbackMinResgate||5)){
     var cashbackBtn=el('button',{style:{width:'100%',background:'#1d4ed8',color:'#fff',border:'none',borderRadius:'12px',padding:'14px',cursor:'pointer',fontSize:'14px',fontWeight:'800',marginBottom:'10px'}},'💰 Resgatar Cashback: '+fmtMoney(c.cashbackSaldo||0));
@@ -1910,29 +1877,20 @@ function _cxRenderFidCarimboModal(session){
     background:'#1e293b',borderRadius:'20px',padding:'26px 24px',
     width:'360px',maxWidth:'94vw',border:'2px solid #334155',
   }});
-  box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center',color:'#4ade80'}},'⭐ Registrar Venda'));
+  box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center',color:'#4ade80'}},'💰 Registrar Venda'));
   box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'18px'}},c.nome));
 
-  box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'6px'}},'Quantidade de carimbos'));
-  var qtdInp=el('input',{type:'number',min:'1',max:'20',value:m.qtd||1,
-    style:{width:'100%',boxSizing:'border-box',padding:'12px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'20px',fontWeight:'800',textAlign:'center',marginBottom:'14px'}});
-  qtdInp.oninput=function(){m.qtd=Math.max(1,parseInt(qtdInp.value)||1);};
-  box.appendChild(qtdInp);
-
-  var cashbackPreview=null;
-  if(cfg.cashbackAtivo){
-    box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'6px'}},'Valor do pedido (R$) — para calcular cashback'));
-    var valInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'0,00',value:m.valorPedido||'',
-      style:{width:'100%',boxSizing:'border-box',padding:'12px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'16px',fontWeight:'700',textAlign:'center',marginBottom:'8px'}});
-    cashbackPreview=el('div',{style:{fontSize:'12px',color:'#4ade80',textAlign:'center',fontWeight:'700',marginBottom:'14px',minHeight:'16px'}});
-    valInp.oninput=function(){
-      m.valorPedido=valInp.value;
-      var v=parseFloat(valInp.value)||0;
-      cashbackPreview.textContent=v>0?('💰 Cashback: '+fmtMoney(v*(cfg.cashbackPorcentagem||5)/100)):'';
-    };
-    box.appendChild(valInp);
-    box.appendChild(cashbackPreview);
-  }
+  box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'6px'}},'Valor do pedido (R$) *'));
+  var valInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'0,00',value:m.valorPedido||'',
+    style:{width:'100%',boxSizing:'border-box',padding:'14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'22px',fontWeight:'800',textAlign:'center',marginBottom:'8px'}});
+  var cashbackPreview=el('div',{style:{fontSize:'13px',color:'#4ade80',textAlign:'center',fontWeight:'800',marginBottom:'16px',minHeight:'18px'}});
+  valInp.oninput=function(){
+    m.valorPedido=valInp.value;
+    var v=parseFloat(valInp.value)||0;
+    cashbackPreview.textContent=v>0?('💰 Cashback ('+(cfg.cashbackPorcentagem||5)+'%): '+fmtMoney(v*(cfg.cashbackPorcentagem||5)/100)):'';
+  };
+  box.appendChild(valInp);
+  box.appendChild(cashbackPreview);
 
   box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'6px'}},'Observação (opcional)'));
   var obsInp=el('input',{type:'text',placeholder:'Ex: Pedido #123...',value:m.obs||'',
@@ -1943,37 +1901,32 @@ function _cxRenderFidCarimboModal(session){
   var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
   var cancelBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
   cancelBtn.onclick=function(){setState({cxFidCarimboModal:null});};
-  var confirmBtn=el('button',{style:{background:'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'⭐ Carimbar!');
+  var confirmBtn=el('button',{style:{background:'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'✓ Confirmar');
   confirmBtn.onclick=function(){
-    var qtd=Math.max(1,parseInt(m.qtd)||1);
-    var valorPedido=parseFloat(m.valorPedido)||0;
-    var cashbackGerado=cfg.cashbackAtivo&&valorPedido>0?Math.round(valorPedido*(cfg.cashbackPorcentagem||5)/100*100)/100:0;
+    var valorPedido=parseFloat((m.valorPedido+'').replace(',','.'))||0;
+    if(!valorPedido||valorPedido<=0){showToast('Informe o valor do pedido','error');return;}
+    var cashbackGerado=Math.round(valorPedido*(cfg.cashbackPorcentagem||5)/100*100)/100;
     var pf=state.profile;
     var clientes=(state.clientes||[]).slice();
     for(var i=0;i<clientes.length;i++){
       if(clientes[i].id===c.id&&clientes[i].profile===pf){
         clientes[i]=Object.assign({},clientes[i]);
-        clientes[i].carimbosTotal=(clientes[i].carimbosTotal||0)+qtd;
-        clientes[i].carimbosAtuais=(clientes[i].carimbosAtuais||0)+qtd;
         clientes[i].ultimoCarimbo=new Date().toISOString();
-        if(cashbackGerado>0){
-          clientes[i].cashbackSaldo=(clientes[i].cashbackSaldo||0)+cashbackGerado;
-          clientes[i].cashbackTotal=(clientes[i].cashbackTotal||0)+cashbackGerado;
-        }
+        clientes[i].cashbackSaldo=(clientes[i].cashbackSaldo||0)+cashbackGerado;
+        clientes[i].cashbackTotal=(clientes[i].cashbackTotal||0)+cashbackGerado;
         break;
       }
     }
     var logs=(state.fidelidadeLog||[]).concat([{
       id:uid(),clienteId:c.id,clienteNome:c.nome,profile:pf,
-      tipo:'carimbo',quantidade:qtd,valorPedido:valorPedido,cashbackGerado:cashbackGerado,
+      tipo:'carimbo',quantidade:0,valorPedido:valorPedido,cashbackGerado:cashbackGerado,
       obs:(m.obs||'')+(session?' — lançado por '+session.funcNome+' (Caixa Diário)':''),
       data:new Date().toISOString(),
     }]);
     lsSet('clientes',clientes);lsSet('fidelidadeLog',logs);
     setState({clientes:clientes,fidelidadeLog:logs,cxFidCarimboModal:null});
     scheduleSave();
-    var msg=qtd+' carimbo(s) para '+c.nome+' ⭐'+(cashbackGerado>0?' | Cashback: '+fmtMoney(cashbackGerado):'');
-    showToast(msg,'success');
+    showToast('Cashback de '+fmtMoney(cashbackGerado)+' creditado para '+c.nome+'! 💰','success');
   };
   actsRow.appendChild(cancelBtn);actsRow.appendChild(confirmBtn);
   box.appendChild(actsRow);

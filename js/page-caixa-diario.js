@@ -9,6 +9,12 @@ function _cxDiaAtual(){
   return (state.caixaDiario||[]).find(function(d){return d.data===dt&&d.profile===pf;})||null;
 }
 
+// Só o Desenvolvedor pode editar/excluir formas de pagamento e taxas
+function _cxIsDev(session){
+  if(!session)return false;
+  return (state.usuarios||[]).some(function(u){return u.id===session.funcId&&u.papel==='desenvolvedor';});
+}
+
 // Semeia o catálogo de formas de pagamento na primeira vez que o kiosk abre
 // taxaTipo: 'pct' (% sobre o valor) ou 'fixo' (R$ fixo por venda, ex: taxa de pedido próprio do Yooga)
 var _CX_FORMAS_DEFAULT=[
@@ -105,12 +111,14 @@ function renderCaixaDiario(){
     ]);
     userBtn.onclick=function(){setState({cxPickerOpen:!pickerOpen});};
     hdr.appendChild(userBtn);
-    var gearBtn=el('button',{title:'Gerenciar formas de pagamento',style:{
-      background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'10px',
-      padding:'10px 14px',cursor:'pointer',fontSize:'16px',flexShrink:'0',
-    }},'⚙');
-    gearBtn.onclick=function(){setState({cxFormasModal:true,cxPickerOpen:false});};
-    hdr.appendChild(gearBtn);
+    if(_cxIsDev(session)){
+      var gearBtn=el('button',{title:'Gerenciar formas de pagamento',style:{
+        background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'10px',
+        padding:'10px 14px',cursor:'pointer',fontSize:'16px',flexShrink:'0',
+      }},'⚙');
+      gearBtn.onclick=function(){setState({cxFormasModal:true,cxPickerOpen:false});};
+      hdr.appendChild(gearBtn);
+    }
   }
   var exitBtn=el('button',{style:{
     background:'#dc2626',color:'#fff',border:'none',borderRadius:'10px',
@@ -723,11 +731,13 @@ function _cxRenderEntradaModal(m,session){
     totalEl,
   ]));
 
-  var gerenciarLink=el('button',{type:'button',style:{
-    background:'none',border:'none',color:'#60a5fa',fontSize:'11px',cursor:'pointer',padding:'0',marginBottom:'16px',textDecoration:'underline',
-  }},'⚙ Gerenciar formas de pagamento e taxas');
-  gerenciarLink.onclick=function(){setState({cxFormasModal:true});};
-  box.appendChild(gerenciarLink);
+  if(_cxIsDev(session)){
+    var gerenciarLink=el('button',{type:'button',style:{
+      background:'none',border:'none',color:'#60a5fa',fontSize:'11px',cursor:'pointer',padding:'0',marginBottom:'16px',textDecoration:'underline',
+    }},'⚙ Gerenciar formas de pagamento e taxas');
+    gerenciarLink.onclick=function(){setState({cxFormasModal:true});};
+    box.appendChild(gerenciarLink);
+  }
 
   var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
   var cancelBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
@@ -772,12 +782,29 @@ function _cxRenderEntradaModal(m,session){
 
 // ── MODAL DE GESTÃO: formas de pagamento e taxa da máquina ──────────────────
 function _cxRenderFormasModal(){
-  var formas=(state.formasPagamento||[]).slice();
-
   var ov=el('div',{style:{
     position:'absolute',inset:'0',background:'rgba(0,0,0,.9)',
     display:'flex',alignItems:'center',justifyContent:'center',zIndex:'400',padding:'20px',overflowY:'auto',
   }});
+
+  if(!_cxIsDev(state.cxSession)){
+    var boxNeg=el('div',{style:{
+      background:'#1e293b',borderRadius:'20px',padding:'32px 28px',
+      width:'340px',maxWidth:'94vw',border:'2px solid #334155',textAlign:'center',
+    }},[
+      el('div',{style:{fontSize:'44px',marginBottom:'12px'}},'🔒'),
+      el('div',{style:{fontWeight:'800',fontSize:'15px',marginBottom:'8px'}},'Acesso restrito'),
+      el('div',{style:{fontSize:'12px',color:'#94a3b8',lineHeight:'1.6',marginBottom:'18px'}},'Somente o desenvolvedor pode editar formas de pagamento e taxas.'),
+    ]);
+    var okBtn=el('button',{style:{width:'100%',background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'12px',cursor:'pointer',fontWeight:'700'}},'Fechar');
+    okBtn.onclick=function(){setState({cxFormasModal:false});};
+    boxNeg.appendChild(okBtn);
+    ov.appendChild(boxNeg);
+    return ov;
+  }
+
+  var formas=(state.formasPagamento||[]).slice();
+
   var box=el('div',{style:{
     background:'#1e293b',borderRadius:'20px',padding:'26px 24px',
     width:'440px',maxWidth:'94vw',border:'2px solid #334155',maxHeight:'92vh',overflowY:'auto',

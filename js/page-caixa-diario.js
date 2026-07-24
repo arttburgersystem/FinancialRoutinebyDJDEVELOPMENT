@@ -10,17 +10,18 @@ function _cxDiaAtual(){
 }
 
 // Semeia o catálogo de formas de pagamento na primeira vez que o kiosk abre
+// taxaTipo: 'pct' (% sobre o valor) ou 'fixo' (R$ fixo por venda, ex: taxa de pedido próprio do Yooga)
 var _CX_FORMAS_DEFAULT=[
-  {id:'fp_dinheiro',          nome:'Dinheiro',            taxaPct:0,    ehDinheiroFisico:true},
-  {id:'fp_pix',                nome:'Pix',                  taxaPct:0,    ehDinheiroFisico:false},
-  {id:'fp_debito',              nome:'Débito',                taxaPct:1.2,  ehDinheiroFisico:false},
-  {id:'fp_credito',            nome:'Crédito',              taxaPct:2.5,  ehDinheiroFisico:false},
-  {id:'fp_delivery_dinheiro', nome:'Delivery - Dinheiro', taxaPct:0,    ehDinheiroFisico:true},
-  {id:'fp_delivery_debito',    nome:'Delivery - Débito',    taxaPct:1.2,  ehDinheiroFisico:false},
-  {id:'fp_delivery_credito',  nome:'Delivery - Crédito',  taxaPct:2.5,  ehDinheiroFisico:false},
-  {id:'fp_delivery_pix',      nome:'Delivery - Pix',      taxaPct:0,    ehDinheiroFisico:false},
-  {id:'fp_ifood',              nome:'iFood Online',         taxaPct:12,   ehDinheiroFisico:false},
-  {id:'fp_yooga',              nome:'Yooga Online',         taxaPct:0,    ehDinheiroFisico:false},
+  {id:'fp_dinheiro',          nome:'Dinheiro',            taxaValor:0,    taxaTipo:'pct', ehDinheiroFisico:true},
+  {id:'fp_pix',                nome:'Pix',                  taxaValor:0,    taxaTipo:'pct', ehDinheiroFisico:false},
+  {id:'fp_debito',              nome:'Débito',                taxaValor:1.2,  taxaTipo:'pct', ehDinheiroFisico:false},
+  {id:'fp_credito',            nome:'Crédito',              taxaValor:2.5,  taxaTipo:'pct', ehDinheiroFisico:false},
+  {id:'fp_delivery_dinheiro', nome:'Delivery - Dinheiro', taxaValor:0,    taxaTipo:'pct', ehDinheiroFisico:true},
+  {id:'fp_delivery_debito',    nome:'Delivery - Débito',    taxaValor:1.2,  taxaTipo:'pct', ehDinheiroFisico:false},
+  {id:'fp_delivery_credito',  nome:'Delivery - Crédito',  taxaValor:2.5,  taxaTipo:'pct', ehDinheiroFisico:false},
+  {id:'fp_delivery_pix',      nome:'Delivery - Pix',      taxaValor:0,    taxaTipo:'pct', ehDinheiroFisico:false},
+  {id:'fp_ifood',              nome:'iFood Online',         taxaValor:12,   taxaTipo:'pct', ehDinheiroFisico:false},
+  {id:'fp_yooga',              nome:'Yooga Online',         taxaValor:0.99, taxaTipo:'fixo', ehDinheiroFisico:false},
 ];
 function _cxSeedFormasPagamento(){
   if(state.formasPagamento&&state.formasPagamento.length>0)return;
@@ -28,13 +29,46 @@ function _cxSeedFormasPagamento(){
   lsSet('formasPagamento',def);
   state.formasPagamento=def;
 }
+// Taxa da forma de pagamento: percentual sobre o valor, ou valor fixo em R$ por venda
+// (ex: Yooga cobra R$0,99 fixo quando o cliente pede por conta própria, não é %)
+function _cxCalcLiquido(val,f){
+  var t=f.taxaValor||0;
+  var desconto=f.taxaTipo==='fixo'?Math.min(t,val):val*(t/100);
+  return Math.round((val-desconto)*100)/100;
+}
+function _cxFormatTaxa(f){
+  return f.taxaTipo==='fixo'?fmtMoney(f.taxaValor||0):(f.taxaValor||0)+'%';
+}
+
+// Junta funcionários (PIN da Requisição de Estoque) + usuários admin/dev
+// (PIN próprio do Caixa, "pinCaixa") numa única lista de login, em ordem alfabética
+function _cxListaLogin(){
+  var pf=state.profile;
+  var funcsFunc=(state.funcionarios||[]).filter(function(f){
+    return (f.profile===pf||!f.profile)&&f.status==='ativo'&&f.senhaRequisicao;
+  }).map(function(f){
+    return {id:f.id,nome:f.nome,cargo:f.cargo||'',pin:f.senhaRequisicao,_tipo:'funcionario'};
+  });
+  var funcsAdmin=(state.usuarios||[]).filter(function(u){
+    return u.ativo!==false&&(u.papel==='desenvolvedor'||u.papel==='administrador')&&(!u.perfil||u.perfil==='ambos'||u.perfil===pf);
+  }).map(function(u){
+    return {id:u.id,nome:u.nome,cargo:u.papel==='desenvolvedor'?'Desenvolvedor':'Administrador',pin:u.pinCaixa||'',_tipo:'usuario'};
+  });
+  return funcsFunc.concat(funcsAdmin).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+}
+function _cxSalvarPinUsuario(fn,pin){
+  var usuarios=(state.usuarios||[]).map(function(u){
+    return u.id===fn.id?Object.assign({},u,{pinCaixa:pin}):u;
+  });
+  lsSet('usuarios',usuarios);
+  state.usuarios=usuarios;
+  scheduleSave();
+}
 
 function renderCaixaDiario(){
   _cxSeedFormasPagamento();
   var pf=state.profile;
-  var funcs=(state.funcionarios||[]).filter(function(f){
-    return (f.profile===pf||!f.profile)&&f.status==='ativo'&&f.senhaRequisicao;
-  }).sort(function(a,b){return a.nome.localeCompare(b.nome);});
+  var funcs=_cxListaLogin();
 
   var session   = state.cxSession        || null;
   var pinSt     = state.cxPin            || null;
@@ -124,6 +158,7 @@ function renderCaixaDiario(){
         card.appendChild(el('div',{style:{fontSize:'44px'}},'👤'));
         card.appendChild(el('div',{style:{fontWeight:'800',fontSize:'16px',textAlign:'center',lineHeight:'1.3'}},f.nome));
         if(f.cargo)card.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8'}},f.cargo));
+        if(!f.pin)card.appendChild(el('div',{style:{fontSize:'10px',fontWeight:'700',color:'#fbbf24',background:'rgba(251,191,36,.12)',border:'1px solid rgba(251,191,36,.3)',borderRadius:'6px',padding:'2px 8px'}},'🆕 Criar PIN'));
         !function(fn){
           card.onclick=function(){setState({cxPin:{funcId:fn.id,value:'',erro:false}});};
         }(f);
@@ -145,10 +180,12 @@ function renderCaixaDiario(){
           width:'300px',maxWidth:'90vw',border:'2px solid #334155',
           boxShadow:'0 30px 80px rgba(0,0,0,.9)',
         }});
+        var isSetup=!pinFunc.pin;
         pinBox.appendChild(el('div',{style:{textAlign:'center',marginBottom:'22px'}},[
           el('div',{style:{fontSize:'52px',lineHeight:'1'}},'👤'),
           el('div',{style:{fontWeight:'800',fontSize:'19px',marginTop:'10px'}},pinFunc.nome),
-        ]));
+          isSetup?el('div',{style:{fontSize:'12px',color:'#fbbf24',marginTop:'6px',fontWeight:'700'}},'🆕 Primeiro acesso — crie seu PIN de 4 dígitos'):null,
+        ].filter(Boolean)));
         var dotsEl=el('div',{style:{display:'flex',gap:'14px',justifyContent:'center',marginBottom:'8px'}});
         for(var d=0;d<4;d++){
           dotsEl.appendChild(el('div',{style:{
@@ -165,15 +202,22 @@ function renderCaixaDiario(){
 
         function pressCxPinKey(key,fn){
           var cur=(state.cxPin||{}).value||'';
-          if(key==='←'){
-            setState({cxPin:{funcId:fn.id,value:cur.slice(0,-1),erro:false}});
-          } else if(key==='✓'){
-            var v=(state.cxPin||{}).value||'';
-            if(v===fn.senhaRequisicao){
+          var setup=!fn.pin;
+          function tentaConcluir(v){
+            if(setup){
+              _cxSalvarPinUsuario(fn,v);
+              setState({cxSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},cxPin:null});
+            } else if(v===fn.pin){
               setState({cxSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},cxPin:null});
             } else {
               setState({cxPin:{funcId:fn.id,value:'',erro:true}});
             }
+          }
+          if(key==='←'){
+            setState({cxPin:{funcId:fn.id,value:cur.slice(0,-1),erro:false}});
+          } else if(key==='✓'){
+            var v=(state.cxPin||{}).value||'';
+            if(v.length===4)tentaConcluir(v);
           } else if(cur.length<4){
             var nova=cur+key;
             setState({cxPin:{funcId:fn.id,value:nova,erro:false}});
@@ -181,11 +225,7 @@ function renderCaixaDiario(){
               setTimeout(function(){
                 var st=state.cxPin;
                 if(!st||st.funcId!==fn.id)return;
-                if(st.value===fn.senhaRequisicao){
-                  setState({cxSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},cxPin:null});
-                } else {
-                  setState({cxPin:{funcId:fn.id,value:'',erro:true}});
-                }
+                tentaConcluir(st.value);
               },300);
             }
           }
@@ -601,7 +641,7 @@ function _cxRenderEntradaModal(m,session){
       flex:'1',padding:'10px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px',
     }});
     formas.forEach(function(f){
-      var opt=el('option',{},f.nome+(f.taxaPct?' ('+f.taxaPct+'%)':''));
+      var opt=el('option',{},f.nome+(f.taxaValor?' ('+_cxFormatTaxa(f)+')':''));
       opt.value=f.id;
       if(f.id===p.formaId)opt.selected=true;
       sel.appendChild(opt);
@@ -658,8 +698,8 @@ function _cxRenderEntradaModal(m,session){
       if(val<=0){erro=true;return;}
       var f=formas.find(function(x){return x.id===p.formaId;});
       if(!f){erro=true;return;}
-      var liq=Math.round(val*(1-(f.taxaPct||0)/100)*100)/100;
-      pags.push({formaId:f.id,formaNome:f.nome,valor:val,taxaPct:f.taxaPct||0,valorLiquido:liq,ehDinheiroFisico:!!f.ehDinheiroFisico});
+      var liq=_cxCalcLiquido(val,f);
+      pags.push({formaId:f.id,formaNome:f.nome,valor:val,taxaValor:f.taxaValor||0,taxaTipo:f.taxaTipo||'pct',valorLiquido:liq,ehDinheiroFisico:!!f.ehDinheiroFisico});
     });
     if(erro||pags.length===0){showToast('Preencha a forma e o valor de cada pagamento','error');return;}
     var total=pags.reduce(function(s,p){return s+p.valor;},0);
@@ -701,33 +741,43 @@ function _cxRenderFormasModal(){
   box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center'}},'⚙ Formas de Pagamento'));
   box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'18px'}},'Cadastre as formas e a taxa da máquina de cada uma'));
 
-  var colHdr=el('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginBottom:'6px',fontSize:'10px',color:'#64748b',fontWeight:'700',textTransform:'uppercase'}},[
-    el('span',{style:{flex:'1'}},'Nome'),
-    el('span',{style:{width:'64px',textAlign:'center'}},'Taxa %'),
-    el('span',{style:{width:'58px',textAlign:'center'}},'$ físico'),
-    el('span',{style:{width:'22px'}},''),
-  ]);
-  box.appendChild(colHdr);
-
   var listWrap=el('div',{style:{marginBottom:'14px'}});
   function renderList(){
     listWrap.innerHTML='';
     formas.forEach(function(f,i){
+      if(!f.taxaTipo)f.taxaTipo='pct';
       var nomeInp=el('input',{type:'text',value:f.nome,placeholder:'Nome da forma',style:{
         flex:'1',minWidth:'0',padding:'8px 10px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px',
       }});
       nomeInp.oninput=function(){f.nome=nomeInp.value;};
-      var taxaInp=el('input',{type:'number',min:'0',max:'100',step:'0.01',value:f.taxaPct||0,style:{
-        width:'64px',padding:'8px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px',textAlign:'center',
+      var rmBtn=el('button',{type:'button',style:{width:'22px',flexShrink:'0',background:'none',border:'none',color:'#f87171',fontSize:'18px',cursor:'pointer',padding:'0'}},'×');
+      rmBtn.onclick=function(){formas.splice(i,1);renderList();};
+
+      var taxaInp=el('input',{type:'number',min:'0',step:'0.01',value:f.taxaValor||0,style:{
+        width:'72px',padding:'8px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px',textAlign:'center',
       }});
-      taxaInp.oninput=function(){f.taxaPct=parseFloat(taxaInp.value)||0;};
+      taxaInp.oninput=function(){f.taxaValor=parseFloat(taxaInp.value)||0;};
+
+      var tipoBtn=el('button',{type:'button',title:'Clique para alternar entre % e R$ fixo por venda',style:{
+        width:'44px',flexShrink:'0',padding:'8px 4px',borderRadius:'8px',border:'1px solid #334155',
+        background:f.taxaTipo==='fixo'?'#1d4ed8':'#334155',color:'#f1f5f9',fontSize:'11px',fontWeight:'800',cursor:'pointer',
+      }},f.taxaTipo==='fixo'?'R$':'%');
+      tipoBtn.onclick=function(){
+        f.taxaTipo=f.taxaTipo==='fixo'?'pct':'fixo';
+        tipoBtn.textContent=f.taxaTipo==='fixo'?'R$':'%';
+        tipoBtn.style.background=f.taxaTipo==='fixo'?'#1d4ed8':'#334155';
+      };
+
       var dinChk=el('input',{type:'checkbox',style:{cursor:'pointer'}});
       dinChk.checked=!!f.ehDinheiroFisico;
       dinChk.onchange=function(){f.ehDinheiroFisico=dinChk.checked;};
-      var dinWrap=el('div',{style:{width:'58px',textAlign:'center'}},[dinChk]);
-      var rmBtn=el('button',{type:'button',style:{width:'22px',background:'none',border:'none',color:'#f87171',fontSize:'18px',cursor:'pointer',padding:'0'}},'×');
-      rmBtn.onclick=function(){formas.splice(i,1);renderList();};
-      listWrap.appendChild(el('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginBottom:'8px'}},[nomeInp,taxaInp,dinWrap,rmBtn]));
+      var dinLabel=el('label',{style:{display:'flex',alignItems:'center',gap:'4px',fontSize:'10px',color:'#94a3b8',marginLeft:'auto',cursor:'pointer',whiteSpace:'nowrap'}},[dinChk,document.createTextNode('$ físico')]);
+
+      var linha1=el('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginBottom:'6px'}},[nomeInp,rmBtn]);
+      var linha2=el('div',{style:{display:'flex',gap:'6px',alignItems:'center'}},[
+        el('span',{style:{fontSize:'10px',color:'#64748b'}},'Taxa:'),taxaInp,tipoBtn,dinLabel,
+      ]);
+      listWrap.appendChild(el('div',{style:{background:'#0f172a',border:'1px solid #334155',borderRadius:'10px',padding:'10px 12px',marginBottom:'8px'}},[linha1,linha2]));
     });
   }
   renderList();
@@ -738,7 +788,7 @@ function _cxRenderFormasModal(){
     padding:'8px',width:'100%',cursor:'pointer',fontSize:'12px',fontWeight:'700',marginBottom:'16px',
   }},'+ Nova forma de pagamento');
   addBtn.onclick=function(){
-    formas.push({id:uid(),nome:'',taxaPct:0,ehDinheiroFisico:false});
+    formas.push({id:uid(),nome:'',taxaValor:0,taxaTipo:'pct',ehDinheiroFisico:false});
     renderList();
   };
   box.appendChild(addBtn);

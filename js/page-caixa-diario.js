@@ -1234,6 +1234,90 @@ function _cxGuessFormaId(nomeTxt){
   return (formas[0]||{}).id||'';
 }
 
+// Normaliza o texto da coluna "Forma de Pagamento" do XLS (minúsculas, sem
+// acento, espaços colapsados) para comparar/mapear de forma estável.
+function _cxNormFormaTxt(txt){
+  return (txt||'').toString().trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/\s+/g,' ');
+}
+// Só retorna uma forma se o texto do XLS bater (exato ou por contenção) com
+// o nome de uma forma já cadastrada — usado para sugerir o mapeamento de
+// uma modalidade nova, sem forçar a escolha (o dev sempre confirma).
+function _cxGuessFormaIdStrict(rawTxt){
+  var norm=_cxNormFormaTxt(rawTxt);
+  if(!norm)return '';
+  var formas=state.formasPagamento||[];
+  var exact=formas.find(function(f){return _cxNormFormaTxt(f.nome)===norm;});
+  if(exact)return exact.id;
+  var contains=formas.find(function(f){
+    var n=_cxNormFormaTxt(f.nome);
+    return n&&(norm.indexOf(n)>=0||n.indexOf(norm)>=0);
+  });
+  return contains?contains.id:'';
+}
+
+// Monta a fila final de pedidos a revisar/editar, já com a forma de
+// pagamento resolvida pelo mapa de modalidades aprovadas (map: texto
+// normalizado do XLS → id da forma de pagamento cadastrada).
+function _cxFinalizarFilaImportacao(doDia,map){
+  var pf=state.profile;
+  var jaLancados={};
+  (state.caixaDiarioMovs||[]).forEach(function(mv){
+    if(mv.profile===pf&&mv.origemImportCodigo)jaLancados[mv.origemImportCodigo]=true;
+  });
+  doDia.forEach(function(r){
+    var gp=_cxGuessCanalPlataforma(r);
+    r.guessCanal=gp.canal;r.guessPlataforma=gp.plataforma;
+    var norm=_cxNormFormaTxt(r.formaPagamento);
+    r.guessFormaId=(map&&map[norm])||_cxGuessFormaIdStrict(r.formaPagamento)||((state.formasPagamento||[])[0]||{}).id||'';
+    r.jaExistia=!!(r.codigo&&jaLancados[r.codigo]);
+    r.importado=r.jaExistia;
+  });
+  setState({cxImportModal:{rows:doDia}});
+}
+
+// Lança automaticamente um pedido importado como Entrada no Caixa Diário,
+// usando os dados sugeridos (canal/plataforma/forma de pagamento) sem abrir
+// o formulário — usado pelo botão "Concluir" para dar baixa em todos os
+// pedidos ainda pendentes de uma vez, deixando a conferência para o
+// fechamento do caixa.
+function _cxRegistrarEntradaAuto(r,session){
+  var formas=state.formasPagamento||[];
+  var f=formas.find(function(x){return x.id===r.guessFormaId;})||formas[0];
+  if(!f)return null;
+  var totalVenda=r.valorTotal>0?r.valorTotal:r.valorRecebido;
+  var cupomValorNum=r.desconto>0?r.desconto:0;
+  var totalDevido=Math.max(0,Math.round((totalVenda-cupomValorNum)*100)/100);
+  var val=r.valorRecebido||0;
+  var isYoogaLinha=f.id==='fp_yooga'||/yooga/i.test(f.nome||'');
+  var liq=isYoogaLinha?val:_cxCalcLiquido(val,f);
+  var pags=[{formaId:f.id,formaNome:f.nome,valor:val,taxaValor:isYoogaLinha?0:(f.taxaValor||0),taxaTipo:f.taxaTipo||'pct',valorLiquido:liq,ehDinheiroFisico:!!f.ehDinheiroFisico}];
+  var totalPago=val;
+  var dif=Math.round((totalPago-totalDevido)*100)/100;
+  var troco=dif>0?dif:0;
+  var falta=dif<0?-dif:0;
+  var totalDinheiro=pags.filter(function(p){return p.ehDinheiroFisico;}).reduce(function(s,p){return s+p.valor;},0);
+  totalDinheiro=Math.max(0,Math.round((totalDinheiro-troco)*100)/100);
+  var diaAtual=_cxDiaAtual();
+  var agora=new Date();
+  return {
+    id:uid(),profile:state.profile,data:_cxDataAtiva(),diaId:diaAtual?diaAtual.id:null,tipo:'entrada',
+    canal:r.guessCanal,
+    identificacao:((r.codigo?'Pedido #'+r.codigo:'')+(r.cliente&&r.cliente!=='Não identificado'?' — '+r.cliente:'')).trim()||'Pedido importado',
+    plataforma:r.guessCanal==='delivery'?r.guessPlataforma:'',tipoPedidoYooga:r.guessPlataforma==='yooga'?'manual':'',taxaPlataforma:0,
+    cupomCodigo:cupomValorNum>0?'Importado':'',cupomValor:cupomValorNum,
+    pagamentos:pags,valorBruto:totalVenda,valor:totalDevido,totalPago:totalPago,troco:troco,falta:falta,
+    valorDinheiroFisico:totalDinheiro,
+    funcId:session.funcId,funcNome:session.funcNome,
+    horario:agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),
+    criadoEm:agora.toISOString(),
+    origemImportCodigo:r.codigo||'',
+    origemImportAuto:true,
+    conferido:false,
+  };
+}
+
 function _cxRenderImportVendasModal(session){
   var m=state.cxImportModal;
   if(!m)return null;
@@ -1248,19 +1332,31 @@ function _cxRenderImportVendasModal(session){
     width:expandido?'96vw':'640px',maxWidth:'96vw',maxHeight:'92vh',overflowY:'auto',border:'2px solid #334155',
   }});
   if(m.rows){
+    var toggleExpand=function(){setState({cxImportModal:Object.assign({},m,{expandido:!expandido})});};
+    // Botão de canto (compacto)
     var expandBtn=el('button',{type:'button',title:expandido?'Reduzir':'Expandir',style:{
       position:'absolute',top:'20px',right:'22px',background:'#334155',color:'#f1f5f9',border:'none',
       borderRadius:'8px',width:'32px',height:'32px',fontSize:'15px',cursor:'pointer',lineHeight:'1',
     }},expandido?'🗗':'🗖');
-    expandBtn.onclick=function(){setState({cxImportModal:Object.assign({},m,{expandido:!expandido})});};
+    expandBtn.onclick=toggleExpand;
     box.appendChild(expandBtn);
+    // Setinha lateral, sempre visível na borda direita, para abrir/fechar rapidamente
+    var arrowBtn=el('button',{type:'button',title:expandido?'Fechar (reduzir)':'Abrir (expandir)',style:{
+      position:'absolute',top:'50%',right:expandido?'0':'-16px',transform:'translateY(-50%)',
+      background:'#1d4ed8',color:'#fff',border:'2px solid #1e293b',
+      borderRadius:'50%',width:'34px',height:'34px',fontSize:'16px',fontWeight:'800',
+      cursor:'pointer',boxShadow:'0 4px 12px rgba(0,0,0,.5)',display:'flex',alignItems:'center',justifyContent:'center',
+      zIndex:'2',
+    }},expandido?'◀':'▶');
+    arrowBtn.onclick=toggleExpand;
+    box.appendChild(arrowBtn);
   }
   var dataAlvo=_cxDataAtiva();
   var dataAlvoDisp=typeof fmtDate==='function'?fmtDate(dataAlvo):dataAlvo;
   box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center',color:'#38bdf8'}},'📊 Importar Vendas do Dia'));
   box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'18px'}},'Data selecionada: '+dataAlvoDisp));
 
-  if(!m.rows&&!m.semDados){
+  if(!m.rows&&!m.semDados&&!m.pendingApproval){
     box.appendChild(el('div',{style:{
       background:'#0f172a',borderRadius:'10px',padding:'12px 14px',fontSize:'12px',color:'#94a3b8',
       lineHeight:'1.7',marginBottom:'16px',borderLeft:'3px solid #38bdf8',
@@ -1291,18 +1387,36 @@ function _cxRenderImportVendasModal(session){
             setState({cxImportModal:{semDados:true,datasEncontradas:datasEncontradas}});
             return;
           }
-          var jaLancados={};
-          (state.caixaDiarioMovs||[]).forEach(function(mv){
-            if(mv.profile===pf&&mv.origemImportCodigo)jaLancados[mv.origemImportCodigo]=true;
-          });
+          // Detecta modalidades de pagamento (coluna "Forma de Pagamento") que
+          // ainda não estão cadastradas nem foram aprovadas em uma importação
+          // anterior — o dev precisa confirmar cada uma antes de prosseguir.
+          var map=lsGet('cxFormaImportMap',{})||{};
+          var formas=state.formasPagamento||[];
+          var novas=[];
+          var vistos={};
           doDia.forEach(function(r){
-            var gp=_cxGuessCanalPlataforma(r);
-            r.guessCanal=gp.canal;r.guessPlataforma=gp.plataforma;
-            r.guessFormaId=_cxGuessFormaId(r.formaPagamento);
-            r.jaExistia=!!(r.codigo&&jaLancados[r.codigo]);
-            r.importado=r.jaExistia;
+            var norm=_cxNormFormaTxt(r.formaPagamento);
+            if(!norm||vistos[norm])return;
+            vistos[norm]=true;
+            if(map[norm])return;
+            var exact=formas.find(function(fm){return _cxNormFormaTxt(fm.nome)===norm;});
+            if(exact){map[norm]=exact.id;return;}
+            var guess=_cxGuessFormaIdStrict(r.formaPagamento);
+            novas.push({
+              raw:r.formaPagamento,norm:norm,
+              count:doDia.filter(function(rx){return _cxNormFormaTxt(rx.formaPagamento)===norm;}).length,
+              modo:guess?'existente':'nova',formaExistenteId:guess||(formas[0]||{}).id||'',
+              novoNome:r.formaPagamento,novoTaxaTipo:'pct',novoTaxaValor:0,novoDinheiroFisico:false,
+            });
           });
-          setState({cxImportModal:{rows:doDia}});
+          lsSet('cxFormaImportMap',map);
+          state.cxFormaImportMap=map;
+
+          if(novas.length){
+            setState({cxImportModal:{pendingApproval:true,novasModalidades:novas,doDia:doDia}});
+            return;
+          }
+          _cxFinalizarFilaImportacao(doDia,map);
         }catch(ex){showToast(ex.message,'error');}
       });
     }
@@ -1328,6 +1442,94 @@ function _cxRenderImportVendasModal(session){
     var cancelBtn=el('button',{style:{width:'100%',background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
     cancelBtn.onclick=function(){setState({cxImportModal:null});};
     box.appendChild(cancelBtn);
+
+  } else if(m.pendingApproval){
+    box.appendChild(el('div',{style:{
+      background:'rgba(251,191,36,.12)',border:'1px solid rgba(251,191,36,.35)',color:'#fbbf24',
+      borderRadius:'10px',padding:'12px 14px',marginBottom:'16px',fontSize:'13px',fontWeight:'700',lineHeight:'1.6',
+    }},'⚠ '+m.novasModalidades.length+' modalidade(s) de pagamento nova(s) encontrada(s) neste arquivo. Confirme como tratar cada uma antes de importar.'));
+
+    var cardsWrap=el('div',{style:{marginBottom:'16px'}});
+    m.novasModalidades.forEach(function(card){
+      var cbox=el('div',{style:{background:'#0f172a',border:'1px solid #334155',borderRadius:'12px',padding:'14px',marginBottom:'12px'}});
+      cbox.appendChild(el('div',{style:{fontSize:'14px',fontWeight:'800',color:'#f1f5f9',marginBottom:'2px'}},'"'+card.raw+'"'));
+      cbox.appendChild(el('div',{style:{fontSize:'11px',color:'#64748b',marginBottom:'10px'}},card.count+' pedido(s) com esse texto no arquivo'));
+
+      var modeRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'10px'}});
+      [['existente','🔗 Mapear p/ existente'],['nova','🆕 Criar nova forma']].forEach(function(pair){
+        var sel=card.modo===pair[0];
+        var b=el('button',{type:'button',style:{
+          padding:'8px',borderRadius:'8px',border:'2px solid '+(sel?'#60a5fa':'#334155'),
+          background:sel?'rgba(29,78,216,.2)':'#1e293b',color:'#f1f5f9',fontWeight:'700',fontSize:'12px',cursor:'pointer',
+        }},pair[1]);
+        b.onclick=function(){card.modo=pair[0];setState({cxImportModal:m});};
+        modeRow.appendChild(b);
+      });
+      cbox.appendChild(modeRow);
+
+      if(card.modo==='existente'){
+        var sel2=el('select',{style:{width:'100%',boxSizing:'border-box',padding:'10px',borderRadius:'8px',border:'1px solid #334155',background:'#1e293b',color:'#f1f5f9',fontSize:'13px'}});
+        (state.formasPagamento||[]).forEach(function(f){
+          var opt=el('option',{},f.nome);opt.value=f.id;if(f.id===card.formaExistenteId)opt.selected=true;
+          sel2.appendChild(opt);
+        });
+        sel2.onchange=function(){card.formaExistenteId=sel2.value;};
+        cbox.appendChild(sel2);
+      } else {
+        var nomeInp=el('input',{type:'text',value:card.novoNome,placeholder:'Nome da forma',
+          style:{width:'100%',boxSizing:'border-box',padding:'10px',borderRadius:'8px',border:'1px solid #334155',background:'#1e293b',color:'#f1f5f9',fontSize:'13px',marginBottom:'8px'}});
+        nomeInp.oninput=function(){card.novoNome=nomeInp.value;};
+        cbox.appendChild(nomeInp);
+
+        var taxaRow=el('div',{style:{display:'flex',gap:'8px',marginBottom:'8px'}});
+        var tipoSel=el('select',{style:{padding:'10px',borderRadius:'8px',border:'1px solid #334155',background:'#1e293b',color:'#f1f5f9',fontSize:'12px'}});
+        [['pct','%'],['fixo','R$ fixo']].forEach(function(o){var op=el('option',{},o[1]);op.value=o[0];if(card.novoTaxaTipo===o[0])op.selected=true;tipoSel.appendChild(op);});
+        tipoSel.onchange=function(){card.novoTaxaTipo=tipoSel.value;};
+        var taxaInp=el('input',{type:'number',min:'0',step:'0.01',value:card.novoTaxaValor,placeholder:'Taxa/desconto',
+          style:{flex:'1',boxSizing:'border-box',padding:'10px',borderRadius:'8px',border:'1px solid #334155',background:'#1e293b',color:'#f1f5f9',fontSize:'13px'}});
+        taxaInp.oninput=function(){card.novoTaxaValor=parseFloat(taxaInp.value)||0;};
+        taxaRow.appendChild(tipoSel);taxaRow.appendChild(taxaInp);
+        cbox.appendChild(taxaRow);
+
+        var dinLbl=el('label',{style:{display:'flex',alignItems:'center',gap:'8px',fontSize:'12px',color:'#94a3b8',cursor:'pointer'}});
+        var dinChk=el('input',{type:'checkbox'});dinChk.checked=!!card.novoDinheiroFisico;
+        dinChk.onchange=function(){card.novoDinheiroFisico=dinChk.checked;};
+        dinLbl.appendChild(dinChk);dinLbl.appendChild(document.createTextNode('É dinheiro físico (entra na contagem de cédulas)'));
+        cbox.appendChild(dinLbl);
+      }
+      cardsWrap.appendChild(cbox);
+    });
+    box.appendChild(cardsWrap);
+
+    var actsRow2=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
+    var cancelBtn2=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
+    cancelBtn2.onclick=function(){setState({cxImportModal:null});};
+    var aprovarBtn=el('button',{style:{background:'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'✓ Aprovar e continuar');
+    aprovarBtn.onclick=function(){
+      var map=lsGet('cxFormaImportMap',{})||{};
+      var formas=(state.formasPagamento||[]).slice();
+      var erro=false;
+      m.novasModalidades.forEach(function(card){
+        if(card.modo==='existente'){
+          if(!card.formaExistenteId){erro=true;return;}
+          map[card.norm]=card.formaExistenteId;
+        } else {
+          if(!(card.novoNome||'').trim()){erro=true;return;}
+          var novaForma={id:uid(),nome:card.novoNome.trim(),taxaValor:card.novoTaxaValor||0,taxaTipo:card.novoTaxaTipo||'pct',ehDinheiroFisico:!!card.novoDinheiroFisico};
+          formas.push(novaForma);
+          map[card.norm]=novaForma.id;
+        }
+      });
+      if(erro){showToast('Preencha todas as modalidades pendentes','error');return;}
+      lsSet('cxFormaImportMap',map);
+      lsSet('formasPagamento',formas);
+      state.cxFormaImportMap=map;
+      state.formasPagamento=formas;
+      scheduleSave();
+      _cxFinalizarFilaImportacao(m.doDia,map);
+    };
+    actsRow2.appendChild(cancelBtn2);actsRow2.appendChild(aprovarBtn);
+    box.appendChild(actsRow2);
 
   } else if(m.semDados){
     box.appendChild(el('div',{style:{
@@ -1401,11 +1603,31 @@ function _cxRenderImportVendasModal(session){
     });
     box.appendChild(listWrap);
 
+    if(pendentes>0){
+      box.appendChild(el('div',{style:{fontSize:'11px',color:'#64748b',marginBottom:'10px',lineHeight:'1.6'}},
+        '⚠ Ao clicar em Concluir, os '+pendentes+' pedido(s) ainda pendente(s) serão lançados automaticamente no caixa com os dados sugeridos, para você conferir depois no fechamento do caixa.'));
+    }
+
     var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
     var trocarBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'← Trocar arquivo');
     trocarBtn.onclick=function(){setState({cxImportModal:{}});};
-    var fecharBtn=el('button',{style:{background:'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'✓ Concluir');
-    fecharBtn.onclick=function(){setState({cxImportModal:null});};
+    var fecharBtn=el('button',{style:{background:'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},
+      pendentes>0?('✓ Lançar '+pendentes+' pendente(s) e concluir'):'✓ Concluir');
+    fecharBtn.onclick=function(){
+      var pendentesRows=m.rows.filter(function(r){return !r.importado;});
+      if(!pendentesRows.length){setState({cxImportModal:null});return;}
+      var novos=[];
+      pendentesRows.forEach(function(r){
+        var nv=_cxRegistrarEntradaAuto(r,session);
+        if(nv)novos.push(nv);
+      });
+      if(!novos.length){setState({cxImportModal:null});return;}
+      var lista=(state.caixaDiarioMovs||[]).concat(novos);
+      lsSet('caixaDiarioMovs',lista);
+      setState({caixaDiarioMovs:lista,cxImportModal:null});
+      scheduleSave();
+      showToast(novos.length+' venda(s) lançada(s) automaticamente — confira os dados no fechamento do caixa.','info');
+    };
     actsRow.appendChild(trocarBtn);actsRow.appendChild(fecharBtn);
     box.appendChild(actsRow);
   }

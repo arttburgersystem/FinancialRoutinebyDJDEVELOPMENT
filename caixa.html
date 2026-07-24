@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Instalar — Caixa Diário</title>
+<link rel="manifest" href="manifest-caixa.json">
+<link rel="icon" href="icons/icon.svg">
+<meta name="theme-color" content="#0f172a">
+<style>
+  *{box-sizing:border-box;}
+  body{
+    margin:0;min-height:100vh;background:#0f172a;color:#f1f5f9;
+    font-family:system-ui,-apple-system,sans-serif;
+    display:flex;align-items:center;justify-content:center;padding:24px;
+  }
+  .box{
+    max-width:420px;width:100%;background:#1e293b;border:1px solid #334155;
+    border-radius:22px;padding:36px 28px;text-align:center;
+    box-shadow:0 30px 80px rgba(0,0,0,.6);
+  }
+  .ico{font-size:52px;margin-bottom:14px;}
+  h1{font-size:20px;margin:0 0 8px;color:#38bdf8;}
+  p{font-size:14px;color:#94a3b8;line-height:1.6;margin:0 0 22px;}
+  button,.btn{
+    width:100%;border:none;border-radius:12px;padding:16px;
+    font-size:15px;font-weight:800;cursor:pointer;margin-bottom:12px;
+    font-family:inherit;
+  }
+  .primary{background:#1d4ed8;color:#fff;}
+  .secondary{background:#334155;color:#f1f5f9;}
+  .hint{
+    font-size:12px;color:#64748b;background:#0f172a;border:1px solid #334155;
+    border-radius:10px;padding:12px 14px;text-align:left;line-height:1.7;margin-top:6px;
+  }
+  #msg{font-size:13px;font-weight:700;min-height:18px;margin-top:6px;}
+  #msg.ok{color:#4ade80;}
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="ico">💵</div>
+    <h1>Caixa Diário</h1>
+    <p>Instale este atalho no computador do caixa. Ele abre direto no livro de caixa do dia — contagem de cédulas/moedas na abertura e fechamento, e lançamento de entradas e saídas — sem passar pela PIN do administrador.</p>
+    <button class="primary" id="btnInstall">📥 Instalar neste computador</button>
+    <a class="btn secondary" id="btnOpen" href="index.html#caixa-diario" style="display:block;text-decoration:none;">▶️ Abrir agora (sem instalar)</a>
+    <div id="msg"></div>
+    <div class="hint" id="hint" style="display:none;"></div>
+  </div>
+<script>
+  var deferredPrompt=null;
+  var btnInstall=document.getElementById('btnInstall');
+  var msg=document.getElementById('msg');
+  var hint=document.getElementById('hint');
+
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/sw.js').catch(function(){});
+  }
+
+  window.addEventListener('beforeinstallprompt',function(e){
+    e.preventDefault();
+    deferredPrompt=e;
+  });
+
+  window.addEventListener('appinstalled',function(){
+    msg.className='ok';msg.textContent='✓ Instalado! Pode abrir pelo atalho na área de trabalho.';
+  });
+
+  function showManualHint(){
+    var ua=navigator.userAgent||'';
+    var isIOS=/iPad|iPhone|iPod/.test(ua);
+    hint.style.display='block';
+    hint.textContent=isIOS
+      ? 'No Safari: toque no ícone de Compartilhar (□↑) e depois em "Adicionar à Tela de Início".'
+      : 'No menu do navegador (⋮ ou ≡), clique em "Instalar app" ou "Criar atalho..." — no Windows/Chrome isso cria um atalho na área de trabalho que abre como um programa próprio.';
+  }
+
+  btnInstall.onclick=function(){
+    if(deferredPrompt){
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.finally(function(){deferredPrompt=null;});
+    } else {
+      showManualHint();
+    }
+  };
+
+  setTimeout(function(){if(!deferredPrompt)showManualHint();},1200);
+</script>
+</body>
+</html>

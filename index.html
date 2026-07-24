@@ -550,6 +550,9 @@ var state={
   usuDevModal: false,
   _devCallback: null,
   downloadModal: false,
+  caixaDiario: lsGet('caixaDiario',[]),
+  caixaDiarioMovs: lsGet('caixaDiarioMovs',[]),
+  caixaDiarioMode: false,
   sessionUser: null,
   sessionPickerOpen: false,
   auditLog: lsGet('auditLog',[]),
@@ -3321,6 +3324,17 @@ function render(){
     return;
   }
 
+  // Caixa Diário (kiosk PC do caixa)
+  if (state.caixaDiarioMode && typeof renderCaixaDiario === 'function') {
+    root.appendChild(renderCaixaDiario());
+    if(state.toast){
+      var tCx=el('div',{class:'toast '+state.toast.type},[el('span',{},state.toast.type==='success'?'✓':state.toast.type==='error'?'✕':'ℹ'),el('span',{},state.toast.msg)]);
+      root.appendChild(tCx);
+    }
+    _restoreFocus();
+    return;
+  }
+
   var _hiddenPages=['estoque','impressoes','mapa'];
   if(_hiddenPages.indexOf(state.page)!==-1){setState({page:'dashboard'});return;}
 
@@ -3459,6 +3473,7 @@ function render(){
 <script src="js/page-dp.js"></script>
 <script src="js/page-manual.js"></script>
 <script src="js/page-caixa.js"></script>
+<script src="js/page-caixa-diario.js"></script>
 <script src="js/page-patrimonio.js"></script>
 <script src="js/page-impressoes.js"></script>
 <script src="js/xlsx.min.js"></script>
@@ -3527,25 +3542,35 @@ function lockApp(){
   buildPinScreen('enter');
 }
 
-// ── MODAL DE DOWNLOAD: atalho dedicado ao Tablet de Requisição ───────────────
+// ── MODAL DE DOWNLOAD: atalhos dedicados (Tablet de Requisição, Caixa Diário) ─
+function _downloadFerramentaCard(titulo,descricao,arquivo){
+  var link=location.origin+location.pathname.replace(/[^/]*$/,'')+arquivo;
+  return el('div',{style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'12px',padding:'16px',marginBottom:'14px'}},[
+    el('div',{style:{fontWeight:'800',fontSize:'14px',marginBottom:'6px'}},titulo),
+    el('p',{style:{color:'var(--text2)',fontSize:'12px',lineHeight:'1.6',marginBottom:'12px'}},descricao),
+    el('a',{href:arquivo,target:'_blank',rel:'noopener',class:'btn-primary',
+      style:{display:'block',textAlign:'center',textDecoration:'none',width:'100%',padding:'12px',borderRadius:'10px',fontWeight:'700',marginBottom:'8px',boxSizing:'border-box'}
+    },'📥 Abrir página de instalação'),
+    el('div',{style:{fontSize:'10px',color:'var(--text3)',lineHeight:'1.6',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'8px',padding:'8px 10px',wordBreak:'break-all'}},[
+      el('div',{style:{marginBottom:'2px',fontWeight:'700'}},'Link direto:'),
+      link,
+    ]),
+  ]);
+}
 function renderDownloadModal(){
-  var link=location.origin+location.pathname.replace(/[^/]*$/,'')+'requisicao.html';
   return el('div',{class:'modal-overlay',onclick:function(e){if(e.target===this)setState({downloadModal:false});}},
-    el('div',{class:'modal',style:{maxWidth:'380px'}},[
+    el('div',{class:'modal',style:{maxWidth:'420px'}},[
       el('div',{class:'modal-header'},[
-        el('h3',{class:'modal-title'},'⬇️ Download — Tablet de Requisição'),
+        el('h3',{class:'modal-title'},'⬇️ Download — Atalhos dedicados'),
         el('button',{class:'modal-close',onclick:function(){setState({downloadModal:false});}},'✕'),
       ]),
       el('div',{class:'modal-body',style:{padding:'22px 24px'}},[
-        el('p',{style:{color:'var(--text2)',fontSize:'13px',lineHeight:'1.7',marginBottom:'16px'}},
-          'Gera um atalho separado para instalar no tablet do estoque. Ele abre direto na tela de retirada de itens (PIN de 4 dígitos por funcionário) — sem passar pelo login do sistema.'),
-        el('a',{href:'requisicao.html',target:'_blank',rel:'noopener',class:'btn-primary',
-          style:{display:'block',textAlign:'center',textDecoration:'none',width:'100%',padding:'13px',borderRadius:'10px',fontWeight:'700',marginBottom:'10px',boxSizing:'border-box'}
-        },'📥 Abrir página de instalação'),
-        el('div',{style:{fontSize:'11px',color:'var(--text3)',lineHeight:'1.6',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:'10px',padding:'10px 12px',wordBreak:'break-all'}},[
-          el('div',{style:{marginBottom:'4px',fontWeight:'700'}},'Link direto:'),
-          link,
-        ]),
+        _downloadFerramentaCard('📦 Tablet de Requisição',
+          'Instala no tablet do estoque. Abre direto na retirada de itens (PIN de 4 dígitos por funcionário) — sem passar pelo login do sistema.',
+          'requisicao.html'),
+        _downloadFerramentaCard('💵 Caixa Diário',
+          'Instala no PC do caixa. Abre direto no livro de caixa do dia (contagem de cédulas/moedas na abertura e fechamento, lançamento de entradas e saídas) — sem passar pelo login do sistema.',
+          'caixa.html'),
       ]),
     ])
   );
@@ -3865,6 +3890,15 @@ function oferecerBiometria() {
   if(location.hash==='#requisicao'){
     window.DJF_KIOSK_BOOT=true;
     state.reqMode=true;
+    document.getElementById('pin-overlay').style.display='none';
+    initApp();
+    return;
+  }
+  // Acesso direto ao kiosk de Caixa Diário (link salvo no PC do caixa),
+  // mesma lógica: pula a PIN geral, login é por PIN do funcionário.
+  if(location.hash==='#caixa-diario'){
+    window.DJF_KIOSK_BOOT=true;
+    state.caixaDiarioMode=true;
     document.getElementById('pin-overlay').style.display='none';
     initApp();
     return;

@@ -284,11 +284,11 @@ function renderCaixaDiario(){
   }},session?'⬅ Sair':'✕ Fechar');
   exitBtn.onclick=function(){
     if(session){
-      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null});
+      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null});
     } else if(window.DJF_KIOSK_BOOT && typeof lockApp==='function'){
       lockApp();
     } else {
-      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null});
+      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null});
     }
   };
   hdr.appendChild(exitBtn);
@@ -537,6 +537,7 @@ function renderCaixaDiario(){
 
   if(contModal)root.appendChild(_cxRenderContagemModal(contModal,dia,session,totalDinheiroFisico,totalSaidas));
   if(state.cxImportModal&&_cxIsDev(session))root.appendChild(_cxRenderImportVendasModal(session));
+  if(state.cxStoneModal&&_cxIsDev(session))root.appendChild(_cxRenderStoneModal(session));
   if(movModal)root.appendChild(
     movModal.tipo==='entrada'?_cxRenderEntradaModal(movModal,session):
     movModal.tipo==='sangria'?_cxRenderSangriaModal(movModal,session):
@@ -1427,6 +1428,242 @@ function _cxRegistrarEntradaAuto(r,session){
   };
 }
 
+// ── CONFERÊNCIA DO EXTRATO STONE (crédito/débito/pix da maquininha) ─────────
+// Lê o relatório de vendas exportado do Portal Stone e compara o total por
+// modalidade (crédito/débito/pix) contra o que foi lançado no Caixa Diário
+// pelas formas de pagamento correspondentes, pra achar diferenças (venda que
+// passou na maquininha mas não foi lançada no caixa, ou vice-versa).
+
+// Interpreta a data de uma célula do XLS: string "DD/MM/AAAA" ou serial do Excel.
+function _cxParseDataCelula(v){
+  var s=(v+'').trim();
+  var dm=s.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if(dm)return dm[3]+'-'+dm[2]+'-'+dm[1];
+  if(typeof v==='number'&&v>20000&&v<80000){
+    var d=new Date(Math.round((v-25569)*86400*1000));
+    var yyyy=d.getUTCFullYear(),mm=String(d.getUTCMonth()+1).padStart(2,'0'),dd=String(d.getUTCDate()).padStart(2,'0');
+    return yyyy+'-'+mm+'-'+dd;
+  }
+  return '';
+}
+
+function _parseStoneRows(raw){
+  var hIdx=-1;
+  for(var i=0;i<Math.min(raw.length,20);i++){
+    var joined=raw[i].map(function(c){return(c+'').toUpperCase();}).join('|');
+    if(joined.indexOf('DATA')>=0&&(joined.indexOf('BRUTO')>=0||joined.indexOf('LÍQUID')>=0||joined.indexOf('LIQUID')>=0||joined.indexOf('VALOR')>=0)){hIdx=i;break;}
+  }
+  if(hIdx<0)throw new Error('Formato não reconhecido. Exporte o relatório de vendas do Portal Stone em Excel (com colunas de Data, Modalidade e Valor).');
+
+  var hdrs=raw[hIdx].map(function(h){return(h+'').trim().toUpperCase();});
+  function col(){
+    var cands=Array.prototype.slice.call(arguments);
+    for(var i=0;i<hdrs.length;i++){for(var c=0;c<cands.length;c++){if(hdrs[i].indexOf(cands[c])>=0)return i;}}
+    return -1;
+  }
+  var cData=col('DATA DA VENDA','DATA DA TRANSAÇÃO','DATA'),
+      cTipo=col('MODALIDADE','TIPO DE TRANSAÇÃO','TIPO DE TRANSACAO','FORMA DE PAGAMENTO','TIPO'),
+      cBandeira=col('BANDEIRA'),
+      cBruto=col('VALOR BRUTO','VALOR DA VENDA','VALOR TOTAL'),
+      cLiquido=col('VALOR LÍQUIDO','VALOR LIQUIDO','VALOR RECEBIDO','VALOR A RECEBER'),
+      cTaxa=col('TAXA','DESCONTO','MDR');
+
+  function parseBRL(v){
+    if(typeof v==='number')return Math.round(v*100)/100;
+    return parseFloat((v+'').replace(/[R$\s]/g,'').replace(/\./g,'').replace(',','.'))||0;
+  }
+
+  var rows=[];
+  for(var j=hIdx+1;j<raw.length;j++){
+    var r=raw[j];
+    var dataISO=_cxParseDataCelula(cData>=0?r[cData]:'');
+    if(!dataISO)continue;
+    var tipoTxt=(cTipo>=0?r[cTipo]:'')+'';
+    var tipoNorm=_cxNormFormaTxt(tipoTxt);
+    var tipo='outro';
+    if(tipoNorm.indexOf('debit')>=0)tipo='debito';
+    else if(tipoNorm.indexOf('credit')>=0)tipo='credito';
+    else if(tipoNorm.indexOf('pix')>=0)tipo='pix';
+    var bruto=parseBRL(cBruto>=0?r[cBruto]:0);
+    var liquido=parseBRL(cLiquido>=0?r[cLiquido]:bruto);
+    if(bruto<=0&&liquido<=0)continue;
+    rows.push({
+      data:dataISO,tipo:tipo,tipoRaw:tipoTxt,
+      bandeira:(cBandeira>=0?(r[cBandeira]+''):'').trim(),
+      valorBruto:bruto,valorLiquido:liquido||bruto,
+      taxa:parseBRL(cTaxa>=0?r[cTaxa]:0),
+    });
+  }
+  if(!rows.length)throw new Error('Nenhuma linha de venda encontrada no arquivo.');
+  return rows;
+}
+
+// Soma o que foi recebido no Caixa Diário na data, por modalidade (crédito/
+// débito/pix), olhando as formas de pagamento de cada venda lançada.
+function _cxCalcRecebidoCaixaPorTipo(dataAlvo){
+  var pf=state.profile;
+  var diasDaData=(state.caixaDiario||[]).filter(function(d){return d.data===dataAlvo&&d.profile===pf;}).map(function(d){return d.id;});
+  var movsDoDia=(state.caixaDiarioMovs||[]).filter(function(mv){
+    return mv.profile===pf&&mv.tipo==='entrada'&&(mv.data===dataAlvo||diasDaData.indexOf(mv.diaId)>=0);
+  });
+  var totais={credito:0,debito:0,pix:0,outro:0};
+  var qtds={credito:0,debito:0,pix:0,outro:0};
+  movsDoDia.forEach(function(mv){
+    (mv.pagamentos||[]).forEach(function(p){
+      var n=_cxNormFormaTxt(p.formaNome);
+      var tipo=n.indexOf('debit')>=0?'debito':n.indexOf('credit')>=0?'credito':n.indexOf('pix')>=0?'pix':'outro';
+      totais[tipo]+=p.valor;qtds[tipo]++;
+    });
+  });
+  Object.keys(totais).forEach(function(k){totais[k]=Math.round(totais[k]*100)/100;});
+  return {totais:totais,qtds:qtds};
+}
+
+function _cxRenderStoneModal(session){
+  var m=state.cxStoneModal;
+  if(!m)return null;
+
+  var ov=el('div',{style:{
+    position:'absolute',inset:'0',background:'rgba(0,0,0,.88)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:'310',padding:'20px',overflowY:'auto',
+  }});
+  var box=el('div',{style:{
+    background:'#1e293b',borderRadius:'20px',padding:'26px 24px',
+    width:'560px',maxWidth:'96vw',maxHeight:'92vh',overflowY:'auto',border:'2px solid #334155',
+  }});
+  var dataAlvo=_cxDataAtiva();
+  var dataAlvoDisp=typeof fmtDate==='function'?fmtDate(dataAlvo):dataAlvo;
+  box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center',color:'#2dd4bf'}},'💳 Conferência Extrato Stone'));
+  box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'18px'}},'Data selecionada: '+dataAlvoDisp));
+
+  if(!m.rows){
+    box.appendChild(el('div',{style:{
+      background:'#0f172a',borderRadius:'10px',padding:'12px 14px',fontSize:'12px',color:'#94a3b8',
+      lineHeight:'1.7',marginBottom:'16px',borderLeft:'3px solid #2dd4bf',
+    }},[
+      el('strong',{style:{color:'#f1f5f9',display:'block',marginBottom:'4px'}},'Como funciona:'),
+      'No Portal Stone (site ou app), exporte em Excel o relatório de "Vendas" do dia (com colunas de Data, Modalidade/Tipo e Valor). '
+      +'O sistema soma o total de Crédito, Débito e Pix que passou na maquininha e compara com o que foi lançado no Caixa Diário — assim você vê na hora se falta lançar alguma venda no caixa (ou se sobrou algo lançado que não bateu na maquininha).',
+    ]));
+
+    var fileInp=el('input',{type:'file',accept:'.xlsx,.xls,.csv',style:{display:'none'}});
+    function handleFile(f){
+      if(!f)return;
+      showToast('Lendo arquivo…','info');
+      _parseYoogaFile(f,function(err,raw){
+        if(err){showToast('Erro: '+err.message,'error');return;}
+        try{
+          var todasLinhas=_parseStoneRows(raw);
+          var doDia=todasLinhas.filter(function(r){return r.data===dataAlvo;});
+          if(!doDia.length){
+            var datasSet={};
+            todasLinhas.forEach(function(r){datasSet[r.data]=(datasSet[r.data]||0)+1;});
+            var datasEncontradas=Object.keys(datasSet).sort().map(function(d){return {data:d,qtd:datasSet[d]};});
+            setState({cxStoneModal:{semDados:true,datasEncontradas:datasEncontradas}});
+            return;
+          }
+          setState({cxStoneModal:{rows:doDia}});
+        }catch(ex){showToast(ex.message,'error');}
+      });
+    }
+    fileInp.onchange=function(){handleFile(fileInp.files[0]);};
+
+    var dropZone=el('div',{style:{
+      border:'2px dashed #334155',borderRadius:'12px',padding:'32px 20px',
+      textAlign:'center',cursor:'pointer',background:'#0f172a',marginBottom:'16px',
+    }});
+    dropZone.innerHTML='<div style="font-size:36px;margin-bottom:10px">📂</div>'
+      +'<div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:4px">Clique para selecionar o arquivo do extrato Stone</div>'
+      +'<div style="font-size:12px;color:#64748b">Relatório de vendas exportado do Portal Stone (Excel)</div>';
+    dropZone.onclick=function(){fileInp.click();};
+    dropZone.ondragover=function(e){e.preventDefault();dropZone.style.borderColor='#2dd4bf';};
+    dropZone.ondragleave=function(){dropZone.style.borderColor='#334155';};
+    dropZone.ondrop=function(e){e.preventDefault();dropZone.style.borderColor='#334155';handleFile(e.dataTransfer.files[0]);};
+    box.appendChild(dropZone);
+    box.appendChild(fileInp);
+
+    var cancelBtn=el('button',{style:{width:'100%',background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
+    cancelBtn.onclick=function(){setState({cxStoneModal:null});};
+    box.appendChild(cancelBtn);
+
+  } else if(m.semDados){
+    box.appendChild(el('div',{style:{
+      background:'rgba(248,113,113,.12)',border:'1px solid rgba(248,113,113,.35)',color:'#f87171',
+      borderRadius:'10px',padding:'14px',marginBottom:'16px',fontSize:'13px',fontWeight:'700',
+    }},'⚠ Nenhuma venda encontrada para '+dataAlvoDisp+' neste arquivo.'));
+    if(m.datasEncontradas&&m.datasEncontradas.length){
+      box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',marginBottom:'8px',fontWeight:'700'}},'Datas encontradas no arquivo:'));
+      var datasList=el('div',{style:{marginBottom:'14px',border:'1px solid #334155',borderRadius:'10px',overflow:'hidden'}});
+      m.datasEncontradas.forEach(function(d){
+        datasList.appendChild(el('div',{style:{fontSize:'13px',color:'#f1f5f9',padding:'8px 12px',borderBottom:'1px solid #334155'}},
+          (typeof fmtDate==='function'?fmtDate(d.data):d.data)+' — '+d.qtd+' venda(s)'));
+      });
+      box.appendChild(datasList);
+    }
+    var voltarBtn=el('button',{style:{width:'100%',background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'← Tentar outro arquivo');
+    voltarBtn.onclick=function(){setState({cxStoneModal:{}});};
+    box.appendChild(voltarBtn);
+
+  } else {
+    var extrato={credito:0,debito:0,pix:0,outro:0};
+    var qtdsExtrato={credito:0,debito:0,pix:0,outro:0};
+    m.rows.forEach(function(r){extrato[r.tipo]+=r.valorLiquido;qtdsExtrato[r.tipo]++;});
+    Object.keys(extrato).forEach(function(k){extrato[k]=Math.round(extrato[k]*100)/100;});
+
+    var caixaCalc=_cxCalcRecebidoCaixaPorTipo(dataAlvo);
+    var caixa=caixaCalc.totais,qtdsCaixa=caixaCalc.qtds;
+
+    var linhas=[['credito','💳 Crédito'],['debito','💵 Débito'],['pix','⚡ Pix']];
+    if(extrato.outro>0||qtdsCaixa.outro>0)linhas.push(['outro','❓ Outro']);
+
+    var tbl=el('table',{style:{width:'100%',borderCollapse:'collapse',marginBottom:'16px'}});
+    var thead=el('thead',{},[el('tr',{},[
+      el('th',{style:{textAlign:'left',padding:'8px',fontSize:'11px',color:'#64748b',textTransform:'uppercase'}},'Modalidade'),
+      el('th',{style:{textAlign:'right',padding:'8px',fontSize:'11px',color:'#64748b',textTransform:'uppercase'}},'Extrato Stone'),
+      el('th',{style:{textAlign:'right',padding:'8px',fontSize:'11px',color:'#64748b',textTransform:'uppercase'}},'Lançado no Caixa'),
+      el('th',{style:{textAlign:'right',padding:'8px',fontSize:'11px',color:'#64748b',textTransform:'uppercase'}},'Diferença'),
+    ])]);
+    tbl.appendChild(thead);
+    var tbody=el('tbody',{});
+    var totalDif=0;
+    linhas.forEach(function(pair){
+      var k=pair[0];
+      var vExtrato=extrato[k]||0, vCaixa=caixa[k]||0;
+      var dif=Math.round((vExtrato-vCaixa)*100)/100;
+      totalDif+=Math.abs(dif);
+      var bate=Math.abs(dif)<0.02;
+      tbody.appendChild(el('tr',{style:{borderBottom:'1px solid #334155'}},[
+        el('td',{style:{padding:'10px 8px',fontSize:'13px',fontWeight:'700',color:'#f1f5f9'}},pair[1]+' ('+(qtdsExtrato[k]||0)+' venda(s) / '+(qtdsCaixa[k]||0)+' lanç.)'),
+        el('td',{style:{padding:'10px 8px',fontSize:'13px',textAlign:'right',color:'#f1f5f9',fontWeight:'700'}},fmtMoney(vExtrato)),
+        el('td',{style:{padding:'10px 8px',fontSize:'13px',textAlign:'right',color:'#f1f5f9',fontWeight:'700'}},fmtMoney(vCaixa)),
+        el('td',{style:{padding:'10px 8px',fontSize:'13px',textAlign:'right',fontWeight:'800',color:bate?'#4ade80':'#f87171'}},bate?'✓ Bate':((dif>0?'−':'+')+fmtMoney(Math.abs(dif)))),
+      ]));
+    });
+    tbl.appendChild(tbody);
+    box.appendChild(tbl);
+
+    if(totalDif<0.02){
+      box.appendChild(el('div',{style:{background:'rgba(74,222,128,.12)',border:'1px solid rgba(74,222,128,.3)',color:'#4ade80',borderRadius:'10px',padding:'12px',fontSize:'13px',fontWeight:'700',textAlign:'center',marginBottom:'16px'}},'✓ Tudo bateu certinho — nenhuma diferença encontrada.'));
+    } else {
+      box.appendChild(el('div',{style:{background:'rgba(248,113,113,.12)',border:'1px solid rgba(248,113,113,.3)',color:'#f87171',borderRadius:'10px',padding:'12px',fontSize:'13px',fontWeight:'700',textAlign:'center',marginBottom:'16px'}},'⚠ Encontrada diferença — confira se falta lançar alguma venda no caixa (ou algo foi lançado a mais/errado).'));
+    }
+
+    box.appendChild(el('div',{style:{fontSize:'10px',color:'#64748b',marginBottom:'16px',lineHeight:'1.6'}},
+      'A coluna "Lançado no Caixa" considera todas as formas de pagamento cadastradas cujo nome contenha "Débito", "Crédito" ou "Pix" (salão e delivery). Se algum nome de forma estiver diferente, o total pode não bater por causa disso — confira em ⚙ Gerenciar formas de pagamento.'));
+
+    var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
+    var trocarBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'← Trocar arquivo');
+    trocarBtn.onclick=function(){setState({cxStoneModal:{}});};
+    var fecharBtn=el('button',{style:{background:'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'✓ Fechar');
+    fecharBtn.onclick=function(){setState({cxStoneModal:null});};
+    actsRow.appendChild(trocarBtn);actsRow.appendChild(fecharBtn);
+    box.appendChild(actsRow);
+  }
+
+  ov.appendChild(box);
+  return ov;
+}
+
 function _cxRenderImportVendasModal(session){
   var m=state.cxImportModal;
   if(!m)return null;
@@ -1705,6 +1942,13 @@ function _cxRenderImportVendasModal(session){
       box.appendChild(el('div',{style:{fontSize:'11px',color:'#64748b',marginBottom:'10px',lineHeight:'1.6'}},
         '⚠ Ao clicar em Concluir, os '+pendentes+' pedido(s) ainda pendente(s) serão lançados automaticamente no caixa com os dados sugeridos, para você conferir depois no fechamento do caixa.'));
     }
+
+    var stoneBtn=el('button',{type:'button',style:{
+      width:'100%',background:'#0f766e',color:'#fff',border:'none',borderRadius:'10px',
+      padding:'12px',cursor:'pointer',fontSize:'13px',fontWeight:'700',marginBottom:'10px',
+    }},'💳 Conferir Extrato Stone (Crédito/Débito/Pix)');
+    stoneBtn.onclick=function(){setState({cxStoneModal:{}});};
+    box.appendChild(stoneBtn);
 
     var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
     var trocarBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'← Trocar arquivo');

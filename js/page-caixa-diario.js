@@ -452,6 +452,7 @@ function renderCaixaDiario(){
           titulo=canalLabel+(platLabel?' · '+platLabel:'')+(m.identificacao?' · '+m.identificacao:'');
           var formasTxt=m.pagamentos.map(function(p){return p.formaNome+' '+fmtMoney(p.valor);}).join(' + ');
           if(m.taxaPlataforma>0)formasTxt+=' (taxa plataforma '+fmtMoney(m.taxaPlataforma)+')';
+          if(m.cupomCodigo)formasTxt+=' (🎟 '+m.cupomCodigo+': -'+fmtMoney(m.cupomValor)+')';
           if(m.troco>0)formasTxt+=' (troco '+fmtMoney(m.troco)+')';
           if(m.falta>0)formasTxt+=' (falta '+fmtMoney(m.falta)+')';
           sub=(m.horario||'')+' · '+(m.funcNome||'')+' · '+formasTxt;
@@ -937,6 +938,26 @@ function _cxRenderEntradaModal(m,session){
   totalVendaInp.oninput=function(){m.totalVenda=totalVendaInp.value;atualizaBannerPag();};
   box.appendChild(totalVendaInp);
 
+  // ── Cupom de desconto (opcional) ──
+  var cupomRow=el('label',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px',cursor:'pointer',fontSize:'13px',fontWeight:'700',color:'#f1f5f9'}});
+  var cupomChk=el('input',{type:'checkbox'});
+  cupomChk.checked=!!m.cupomAtivo;
+  cupomChk.onchange=function(){m.cupomAtivo=cupomChk.checked;if(!m.cupomAtivo){m.cupomCodigo='';m.cupomValor='';}rerenderMov();};
+  cupomRow.appendChild(cupomChk);
+  cupomRow.appendChild(document.createTextNode('🎟 Usar cupom de desconto'));
+  box.appendChild(cupomRow);
+  if(m.cupomAtivo){
+    var cupomWrap=el('div',{style:{display:'flex',gap:'8px',marginBottom:'16px'}});
+    var cupomCodInp=el('input',{type:'text',placeholder:'Código do cupom',value:m.cupomCodigo||'',
+      style:{flex:'1',boxSizing:'border-box',padding:'10px 12px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px'}});
+    cupomCodInp.oninput=function(){m.cupomCodigo=cupomCodInp.value;};
+    var cupomValInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'Valor desc.',value:m.cupomValor||'',
+      style:{width:'110px',boxSizing:'border-box',padding:'10px 12px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px',fontWeight:'700',textAlign:'right'}});
+    cupomValInp.oninput=function(){m.cupomValor=cupomValInp.value;};
+    cupomWrap.appendChild(cupomCodInp);cupomWrap.appendChild(cupomValInp);
+    box.appendChild(cupomWrap);
+  }
+
   if(formas.length===0){
     box.appendChild(el('div',{style:{fontSize:'12px',color:'#fbbf24',background:'rgba(251,191,36,.12)',border:'1px solid rgba(251,191,36,.3)',borderRadius:'8px',padding:'10px 12px',marginBottom:'16px'}},
       '⚠ Nenhuma forma de pagamento cadastrada. Toque em ⚙ no topo para cadastrar.'));
@@ -984,6 +1005,37 @@ function _cxRenderEntradaModal(m,session){
       bannerEl.textContent='⚠ Falta receber: '+fmtMoney(-dif);
     }
   }
+  // Taxa da plataforma de uma linha de pagamento: iFood/cartão/etc usam a taxa
+  // cadastrada na forma normalmente; Yooga é especial (só cobra quando o pedido
+  // é Automático, e não quando é Manual — então não usa a taxa fixa da forma).
+  function _cxTaxaLinha(p,f){
+    if(!f)return 0;
+    var isYooga=f.id==='fp_yooga'||/yooga/i.test(f.nome||'');
+    if(isYooga)return 0; // Yooga é tratado à parte, via tipoPedidoYooga
+    var val=parseFloat((p.valor+'').replace(',','.'))||0;
+    return Math.round((val-_cxCalcLiquido(val,f))*100)/100;
+  }
+  var taxasResumoEl=el('div',{style:{fontSize:'11px',color:'#94a3b8',marginBottom:'10px',display:'none'}});
+  function atualizaTaxasResumo(){
+    var linhas=[];
+    var totalTaxas=0;
+    m.pagamentos.forEach(function(p){
+      var f=formas.find(function(x){return x.id===p.formaId;});
+      var t=_cxTaxaLinha(p,f);
+      if(t>0.004){totalTaxas+=t;linhas.push(f.nome+': -'+fmtMoney(t));}
+    });
+    if(m.plataforma==='yooga'&&m.tipoPedidoYooga==='automatico'){
+      var yf=(state.formasPagamento||[]).find(function(x){return x.id==='fp_yooga'||/yooga/i.test(x.nome||'');});
+      var tp=yf?(yf.taxaValor||0):0;
+      if(tp>0){totalTaxas+=tp;linhas.push('Taxa Yooga (pedido automático): -'+fmtMoney(tp));}
+    }
+    if(linhas.length===0){taxasResumoEl.style.display='none';return;}
+    taxasResumoEl.style.display='block';
+    taxasResumoEl.innerHTML='';
+    taxasResumoEl.appendChild(el('div',{style:{fontWeight:'700',color:'#fb923c',marginBottom:'3px'}},'💸 Taxas descontadas automaticamente:'));
+    linhas.forEach(function(l){taxasResumoEl.appendChild(el('div',{},l));});
+    taxasResumoEl.appendChild(el('div',{style:{fontWeight:'800',color:'#fb923c',marginTop:'3px'}},'Total de taxas: -'+fmtMoney(totalTaxas)));
+  }
 
   var pagWrap=el('div',{style:{marginBottom:'8px'}});
   m.pagamentos.forEach(function(p,i){
@@ -996,11 +1048,11 @@ function _cxRenderEntradaModal(m,session){
       if(f.id===p.formaId)opt.selected=true;
       sel.appendChild(opt);
     });
-    sel.onchange=function(){p.formaId=sel.value;};
+    sel.onchange=function(){p.formaId=sel.value;atualizaTaxasResumo();};
 
     var valInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'Valor pago',value:p.valor||'',
       style:{width:'100px',padding:'10px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px',fontWeight:'700',textAlign:'right'}});
-    valInp.oninput=function(){p.valor=valInp.value;totalEl.textContent=fmtMoney(calcTotalPag());atualizaBannerPag();};
+    valInp.oninput=function(){p.valor=valInp.value;totalEl.textContent=fmtMoney(calcTotalPag());atualizaBannerPag();atualizaTaxasResumo();};
 
     var linha=el('div',{style:{display:'flex',gap:'8px',marginBottom:'8px',alignItems:'center'}},[sel,valInp]);
     if(m.misto&&m.pagamentos.length>1){
@@ -1030,6 +1082,8 @@ function _cxRenderEntradaModal(m,session){
   ]));
   box.appendChild(bannerEl);
   atualizaBannerPag();
+  box.appendChild(taxasResumoEl);
+  atualizaTaxasResumo();
 
   box.appendChild(el('div',{style:{fontSize:'10px',color:'#64748b',marginBottom:'12px'}},'* Todos os campos são obrigatórios (canal, identificação, total e forma de pagamento).'));
 
@@ -1050,6 +1104,9 @@ function _cxRenderEntradaModal(m,session){
     if(!(m.identificacao||'').trim()){showToast('Informe a identificação da venda','error');return;}
     if(m.canal==='delivery'&&!m.plataforma){showToast('Selecione a plataforma de delivery (iFood ou Yooga)','error');return;}
     if(m.plataforma==='yooga'&&!m.tipoPedidoYooga){showToast('Selecione o tipo de pedido Yooga (Manual ou Automático)','error');return;}
+    var cupomValorNum=parseFloat((m.cupomValor+'').replace(',','.'))||0;
+    if(m.cupomAtivo&&!(m.cupomCodigo||'').trim()){showToast('Informe o código do cupom','error');return;}
+    if(m.cupomAtivo&&cupomValorNum<=0){showToast('Informe o valor do desconto do cupom','error');return;}
     var totalVenda=calcTotalVenda();
     if(!totalVenda||totalVenda<=0){showToast('Informe o total da venda','error');return;}
     var pags=[];
@@ -1059,8 +1116,9 @@ function _cxRenderEntradaModal(m,session){
       if(val<=0){erro=true;return;}
       var f=formas.find(function(x){return x.id===p.formaId;});
       if(!f){erro=true;return;}
-      var liq=_cxCalcLiquido(val,f);
-      pags.push({formaId:f.id,formaNome:f.nome,valor:val,taxaValor:f.taxaValor||0,taxaTipo:f.taxaTipo||'pct',valorLiquido:liq,ehDinheiroFisico:!!f.ehDinheiroFisico});
+      var isYoogaLinha=f.id==='fp_yooga'||/yooga/i.test(f.nome||'');
+      var liq=isYoogaLinha?val:_cxCalcLiquido(val,f);
+      pags.push({formaId:f.id,formaNome:f.nome,valor:val,taxaValor:isYoogaLinha?0:(f.taxaValor||0),taxaTipo:f.taxaTipo||'pct',valorLiquido:liq,ehDinheiroFisico:!!f.ehDinheiroFisico});
     });
     if(erro||pags.length===0){showToast('Preencha a forma e o valor de cada pagamento','error');return;}
     var totalPago=pags.reduce(function(s,p){return s+p.valor;},0);
@@ -1084,6 +1142,7 @@ function _cxRenderEntradaModal(m,session){
       id:uid(),profile:state.profile,data:_cxDataAtiva(),diaId:diaAtual?diaAtual.id:null,tipo:'entrada',
       canal:m.canal,identificacao:(m.identificacao||'').trim(),
       plataforma:m.canal==='delivery'?m.plataforma:'',tipoPedidoYooga:m.tipoPedidoYooga||'',taxaPlataforma:taxaPlataforma,
+      cupomCodigo:m.cupomAtivo?(m.cupomCodigo||'').trim():'',cupomValor:m.cupomAtivo?cupomValorNum:0,
       pagamentos:pags,valor:totalVenda,totalPago:totalPago,troco:troco,falta:falta,
       valorDinheiroFisico:totalDinheiro,
       funcId:session.funcId,funcNome:session.funcNome,
@@ -1243,6 +1302,7 @@ function _cxRenderKpiModal(tipo,dia,movs,aberturaTotal,totalEntradas,totalSaidas
       titulo=canalLabel+(platLabel2?' · '+platLabel2:'')+(m.identificacao?' · '+m.identificacao:'');
       var formasTxt2=m.pagamentos.map(function(p){return p.formaNome+' '+fmtMoney(p.valor);}).join(' + ');
       if(m.taxaPlataforma>0)formasTxt2+=' (taxa plataforma '+fmtMoney(m.taxaPlataforma)+')';
+      if(m.cupomCodigo)formasTxt2+=' (🎟 '+m.cupomCodigo+': -'+fmtMoney(m.cupomValor)+')';
       if(m.troco>0)formasTxt2+=' (troco '+fmtMoney(m.troco)+')';
       if(m.falta>0)formasTxt2+=' (falta '+fmtMoney(m.falta)+')';
       sub=(m.horario||'')+' · '+(m.funcNome||'')+' · '+formasTxt2;
@@ -1420,6 +1480,8 @@ function _cxExportarRelatorio(dataFiltro){
   var totalDinheiroFisico=entradas.reduce(function(s,m){return s+(m.valorDinheiroFisico!==undefined?m.valorDinheiroFisico:m.valor);},0);
   var saldoFisicoEsperado=aberturaTotal+totalDinheiroFisico-totalSaidas;
   var totalTaxaPlataforma=entradas.reduce(function(s,m){return s+(m.taxaPlataforma||0);},0);
+  var vendasComCupom=entradas.filter(function(m){return m.cupomCodigo;});
+  var totalCupons=vendasComCupom.reduce(function(s,m){return s+(m.cupomValor||0);},0);
 
   // Totais por forma de pagamento
   var porForma={};
@@ -1436,7 +1498,7 @@ function _cxExportarRelatorio(dataFiltro){
   var entradasRows=entradas.map(function(m){
     var canalLabel=(m.canal==='delivery'?'Delivery':'Salão')+(_cxPlataformaLabel(m)?' — '+_cxPlataformaLabel(m):'');
     var formasTxt=(m.pagamentos||[]).map(function(p){return p.formaNome+' '+M(p.valor);}).join(' + ');
-    var obs=(m.taxaPlataforma>0?' · taxa plat. '+M(m.taxaPlataforma):'')+(m.troco>0?' · troco '+M(m.troco):'')+(m.falta>0?' · falta '+M(m.falta):'');
+    var obs=(m.taxaPlataforma>0?' · taxa plat. '+M(m.taxaPlataforma):'')+(m.cupomCodigo?' · cupom '+m.cupomCodigo+' -'+M(m.cupomValor):'')+(m.troco>0?' · troco '+M(m.troco):'')+(m.falta>0?' · falta '+M(m.falta):'');
     return '<tr>'+
       '<td>'+(m.horario||'')+'</td>'+
       '<td>'+canalLabel+'</td>'+
@@ -1458,6 +1520,10 @@ function _cxExportarRelatorio(dataFiltro){
 
   var porFormaRows=Object.keys(porForma).sort().map(function(k){
     return '<tr><td>'+k+'</td><td class="num">'+M(porForma[k])+'</td></tr>';
+  }).join('');
+
+  var cupomRows=vendasComCupom.map(function(m){
+    return '<tr><td>'+(m.horario||'')+'</td><td>'+(m.identificacao||'—')+'</td><td>'+m.cupomCodigo+'</td><td class="num">-'+M(m.cupomValor)+'</td></tr>';
   }).join('');
 
   var w=window.open('','_blank','width=800,height=1000');
@@ -1501,6 +1567,11 @@ function _cxExportarRelatorio(dataFiltro){
     )+
     '<h3>Totais por forma de pagamento</h3>'+
     (porFormaRows?'<table><thead><tr><th>Forma</th><th class="num">Total</th></tr></thead><tbody>'+porFormaRows+'</tbody></table>':'<div class="sub">Nenhuma venda registrada.</div>')+
+    (vendasComCupom.length>0?(
+      '<h3>Cupons de desconto utilizados ('+vendasComCupom.length+')</h3>'+
+      '<table><thead><tr><th>Hora</th><th>Identificação</th><th>Cupom</th><th class="num">Desconto</th></tr></thead><tbody>'+cupomRows+
+      '</tbody><tfoot><tr style="font-weight:700"><td colspan="3">Total em cupons</td><td class="num">-'+M(totalCupons)+'</td></tr></tfoot></table>'
+    ):'')+
     '<h3>Vendas do dia ('+entradas.length+')</h3>'+
     (entradasRows?'<table><thead><tr><th>Hora</th><th>Canal</th><th>Identificação</th><th>Pagamento</th><th class="num">Valor</th><th>Funcionário</th></tr></thead><tbody>'+entradasRows+'</tbody></table>':'<div class="sub">Nenhuma venda registrada.</div>')+
     '<h3>Saídas do dia ('+saidas.length+')</h3>'+

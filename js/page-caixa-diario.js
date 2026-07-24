@@ -524,13 +524,18 @@ function _cxResumoFechado(dia,totalEntradas,totalSaidas,totalDinheiroFisico){
     borderRadius:'10px',padding:'12px',cursor:'pointer',fontSize:'13px',fontWeight:'700',
   }},'🔓 Reabrir caixa para corrigir');
   reabrirBtn.onclick=function(){
+    // Reabrir exige contar as cédulas/moedas de novo antes de poder fechar outra
+    // vez -- não é só destravar o status, garante uma conferência formal.
     var dias=(state.caixaDiario||[]).map(function(d){
       return d.id===dia.id?Object.assign({},d,{status:'aberto'}):d;
     });
     lsSet('caixaDiario',dias);
-    setState({caixaDiario:dias});
+    setState({
+      caixaDiario:dias,
+      cxContagemModal:{tipo:'fechamento',qtds:Object.assign({},dia.fechamentoCedulas||{})},
+    });
     scheduleSave();
-    showToast('Caixa reaberto','error');
+    showToast('Caixa reaberto — confira a contagem de cédulas antes de fechar de novo','error');
   };
   card.appendChild(reabrirBtn);
   return card;

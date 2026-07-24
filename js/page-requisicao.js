@@ -128,10 +128,14 @@ function renderRequisicao() {
     if (pinSt) {
       var pinFunc = funcs.find(function(x){return x.id===pinSt.funcId;});
       if (pinFunc) {
-        var pinOv = el('div',{style:{
-          position:'absolute',inset:'0',background:'rgba(0,0,0,.82)',
-          display:'flex',alignItems:'center',justifyContent:'center',zIndex:'200',
-        }});
+        var pinOv = el('div',{
+          tabIndex:'-1',
+          style:{
+            position:'absolute',inset:'0',background:'rgba(0,0,0,.82)',
+            display:'flex',alignItems:'center',justifyContent:'center',zIndex:'200',
+            outline:'none',
+          },
+        });
         var pinBox = el('div',{style:{
           background:'#1e293b',borderRadius:'22px',padding:'32px 28px',
           width:'300px',maxWidth:'90vw',border:'2px solid #334155',
@@ -157,6 +161,42 @@ function renderRequisicao() {
           textAlign:'center',minHeight:'22px',fontSize:'13px',fontWeight:'700',
           color:'#f87171',marginBottom:'14px',
         }},pinSt.erro?'❌ PIN incorreto — tente novamente':''));
+        // Pressiona uma tecla do teclado do PIN (clique no botão ou teclado físico/numérico)
+        function pressPinKey(key, fn){
+          var cur=(state.reqPin||{}).value||'';
+          if(key==='←'){
+            setState({reqPin:{funcId:fn.id,value:cur.slice(0,-1),erro:false}});
+          } else if(key==='✓'){
+            var v=(state.reqPin||{}).value||'';
+            if(v===fn.senhaRequisicao){
+              setState({reqSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},reqPin:null,reqCarrinho:[]});
+            } else {
+              setState({reqPin:{funcId:fn.id,value:'',erro:true}});
+            }
+          } else if(cur.length<4){
+            var nova=cur+key;
+            setState({reqPin:{funcId:fn.id,value:nova,erro:false}});
+            if(nova.length===4){
+              setTimeout(function(){
+                var st=state.reqPin;
+                if(!st||st.funcId!==fn.id)return;
+                if(st.value===fn.senhaRequisicao){
+                  setState({reqSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},reqPin:null,reqCarrinho:[]});
+                } else {
+                  setState({reqPin:{funcId:fn.id,value:'',erro:true}});
+                }
+              },300);
+            }
+          }
+        }
+        // Habilita digitação via teclado físico/numérico (além do toque nos botões)
+        pinOv.onkeydown=function(ev){
+          var key=ev.key;
+          if(key>='0'&&key<='9'){ev.preventDefault();pressPinKey(key,pinFunc);}
+          else if(key==='Backspace'){ev.preventDefault();pressPinKey('←',pinFunc);}
+          else if(key==='Enter'){ev.preventDefault();pressPinKey('✓',pinFunc);}
+          else if(key==='Escape'){ev.preventDefault();setState({reqPin:null});}
+        };
         // Keypad
         var kpad = el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'9px'}});
         ['1','2','3','4','5','6','7','8','9','←','0','✓'].forEach(function(k){
@@ -168,33 +208,7 @@ function renderRequisicao() {
           kb.onmouseenter=function(){kb.style.opacity='.8';};
           kb.onmouseleave=function(){kb.style.opacity='1';};
           !function(key,fn){
-            kb.onclick=function(){
-              var cur=(state.reqPin||{}).value||'';
-              if(key==='←'){
-                setState({reqPin:{funcId:fn.id,value:cur.slice(0,-1),erro:false}});
-              } else if(key==='✓'){
-                var v=(state.reqPin||{}).value||'';
-                if(v===fn.senhaRequisicao){
-                  setState({reqSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},reqPin:null,reqCarrinho:[]});
-                } else {
-                  setState({reqPin:{funcId:fn.id,value:'',erro:true}});
-                }
-              } else if(cur.length<4){
-                var nova=cur+key;
-                setState({reqPin:{funcId:fn.id,value:nova,erro:false}});
-                if(nova.length===4){
-                  setTimeout(function(){
-                    var st=state.reqPin;
-                    if(!st||st.funcId!==fn.id)return;
-                    if(st.value===fn.senhaRequisicao){
-                      setState({reqSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},reqPin:null,reqCarrinho:[]});
-                    } else {
-                      setState({reqPin:{funcId:fn.id,value:'',erro:true}});
-                    }
-                  },300);
-                }
-              }
-            };
+            kb.onclick=function(){pressPinKey(key,fn);};
           }(k,pinFunc);
           kpad.appendChild(kb);
         });
@@ -208,6 +222,7 @@ function renderRequisicao() {
         pinBox.appendChild(cancelPin);
         pinOv.appendChild(pinBox);
         root.appendChild(pinOv);
+        setTimeout(function(){pinOv.focus();},0);
       }
     }
     return root;
@@ -219,6 +234,7 @@ function renderRequisicao() {
     borderBottom:'1px solid #334155',flexShrink:'0',
   }});
   var searchInp = el('input',{
+    id:'req-busca-inp',
     type:'text',placeholder:'🔍 Buscar produto por nome ou categoria...',
     style:{
       width:'100%',background:'#0f172a',border:'2px solid #334155',

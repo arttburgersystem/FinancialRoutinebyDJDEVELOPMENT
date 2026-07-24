@@ -3272,6 +3272,18 @@ function render(){
 
   root.innerHTML='';
 
+  // Restaura foco após re-render para que inputs de busca não percam o cursor
+  function _restoreFocus(){
+    if(_fId){
+      var _r=document.getElementById(_fId);
+      if(_r){_r.focus();if(_fSel&&typeof _r.setSelectionRange==='function')try{_r.setSelectionRange(_fSel.s,_fSel.e);}catch(e){}}
+    }else if(_fIdx>=0){
+      var _allPost=root.querySelectorAll('input,textarea,select');
+      var _r2=_allPost[_fIdx];
+      if(_r2){_r2.focus();if(_fSel&&typeof _r2.setSelectionRange==='function')try{_r2.setSelectionRange(_fSel.s,_fSel.e);}catch(e){}}
+    }
+  }
+
   // PDV mode: tela cheia, sem sidebar
   if (state.page === 'pdv' && typeof renderPDV === 'function') {
     root.appendChild(renderPDV());
@@ -3279,6 +3291,7 @@ function render(){
       var tPdv=el('div',{class:'toast '+state.toast.type},[el('span',{},state.toast.type==='success'?'✓':state.toast.type==='error'?'✕':'ℹ'),el('span',{},state.toast.msg)]);
       root.appendChild(tPdv);
     }
+    _restoreFocus();
     return;
   }
 
@@ -3289,6 +3302,7 @@ function render(){
       var tReq=el('div',{class:'toast '+state.toast.type},[el('span',{},state.toast.type==='success'?'✓':state.toast.type==='error'?'✕':'ℹ'),el('span',{},state.toast.msg)]);
       root.appendChild(tReq);
     }
+    _restoreFocus();
     return;
   }
 
@@ -3299,6 +3313,7 @@ function render(){
       var tKds=el('div',{class:'toast '+state.toast.type},[el('span',{},state.toast.type==='success'?'✓':state.toast.type==='error'?'✕':'ℹ'),el('span',{},state.toast.msg)]);
       root.appendChild(tKds);
     }
+    _restoreFocus();
     return;
   }
 
@@ -3381,15 +3396,7 @@ function render(){
   }
   root.appendChild(app);
 
-  // Restaura foco após re-render para que inputs de busca não percam o cursor
-  if(_fId){
-    var _r=document.getElementById(_fId);
-    if(_r){_r.focus();if(_fSel&&typeof _r.setSelectionRange==='function')try{_r.setSelectionRange(_fSel.s,_fSel.e);}catch(e){}}
-  }else if(_fIdx>=0){
-    var _allPost=root.querySelectorAll('input,textarea,select');
-    var _r2=_allPost[_fIdx];
-    if(_r2){_r2.focus();if(_fSel&&typeof _r2.setSelectionRange==='function')try{_r2.setSelectionRange(_fSel.s,_fSel.e);}catch(e){}}
-  }
+  _restoreFocus();
 
   if(window._djfClockTimer)clearInterval(window._djfClockTimer);
   window._djfClockTimer=setInterval(function(){

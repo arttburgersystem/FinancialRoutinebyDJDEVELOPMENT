@@ -54,7 +54,7 @@
   var hint=document.getElementById('hint');
 
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/sw.js').catch(function(){});
+    navigator.serviceWorker.register('sw.js').catch(function(){});
   }
 
   window.addEventListener('beforeinstallprompt',function(e){

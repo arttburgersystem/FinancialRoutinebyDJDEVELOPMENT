@@ -9,7 +9,7 @@ var _bgTaskTimer = null;   // timer do task checker
 
 function registrarSW() {
   if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.register('/sw.js').then(function(reg) {
+  navigator.serviceWorker.register('sw.js').then(function(reg) {
     _bgSW = reg;
     // Escuta mensagens do SW (ex: clique em notificação)
     navigator.serviceWorker.addEventListener('message', function(e) {

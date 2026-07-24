@@ -639,13 +639,13 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
     box.appendChild(el('div',{style:{
       fontSize:'13px',color:'#fbbf24',background:'rgba(251,191,36,.12)',border:'1px solid rgba(251,191,36,.3)',
       borderRadius:'10px',padding:'12px 14px',marginBottom:'18px',lineHeight:'1.6',textAlign:'center',
-    }},'Abertura de '+fmtMoney(m._totalPendente)+' está '+(diff>0?(fmtMoney(diff)+' ACIMA'):(fmtMoney(-diff)+' ABAIXO'))+' do padrão ('+fmtMoney(_CX_ABERTURA_PADRAO)+'). Digite a senha do desenvolvedor pra autorizar.'));
+    }},'Abertura de '+fmtMoney(m._totalPendente)+' está '+(diff>0?(fmtMoney(diff)+' ACIMA'):(fmtMoney(-diff)+' ABAIXO'))+' do padrão ('+fmtMoney(_CX_ABERTURA_PADRAO)+'). Digite o PIN do desenvolvedor (o mesmo do login do Caixa Diário) pra autorizar.'));
 
-    var senhaInp=el('input',{type:'password',placeholder:'Senha do desenvolvedor',
-      style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'15px',textAlign:'center',marginBottom:'8px'}});
-    senhaInp.oninput=function(){m._senhaAutorizacao=senhaInp.value;};
+    var senhaInp=el('input',{type:'password',inputmode:'numeric',maxLength:'4',placeholder:'PIN do desenvolvedor',
+      style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'20px',fontWeight:'700',textAlign:'center',letterSpacing:'8px',marginBottom:'8px'}});
+    senhaInp.oninput=function(){senhaInp.value=senhaInp.value.replace(/\D/g,'').slice(0,4);m._senhaAutorizacao=senhaInp.value;};
     box.appendChild(senhaInp);
-    var errAut=el('div',{style:{fontSize:'12px',color:'#f87171',textAlign:'center',minHeight:'18px',marginBottom:'10px',fontWeight:'700'}},m._erroAutorizacao?'❌ Senha incorreta':'');
+    var errAut=el('div',{style:{fontSize:'12px',color:'#f87171',textAlign:'center',minHeight:'18px',marginBottom:'10px',fontWeight:'700'}},m._erroAutorizacao?'❌ PIN incorreto':'');
     box.appendChild(errAut);
 
     var actsAut=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
@@ -653,8 +653,8 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
     voltarBtn.onclick=function(){m.autorizando=false;m._erroAutorizacao=false;setState({cxContagemModal:m});};
     var autorizarBtn=el('button',{style:{background:'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'✓ Autorizar');
     autorizarBtn.onclick=function(){
-      var dev=(state.usuarios||[]).find(function(u){return u.papel==='desenvolvedor';});
-      if(!dev||typeof verificaSenha!=='function'||!verificaSenha(m._senhaAutorizacao||'',dev.senhaHash)){
+      var dev=(state.usuarios||[]).find(function(u){return u.papel==='desenvolvedor'&&u.pinCaixa;});
+      if(!dev||!m._senhaAutorizacao||m._senhaAutorizacao!==dev.pinCaixa){
         m._erroAutorizacao=true;
         setState({cxContagemModal:m});
         return;

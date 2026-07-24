@@ -66,6 +66,10 @@ function renderRequisicao() {
   exitBtn.onclick = function(){
     if(session){
       setState({reqSession:null,reqCarrinho:[],reqPin:null,reqQtdModal:null,reqBusca:''});
+    } else if(window.DJF_KIOSK_BOOT && typeof lockApp==='function'){
+      // Tablet dedicado (aberto via link direto): fechar exige a PIN geral do sistema,
+      // em vez de abrir o app completo sem proteção.
+      lockApp();
     } else {
       setState({reqMode:false,reqSession:null,reqCarrinho:[],reqPin:null,reqBusca:'',reqQtdModal:null});
     }
@@ -380,10 +384,14 @@ function renderRequisicao() {
     var qEstq=qItem.estoqueAtual||0;
     var needsDec=['kg','g','L','mL','ml'].indexOf(qItem.unidade||'')>=0;
 
-    var qOv=el('div',{style:{
-      position:'absolute',inset:'0',background:'rgba(0,0,0,.82)',
-      display:'flex',alignItems:'center',justifyContent:'center',zIndex:'200',
-    }});
+    var qOv=el('div',{
+      tabIndex:'-1',
+      style:{
+        position:'absolute',inset:'0',background:'rgba(0,0,0,.82)',
+        display:'flex',alignItems:'center',justifyContent:'center',zIndex:'200',
+        outline:'none',
+      },
+    });
     var qBox=el('div',{style:{
       background:'#1e293b',borderRadius:'22px',padding:'28px 24px',
       width:'310px',maxWidth:'92vw',border:'2px solid #334155',
@@ -405,6 +413,46 @@ function renderRequisicao() {
     qBox.appendChild(el('div',{style:{
       textAlign:'center',fontSize:'13px',color:'#64748b',marginBottom:'16px',
     }},'Quantidade em '+(qItem.unidade||'un')));
+    // Confirma a quantidade e adiciona ao carrinho
+    function qtdConfirmar(){
+      var md=state.reqQtdModal;
+      if(!md)return;
+      var qty=parseFloat(md.qtd);
+      if(!qty||qty<=0){showToast&&showToast('Informe uma quantidade válida','error');return;}
+      var estq=md.item.estoqueAtual||0;
+      if(qty>estq){
+        if(!confirm('Atenção: quantidade ('+qty+') maior que o estoque disponível ('+estq+').\nContinuar mesmo assim?'))return;
+      }
+      var carr=(state.reqCarrinho||[]).slice();
+      var idx=-1;
+      for(var ci=0;ci<carr.length;ci++){if(carr[ci].insumoId===md.item.id){idx=ci;break;}}
+      var novo={insumoId:md.item.id,nome:md.item.nome,unidade:md.item.unidade||'un',qtd:qty,estoqueAtual:estq,custoMedio:md.item.custoMedio||0};
+      if(idx>=0)carr[idx]=novo;else carr.push(novo);
+      setState({reqQtdModal:null,reqCarrinho:carr});
+    }
+    // Pressiona uma tecla do teclado de quantidade (clique no botão ou teclado físico/numérico)
+    function pressQtyKey(key){
+      var cur=(state.reqQtdModal||{}).qtd||'';
+      var item2=(state.reqQtdModal||{}).item;
+      if(key==='←'){
+        setState({reqQtdModal:{item:item2,qtd:cur.slice(0,-1)}});
+      } else if(key==='.'&&(!needsDec||cur.indexOf('.')>=0)){
+        return;
+      } else if(cur==='0'&&key!=='.'){
+        setState({reqQtdModal:{item:item2,qtd:key}});
+      } else if(cur.length<8){
+        setState({reqQtdModal:{item:item2,qtd:cur+key}});
+      }
+    }
+    // Habilita digitação via teclado físico/numérico (além do toque nos botões)
+    qOv.onkeydown=function(ev){
+      var key=ev.key;
+      if(key>='0'&&key<='9'){ev.preventDefault();pressQtyKey(key);}
+      else if(key==='.'||key===','){ev.preventDefault();pressQtyKey('.');}
+      else if(key==='Backspace'){ev.preventDefault();pressQtyKey('←');}
+      else if(key==='Enter'){ev.preventDefault();qtdConfirmar();}
+      else if(key==='Escape'){ev.preventDefault();setState({reqQtdModal:null});}
+    };
     // Teclado numérico
     var qKpad=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'8px',marginBottom:'14px'}});
     var qKeys=['1','2','3','4','5','6','7','8','9',needsDec?'.':'__','0','←'];
@@ -418,19 +466,7 @@ function renderRequisicao() {
       kb.onmouseenter=function(){kb.style.opacity='.8';};
       kb.onmouseleave=function(){kb.style.opacity='1';};
       !function(key){
-        kb.onclick=function(){
-          var cur=(state.reqQtdModal||{}).qtd||'';
-          var item2=(state.reqQtdModal||{}).item;
-          if(key==='←'){
-            setState({reqQtdModal:{item:item2,qtd:cur.slice(0,-1)}});
-          } else if(key==='.'&&cur.indexOf('.')>=0){
-            return;
-          } else if(cur==='0'&&key!=='.'){
-            setState({reqQtdModal:{item:item2,qtd:key}});
-          } else if(cur.length<8){
-            setState({reqQtdModal:{item:item2,qtd:cur+key}});
-          }
-        };
+        kb.onclick=function(){pressQtyKey(key);};
       }(k);
       qKpad.appendChild(kb);
     });
@@ -446,22 +482,7 @@ function renderRequisicao() {
       background:'#1d4ed8',color:'#fff',border:'none',borderRadius:'11px',
       padding:'15px',cursor:'pointer',fontSize:'15px',fontWeight:'900',
     }},'+ Adicionar');
-    qAdd.onclick=function(){
-      var md=state.reqQtdModal;
-      if(!md)return;
-      var qty=parseFloat(md.qtd);
-      if(!qty||qty<=0){showToast&&showToast('Informe uma quantidade válida','error');return;}
-      var estq=md.item.estoqueAtual||0;
-      if(qty>estq){
-        if(!confirm('Atenção: quantidade ('+qty+') maior que o estoque disponível ('+estq+').\nContinuar mesmo assim?'))return;
-      }
-      var carr=(state.reqCarrinho||[]).slice();
-      var idx=-1;
-      for(var ci=0;ci<carr.length;ci++){if(carr[ci].insumoId===md.item.id){idx=ci;break;}}
-      var novo={insumoId:md.item.id,nome:md.item.nome,unidade:md.item.unidade||'un',qtd:qty,estoqueAtual:estq,custoMedio:md.item.custoMedio||0};
-      if(idx>=0)carr[idx]=novo;else carr.push(novo);
-      setState({reqQtdModal:null,reqCarrinho:carr});
-    };
+    qAdd.onclick=qtdConfirmar;
     qActs.appendChild(qCancel);
     qActs.appendChild(qAdd);
     qBox.appendChild(qActs);
@@ -481,6 +502,7 @@ function renderRequisicao() {
     }
     qOv.appendChild(qBox);
     root.appendChild(qOv);
+    setTimeout(function(){qOv.focus();},0);
   }
 
   return root;

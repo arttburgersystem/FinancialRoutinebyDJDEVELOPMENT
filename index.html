@@ -3831,6 +3831,15 @@ function oferecerBiometria() {
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 (function(){
+  // Acesso direto ao kiosk de Requisição de Estoque (link salvo no tablet do estoque),
+  // pula a PIN geral do sistema — cada funcionário usa seu próprio PIN de 4 dígitos.
+  if(location.hash==='#requisicao'){
+    window.DJF_KIOSK_BOOT=true;
+    state.reqMode=true;
+    document.getElementById('pin-overlay').style.display='none';
+    initApp();
+    return;
+  }
   var saved=getPin();
   buildPinScreen(saved?'enter':'setup');
 })();

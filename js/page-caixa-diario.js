@@ -1728,6 +1728,18 @@ function _cxRenderStoneModal(session){
     var caixaCalc=_cxCalcRecebidoCaixaPorTipo(dataAlvo);
     var caixa=caixaCalc.totais,qtdsCaixa=caixaCalc.qtds;
 
+    // Se ainda existem pedidos pendentes (não salvos) na importação de vendas
+    // do dia, avisa antes da tabela — senão a conferência dá "tudo faltando"
+    // só porque nada foi lançado no caixa ainda, o que confunde.
+    var pendentesImport=(state.cxImportModal&&state.cxImportModal.rows)
+      ?state.cxImportModal.rows.filter(function(r){return !r.importado;}).length:0;
+    if(pendentesImport>0){
+      box.appendChild(el('div',{style:{
+        background:'rgba(251,191,36,.14)',border:'1px solid rgba(251,191,36,.4)',color:'#fbbf24',
+        borderRadius:'10px',padding:'12px 14px',marginBottom:'16px',fontSize:'13px',fontWeight:'700',lineHeight:'1.6',
+      }},'⚠ Você ainda tem '+pendentesImport+' pedido(s) pendente(s) de lançamento na importação de vendas do dia. Enquanto não forem salvos no caixa (um a um ou pelo botão "Lançar e concluir"), a coluna "Lançado no Caixa" fica menor que o real — a diferença abaixo não significa erro ainda.'));
+    }
+
     if(m.resumo.fonte==='pdf'&&m.resumo.totalVendido>0){
       box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'14px'}},
         'Resumo Stone: '+fmtMoney(m.resumo.totalVendido)+' total vendido em '+(m.resumo.vendasRealizadas||0)+' venda(s).'));

@@ -4,9 +4,15 @@
 // Acessível via state.caixaDiarioMode = true (login por PIN de funcionário,
 // reaproveita o mesmo PIN de 4 dígitos já usado na Requisição de Estoque).
 
+// Permite múltiplas sessões de caixa no mesmo dia (ex: turno almoço + jantar).
+// Retorna a sessão aberta de hoje se existir; senão, a última sessão de hoje
+// (fechada) para exibir o resumo; senão null (nenhuma sessão hoje ainda).
 function _cxDiaAtual(){
   var pf=state.profile, dt=today();
-  return (state.caixaDiario||[]).find(function(d){return d.data===dt&&d.profile===pf;})||null;
+  var todos=(state.caixaDiario||[]).filter(function(d){return d.data===dt&&d.profile===pf;});
+  if(todos.length===0)return null;
+  var aberto=todos.find(function(d){return d.status==='aberto';});
+  return aberto||todos[todos.length-1];
 }
 
 // Processa uma tecla do teclado numérico do PIN (clique no botão ou teclado físico)
@@ -311,8 +317,10 @@ function renderCaixaDiario(){
 
   // ── ÁREA PRINCIPAL (logado) ───────────────────────────────────────────────
   var dia  = _cxDiaAtual();
-  var movs = (state.caixaDiarioMovs||[]).filter(function(m){return m.data===today()&&m.profile===pf;})
-    .sort(function(a,b){return (b.criadoEm||'').localeCompare(a.criadoEm||'');});
+  // Movimentações pertencem à sessão de caixa atual (não a todas do dia), para
+  // que uma nova abertura comece com Vendas/Saídas zerados de novo.
+  var movs = dia?(state.caixaDiarioMovs||[]).filter(function(m){return m.diaId===dia.id&&m.profile===pf;})
+    .sort(function(a,b){return (b.criadoEm||'').localeCompare(a.criadoEm||'');}):[];
   var totalEntradas = movs.filter(function(m){return m.tipo==='entrada';}).reduce(function(s,m){return s+m.valor;},0);
   var totalSaidas   = movs.filter(function(m){return m.tipo==='saida';}).reduce(function(s,m){return s+m.valor;},0);
   // Só as formas marcadas como "dinheiro físico" entram na contagem de cédulas do fechamento
@@ -328,7 +336,7 @@ function renderCaixaDiario(){
 
   if(!dia||dia.status!=='aberto'){
     if(dia&&dia.status==='fechado'){
-      mainArea.appendChild(_cxResumoFechado(dia,totalEntradas,totalSaidas,totalDinheiroFisico));
+      mainArea.appendChild(_cxResumoFechado(dia));
     } else {
       var abrirCard=el('div',{style:{
         textAlign:'center',padding:'48px 32px',background:'#1e293b',
@@ -496,48 +504,23 @@ function renderCaixaDiario(){
 }
 
 // ── RESUMO DO DIA JÁ FECHADO ─────────────────────────────────────────────────
-function _cxResumoFechado(dia,totalEntradas,totalSaidas,totalDinheiroFisico){
-  var saldoEsp=(dia.aberturaTotal||0)+(totalDinheiroFisico!==undefined?totalDinheiroFisico:totalEntradas)-totalSaidas;
-  var dif=(dia.fechamentoTotal||0)-saldoEsp;
+// Visão mínima: o caixa foi encerrado, os números ficam guardados (dev pode
+// consultar pelo Relatório em PDF). A única ação daqui é abrir uma nova sessão.
+function _cxResumoFechado(dia){
   var card=el('div',{style:{
-    background:'#1e293b',border:'1px solid #334155',borderRadius:'16px',padding:'24px',maxWidth:'440px',margin:'20px auto',
+    background:'#1e293b',border:'1px solid #334155',borderRadius:'16px',padding:'32px 24px',
+    maxWidth:'420px',margin:'40px auto',textAlign:'center',
   }});
-  card.appendChild(el('div',{style:{fontSize:'16px',fontWeight:'800',marginBottom:'16px',textAlign:'center'}},'✅ Caixa fechado hoje'));
-  function linha(label,val,cor){
-    return el('div',{style:{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid #334155',fontSize:'14px'}},[
-      el('span',{style:{color:'#94a3b8'}},label),
-      el('span',{style:{fontWeight:'700',color:cor||'#f1f5f9'}},fmtMoney(val)),
-    ]);
-  }
-  card.appendChild(linha('Abertura',dia.aberturaTotal||0,'#60a5fa'));
-  card.appendChild(linha('Vendas do dia',totalEntradas,'#4ade80'));
-  card.appendChild(linha('Saídas',totalSaidas,'#f87171'));
-  card.appendChild(linha('Dinheiro esperado no caixa',saldoEsp,'#fbbf24'));
-  card.appendChild(linha('Contado no fechamento',dia.fechamentoTotal||0));
-  card.appendChild(el('div',{style:{display:'flex',justifyContent:'space-between',padding:'12px 0 0',marginTop:'8px',borderTop:'2px solid #334155',fontSize:'15px'}},[
-    el('span',{style:{fontWeight:'800'}},'Diferença'),
-    el('span',{style:{fontWeight:'900',color:Math.abs(dif)<0.01?'#4ade80':dif>0?'#fbbf24':'#f87171'}},
-      Math.abs(dif)<0.01?'✓ Conferido':(dif>0?'+':'')+fmtMoney(dif)),
-  ]));
-  var reabrirBtn=el('button',{style:{
-    width:'100%',marginTop:'18px',background:'#334155',color:'#fff',border:'none',
-    borderRadius:'10px',padding:'12px',cursor:'pointer',fontSize:'13px',fontWeight:'700',
-  }},'🔓 Reabrir caixa para corrigir');
-  reabrirBtn.onclick=function(){
-    // Reabrir exige contar as cédulas/moedas de novo antes de poder fechar outra
-    // vez -- não é só destravar o status, garante uma conferência formal.
-    var dias=(state.caixaDiario||[]).map(function(d){
-      return d.id===dia.id?Object.assign({},d,{status:'aberto'}):d;
-    });
-    lsSet('caixaDiario',dias);
-    setState({
-      caixaDiario:dias,
-      cxContagemModal:{tipo:'fechamento',qtds:Object.assign({},dia.fechamentoCedulas||{})},
-    });
-    scheduleSave();
-    showToast('Caixa reaberto — confira a contagem de cédulas antes de fechar de novo','error');
-  };
-  card.appendChild(reabrirBtn);
+  card.appendChild(el('div',{style:{fontSize:'44px',marginBottom:'12px'}},'✅'));
+  card.appendChild(el('div',{style:{fontSize:'17px',fontWeight:'800',marginBottom:'6px'}},'Caixa fechado'));
+  card.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',marginBottom:'24px'}},
+    'Encerrado às '+(dia.fechamentoHorario||'—')+' por '+(dia.fechamentoFuncNome||'—')));
+  var novaBtn=el('button',{style:{
+    width:'100%',background:'#16a34a',color:'#fff',border:'none',borderRadius:'12px',
+    padding:'16px',cursor:'pointer',fontSize:'15px',fontWeight:'800',
+  }},'🔓 Iniciar nova abertura de caixa');
+  novaBtn.onclick=function(){setState({cxContagemModal:{tipo:'abertura',qtds:{}}});};
+  card.appendChild(novaBtn);
   return card;
 }
 
@@ -604,9 +587,9 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
     var pf=state.profile, dt=today(), agora=new Date();
     var horario=agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     var dias=(state.caixaDiario||[]).slice();
-    var idx=-1;
-    for(var i=0;i<dias.length;i++){if(dias[i].data===dt&&dias[i].profile===pf){idx=i;break;}}
     if(isFechamento){
+      var idx=-1;
+      for(var i=0;i<dias.length;i++){if(dias[i].data===dt&&dias[i].profile===pf&&dias[i].status==='aberto'){idx=i;break;}}
       if(idx<0)return;
       dias[idx]=Object.assign({},dias[idx],{
         fechamentoCedulas:Object.assign({},qtds),fechamentoTotal:total,
@@ -614,14 +597,14 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
         fechamentoHorario:horario,status:'fechado',
       });
     } else {
+      // Sempre cria uma nova sessão (permite mais de uma abertura no mesmo dia)
       var novo={
         id:uid(),profile:pf,data:dt,
         aberturaCedulas:Object.assign({},qtds),aberturaTotal:total,
         aberturaFuncId:session.funcId,aberturaFuncNome:session.funcNome,aberturaHorario:horario,
         status:'aberto',
       };
-      if(idx>=0)dias[idx]=Object.assign({},dias[idx],novo);
-      else dias.push(novo);
+      dias.push(novo);
     }
     lsSet('caixaDiario',dias);
     setState({caixaDiario:dias,cxContagemModal:null});
@@ -664,9 +647,10 @@ function _cxRenderSaidaModal(m,session){
     var val=parseFloat((m.valor+'').replace(',','.'))||0;
     if(!desc){showToast('Informe uma descrição','error');return;}
     if(!val||val<=0){showToast('Informe um valor válido','error');return;}
+    var diaAtual=_cxDiaAtual();
     var agora=new Date();
     var novo={
-      id:uid(),profile:state.profile,data:today(),
+      id:uid(),profile:state.profile,data:today(),diaId:diaAtual?diaAtual.id:null,
       tipo:'saida',descricao:desc,valor:val,
       funcId:session.funcId,funcNome:session.funcNome,
       horario:agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),
@@ -860,9 +844,10 @@ function _cxRenderEntradaModal(m,session){
     // Dinheiro físico que fica na gaveta: soma das formas em dinheiro menos o troco devolvido
     var totalDinheiro=pags.filter(function(p){return p.ehDinheiroFisico;}).reduce(function(s,p){return s+p.valor;},0);
     totalDinheiro=Math.max(0,Math.round((totalDinheiro-troco)*100)/100);
+    var diaAtual=_cxDiaAtual();
     var agora=new Date();
     var novo={
-      id:uid(),profile:state.profile,data:today(),tipo:'entrada',
+      id:uid(),profile:state.profile,data:today(),diaId:diaAtual?diaAtual.id:null,tipo:'entrada',
       canal:m.canal,identificacao:(m.identificacao||'').trim(),
       pagamentos:pags,valor:totalVenda,totalPago:totalPago,troco:troco,falta:falta,
       valorDinheiroFisico:totalDinheiro,

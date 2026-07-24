@@ -696,7 +696,7 @@ function _cxRenderEntradaModal(m,session){
   function rerenderMov(){setState({cxMovModal:m});}
 
   // ── Canal: Salão ou Delivery ──
-  box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Canal'));
+  box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Canal *'));
   var canalRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'16px'}});
   [['salao','🏠 Salão'],['delivery','🛵 Delivery']].forEach(function(pair){
     var b=el('button',{type:'button',style:{
@@ -710,14 +710,14 @@ function _cxRenderEntradaModal(m,session){
   box.appendChild(canalRow);
 
   // ── Identificação da venda ──
-  box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Identificação da venda'));
+  box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Identificação da venda *'));
   var idInp=el('input',{type:'text',placeholder:'Ex: Comanda 12, Mesa 5, Pedido iFood #123...',value:m.identificacao||'',
     style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'14px',marginBottom:'16px'}});
   idInp.oninput=function(){m.identificacao=idInp.value;};
   box.appendChild(idInp);
 
   // ── Total da venda (o que é devido) ──
-  box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Total da venda'));
+  box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Total da venda *'));
   var totalVendaInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'0,00',value:m.totalVenda||'',
     style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'20px',fontWeight:'800',textAlign:'center',marginBottom:'16px'}});
   totalVendaInp.oninput=function(){m.totalVenda=totalVendaInp.value;atualizaBannerPag();};
@@ -817,6 +817,8 @@ function _cxRenderEntradaModal(m,session){
   box.appendChild(bannerEl);
   atualizaBannerPag();
 
+  box.appendChild(el('div',{style:{fontSize:'10px',color:'#64748b',marginBottom:'12px'}},'* Todos os campos são obrigatórios (canal, identificação, total e forma de pagamento).'));
+
   if(_cxIsDev(session)){
     var gerenciarLink=el('button',{type:'button',style:{
       background:'none',border:'none',color:'#60a5fa',fontSize:'11px',cursor:'pointer',padding:'0',marginBottom:'16px',textDecoration:'underline',
@@ -831,6 +833,7 @@ function _cxRenderEntradaModal(m,session){
   var confirmBtn=el('button',{style:{background:'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'✓ Salvar Venda');
   confirmBtn.onclick=function(){
     if(formas.length===0){showToast('Cadastre ao menos uma forma de pagamento primeiro','error');return;}
+    if(!(m.identificacao||'').trim()){showToast('Informe a identificação da venda','error');return;}
     var totalVenda=calcTotalVenda();
     if(!totalVenda||totalVenda<=0){showToast('Informe o total da venda','error');return;}
     var pags=[];

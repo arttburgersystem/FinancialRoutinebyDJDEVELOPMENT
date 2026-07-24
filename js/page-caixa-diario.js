@@ -172,8 +172,28 @@ function _cxSalvarPinUsuario(fn,pin){
   scheduleSave();
 }
 
+// Libera a redefinição do PIN do Caixa Diário para as contas de desenvolvedor
+// uma única vez (a pedido do próprio dev). Limpa o PIN atual, o que faz a
+// tela de login mostrar "🆕 Criar PIN" de novo — basta digitar um PIN novo
+// pra confirmar. Roda só uma vez por causa da flag em localStorage.
+function _cxLiberarRedefinicaoPinDev(){
+  if(lsGet('cxPinResetV',0)>=1)return;
+  var mudou=false;
+  var usuarios=(state.usuarios||[]).map(function(u){
+    if(u.papel==='desenvolvedor'&&u.pinCaixa){mudou=true;return Object.assign({},u,{pinCaixa:''});}
+    return u;
+  });
+  if(mudou){
+    lsSet('usuarios',usuarios);
+    state.usuarios=usuarios;
+    scheduleSave();
+  }
+  lsSet('cxPinResetV',1);
+}
+
 function renderCaixaDiario(){
   _cxSeedFormasPagamento();
+  _cxLiberarRedefinicaoPinDev();
   var pf=state.profile;
   var funcs=_cxListaLogin();
 

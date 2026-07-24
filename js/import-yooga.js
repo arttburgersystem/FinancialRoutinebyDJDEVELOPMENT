@@ -318,16 +318,22 @@ function renderImportYoogaModal(){
     var totalElD=el('span',{style:{fontWeight:'700',color:'var(--green)',fontVariantNumeric:'tabular-nums'}},fmtMoney(totalValD));
     var countElD=el('span',{style:{fontWeight:'700',color:'var(--text)'}},String(m.rows.filter(function(r){return r.incluir;}).length));
 
+    var rowChecksD=[];
+    function _atualizarTotaisD(){
+      var t=m.rows.reduce(function(s,rx){return s+(rx.incluir?rx.valorRecebido:0);},0);
+      totalElD.textContent=fmtMoney(t);
+      countElD.textContent=String(m.rows.filter(function(rx){return rx.incluir;}).length);
+    }
+
     var tbodyD=el('tbody',{});
     m.rows.forEach(function(r,i){
       var chk=el('input',{type:'checkbox',style:{cursor:'pointer',accentColor:'var(--primary)',marginTop:'1px'}});
       chk.checked=r.incluir;
       chk.onchange=function(){
         m.rows[i].incluir=chk.checked;
-        var t=m.rows.reduce(function(s,rx){return s+(rx.incluir?rx.valorRecebido:0);},0);
-        totalElD.textContent=fmtMoney(t);
-        countElD.textContent=String(m.rows.filter(function(rx){return rx.incluir;}).length);
+        _atualizarTotaisD();
       };
+      rowChecksD.push(chk);
       var dim=r.valorRecebido===0?'0.35':'1';
       tbodyD.appendChild(el('tr',{style:{opacity:dim,borderBottom:'1px solid var(--border)'}},[
         el('td',{style:{padding:'6px 8px',verticalAlign:'middle'}},[chk]),
@@ -338,6 +344,16 @@ function renderImportYoogaModal(){
         el('td',{style:{padding:'6px 8px',fontSize:'11px',color:'var(--text3)',textAlign:'right',whiteSpace:'nowrap'}},(r.data?r.data.split('-').reverse().join('/'):'')+(r.hora?' '+r.hora:'')),
       ]));
     });
+
+    var chkAllD=el('input',{type:'checkbox',style:{cursor:'pointer',accentColor:'var(--primary)'}});
+    chkAllD.checked=m.rows.length>0&&m.rows.every(function(r){return r.incluir;});
+    chkAllD.title='Marcar/desmarcar todos';
+    chkAllD.onchange=function(){
+      var v=chkAllD.checked;
+      m.rows.forEach(function(r){r.incluir=v;});
+      rowChecksD.forEach(function(c){c.checked=v;});
+      _atualizarTotaisD();
+    };
 
     var thD=function(txt,align){return el('th',{style:{padding:'6px 8px',textAlign:align||'left',fontSize:'10px',color:'var(--text3)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'.05em',whiteSpace:'nowrap'}},txt);};
 
@@ -351,7 +367,10 @@ function renderImportYoogaModal(){
       el('div',{style:{overflowX:'auto',maxHeight:expandido?'calc(100vh - 260px)':'340px',overflowY:'auto',border:'1px solid var(--border)',borderRadius:'8px'}},[
         el('table',{style:{width:'100%',borderCollapse:'collapse',minWidth:'620px'}},[
           el('thead',{style:{position:'sticky',top:'0',background:'var(--bg2)',zIndex:'1'}},[
-            el('tr',{},[thD(''),thD('Código'),thD('Cliente'),thD('Pagamento'),thD('Recebido','right'),thD('Data','right')]),
+            el('tr',{},[
+              el('th',{style:{padding:'6px 8px',verticalAlign:'middle'}},[chkAllD]),
+              thD('Código'),thD('Cliente'),thD('Pagamento'),thD('Recebido','right'),thD('Data','right'),
+            ]),
           ]),
           tbodyD,
           el('tfoot',{},[

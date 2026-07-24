@@ -9,6 +9,55 @@ function _cxDiaAtual(){
   return (state.caixaDiario||[]).find(function(d){return d.data===dt&&d.profile===pf;})||null;
 }
 
+// Processa uma tecla do teclado numérico do PIN (clique no botão ou teclado físico)
+function _cxPressPinKey(key,fn){
+  var cur=(state.cxPin||{}).value||'';
+  var setup=!fn.pin;
+  function tentaConcluir(v){
+    if(setup){
+      _cxSalvarPinUsuario(fn,v);
+      setState({cxSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},cxPin:null});
+    } else if(v===fn.pin){
+      setState({cxSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},cxPin:null});
+    } else {
+      setState({cxPin:{funcId:fn.id,value:'',erro:true}});
+    }
+  }
+  if(key==='←'){
+    setState({cxPin:{funcId:fn.id,value:cur.slice(0,-1),erro:false}});
+  } else if(key==='✓'){
+    var v=(state.cxPin||{}).value||'';
+    if(v.length===4)tentaConcluir(v);
+  } else if(cur.length<4){
+    var nova=cur+key;
+    setState({cxPin:{funcId:fn.id,value:nova,erro:false}});
+    if(nova.length===4){
+      setTimeout(function(){
+        var st=state.cxPin;
+        if(!st||st.funcId!==fn.id)return;
+        tentaConcluir(st.value);
+      },300);
+    }
+  }
+}
+
+// Teclado físico do PIN: listener global (não depende de foco em nenhum
+// elemento específico, evitando perder digitação em re-renders do kiosk)
+if(!window._cxKeydownBound){
+  window._cxKeydownBound=true;
+  document.addEventListener('keydown',function(e){
+    if(!state.caixaDiarioMode||!state.cxPin)return;
+    var funcs=typeof _cxListaLogin==='function'?_cxListaLogin():[];
+    var fn=funcs.find(function(x){return x.id===state.cxPin.funcId;});
+    if(!fn)return;
+    var k=e.key;
+    if(k>='0'&&k<='9'){e.preventDefault();_cxPressPinKey(k,fn);}
+    else if(k==='Backspace'){e.preventDefault();_cxPressPinKey('←',fn);}
+    else if(k==='Enter'){e.preventDefault();_cxPressPinKey('✓',fn);}
+    else if(k==='Escape'){e.preventDefault();setState({cxPin:null});}
+  });
+}
+
 // Só o Desenvolvedor pode editar/excluir formas de pagamento e taxas
 function _cxIsDev(session){
   if(!session)return false;
@@ -340,9 +389,9 @@ function renderCaixaDiario(){
   if(pinSt){
     var pinFunc=funcs.find(function(x){return x.id===pinSt.funcId;});
     if(pinFunc){
-      var pinOv=el('div',{tabIndex:'-1',style:{
+      var pinOv=el('div',{style:{
         position:'absolute',inset:'0',background:'rgba(0,0,0,.82)',
-        display:'flex',alignItems:'center',justifyContent:'center',zIndex:'200',outline:'none',
+        display:'flex',alignItems:'center',justifyContent:'center',zIndex:'200',
       }});
       var pinBox=el('div',{style:{
         background:'#1e293b',borderRadius:'22px',padding:'32px 28px',
@@ -369,44 +418,6 @@ function renderCaixaDiario(){
         color:'#f87171',marginBottom:'14px',
       }},pinSt.erro?'❌ PIN incorreto — tente novamente':''));
 
-      function pressCxPinKey(key,fn){
-        var cur=(state.cxPin||{}).value||'';
-        var setup=!fn.pin;
-        function tentaConcluir(v){
-          if(setup){
-            _cxSalvarPinUsuario(fn,v);
-            setState({cxSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},cxPin:null});
-          } else if(v===fn.pin){
-            setState({cxSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},cxPin:null});
-          } else {
-            setState({cxPin:{funcId:fn.id,value:'',erro:true}});
-          }
-        }
-        if(key==='←'){
-          setState({cxPin:{funcId:fn.id,value:cur.slice(0,-1),erro:false}});
-        } else if(key==='✓'){
-          var v=(state.cxPin||{}).value||'';
-          if(v.length===4)tentaConcluir(v);
-        } else if(cur.length<4){
-          var nova=cur+key;
-          setState({cxPin:{funcId:fn.id,value:nova,erro:false}});
-          if(nova.length===4){
-            setTimeout(function(){
-              var st=state.cxPin;
-              if(!st||st.funcId!==fn.id)return;
-              tentaConcluir(st.value);
-            },300);
-          }
-        }
-      }
-      pinOv.onkeydown=function(ev){
-        var key=ev.key;
-        if(key>='0'&&key<='9'){ev.preventDefault();pressCxPinKey(key,pinFunc);}
-        else if(key==='Backspace'){ev.preventDefault();pressCxPinKey('←',pinFunc);}
-        else if(key==='Enter'){ev.preventDefault();pressCxPinKey('✓',pinFunc);}
-        else if(key==='Escape'){ev.preventDefault();setState({cxPin:null});}
-      };
-
       var kpad=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'9px'}});
       ['1','2','3','4','5','6','7','8','9','←','0','✓'].forEach(function(k){
         var bgK=k==='✓'?'#1d4ed8':k==='←'?'#374151':'#334155';
@@ -417,7 +428,7 @@ function renderCaixaDiario(){
         kb.onmouseenter=function(){kb.style.opacity='.8';};
         kb.onmouseleave=function(){kb.style.opacity='1';};
         !function(key,fn){
-          kb.onclick=function(){pressCxPinKey(key,fn);};
+          kb.onclick=function(){_cxPressPinKey(key,fn);};
         }(k,pinFunc);
         kpad.appendChild(kb);
       });
@@ -431,7 +442,6 @@ function renderCaixaDiario(){
       pinBox.appendChild(cancelPin);
       pinOv.appendChild(pinBox);
       root.appendChild(pinOv);
-      setTimeout(function(){pinOv.focus();},0);
     }
   }
 

@@ -725,15 +725,14 @@ function _cxRenderEntradaModal(m,session){
 
     box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Plataforma *'));
     var platRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'16px'}});
-    [['ifood','iFood','#ea1d2c'],['yooga','Yooga','#7c3aed']].forEach(function(pl){
+    [['ifood','iFood','#ea1d2c','icons/logo-ifood.jpg'],['yooga','Yooga','#1c9fdb','icons/logo-yooga.png']].forEach(function(pl){
       var sel=m.plataforma===pl[0];
       var b=el('button',{type:'button',style:{
-        display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',
-        padding:'10px',borderRadius:'10px',border:'2px solid '+(sel?pl[2]:'#334155'),
-        background:sel?pl[2]+'33':'#0f172a',color:'#f1f5f9',fontWeight:'700',fontSize:'13px',cursor:'pointer',
+        display:'flex',alignItems:'center',justifyContent:'center',
+        padding:'8px',borderRadius:'10px',border:'2px solid '+(sel?pl[2]:'#334155'),
+        background:sel?pl[2]+'33':'#0f172a',cursor:'pointer',overflow:'hidden',
       }},[
-        el('span',{style:{width:'20px',height:'20px',borderRadius:'6px',background:pl[2],display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:'900',color:'#fff',flexShrink:'0'}},pl[1][0]),
-        document.createTextNode(pl[1]),
+        el('img',{src:pl[3],alt:pl[1],style:{height:'28px',width:'auto',borderRadius:'4px',display:'block'}}),
       ]);
       b.onclick=function(){
         m.plataforma=pl[0];
@@ -753,8 +752,8 @@ function _cxRenderEntradaModal(m,session){
       [['manual','✋ Manual'],['automatico','🤖 Automático']].forEach(function(tp){
         var sel=m.tipoPedidoYooga===tp[0];
         var b=el('button',{type:'button',style:{
-          padding:'10px',borderRadius:'10px',border:'2px solid '+(sel?'#7c3aed':'#334155'),
-          background:sel?'rgba(124,58,237,.25)':'#0f172a',color:'#f1f5f9',fontWeight:'700',fontSize:'13px',cursor:'pointer',
+          padding:'10px',borderRadius:'10px',border:'2px solid '+(sel?'#1c9fdb':'#334155'),
+          background:sel?'rgba(28,159,219,.25)':'#0f172a',color:'#f1f5f9',fontWeight:'700',fontSize:'13px',cursor:'pointer',
         }},tp[1]);
         b.onclick=function(){m.tipoPedidoYooga=tp[0];rerenderMov();};
         tipoRow.appendChild(b);

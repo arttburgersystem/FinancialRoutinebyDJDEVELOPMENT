@@ -169,10 +169,18 @@ function renderCaixaDiario(){
     padding:'14px 20px',background:'#1e293b',
     borderBottom:'2px solid #334155',flexShrink:'0',
   }});
+  var logoBase64=((state.empresaData||{})[pf]||{}).logoBase64;
+  var tituloEls=[];
+  if(logoBase64){
+    tituloEls.push(el('img',{src:logoBase64,style:{width:'32px',height:'32px',borderRadius:'8px',objectFit:'cover',flexShrink:'0'}}));
+  } else {
+    tituloEls.push(document.createTextNode('💵'));
+  }
+  tituloEls.push(document.createTextNode('Caixa Diário'));
   hdr.appendChild(el('div',{style:{
     fontSize:'18px',fontWeight:'800',color:'#38bdf8',flex:'1',
     display:'flex',alignItems:'center',gap:'8px',
-  }},'💵 Caixa Diário'));
+  }},tituloEls));
   var pickerOpen=!!state.cxPickerOpen;
   if(session){
     var userBtn=el('button',{title:'Trocar de usuário',style:{

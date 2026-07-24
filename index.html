@@ -554,6 +554,7 @@ var state={
   caixaDiarioMovs: lsGet('caixaDiarioMovs',[]),
   caixaDiarioMode: false,
   formasPagamento: lsGet('formasPagamento',[]),
+  beepConfig: lsGet('beepConfig',{tipo:'classico',volume:60,ativo:true}),
   sessionUser: null,
   sessionPickerOpen: false,
   auditLog: lsGet('auditLog',[]),
@@ -1507,6 +1508,38 @@ function renderSidebar(){
     ]),
     intensInp,
   ]);
+
+  // ── Configuração do bipe horário ──────────────────────────────────────────
+  var _beepCfg=Object.assign({tipo:'classico',volume:60,ativo:true},lsGet('beepConfig',{}));
+  function _salvarBeepCfg(){lsSet('beepConfig',_beepCfg);state.beepConfig=_beepCfg;}
+  var beepAtivoChk=el('input',{type:'checkbox',style:{cursor:'pointer'}});
+  beepAtivoChk.checked=_beepCfg.ativo!==false;
+  beepAtivoChk.onchange=function(){_beepCfg.ativo=beepAtivoChk.checked;_salvarBeepCfg();};
+  var beepTipoSel=el('select',{class:'form-input',style:{fontSize:'11px',padding:'5px 6px',width:'100%',marginBottom:'6px'}});
+  [['classico','Clássico'],['duplo','Duplo'],['sino','Sino'],['grave','Grave']].forEach(function(o){
+    var opt=el('option',{},o[1]);opt.value=o[0];if(o[0]===_beepCfg.tipo)opt.selected=true;beepTipoSel.appendChild(opt);
+  });
+  beepTipoSel.onchange=function(){_beepCfg.tipo=beepTipoSel.value;_salvarBeepCfg();};
+  var beepVolInp=el('input',{type:'range',min:'0',max:'100',value:String(_beepCfg.volume),style:{
+    width:'100%',cursor:'pointer',accentColor:pf.color,margin:'0',display:'block',
+  }});
+  var beepVolLbl=el('span',{style:{fontSize:'10px',color:'var(--text3)',fontVariantNumeric:'tabular-nums',fontWeight:'600',minWidth:'30px',textAlign:'right'}},_beepCfg.volume+'%');
+  beepVolInp.oninput=function(){
+    var v=parseInt(beepVolInp.value);
+    beepVolLbl.textContent=v+'%';
+    _beepCfg.volume=v;_salvarBeepCfg();
+  };
+  var beepTestBtn=el('button',{class:'btn-ghost',style:{fontSize:'10px',padding:'4px 8px',width:'100%',marginTop:'6px'},type:'button'},'🔊 Testar');
+  beepTestBtn.onclick=function(){if(typeof _djfTocarBipe==='function')_djfTocarBipe(_beepCfg.tipo,_beepCfg.volume);};
+  var beepWrap=el('div',{style:{padding:'8px 10px 4px',borderTop:'1px solid var(--border)'}},[
+    el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}},[
+      el('label',{style:{display:'flex',alignItems:'center',gap:'6px',fontSize:'10px',color:'var(--text3)',cursor:'pointer'}},[beepAtivoChk,document.createTextNode('🔔 Bipe horário')]),
+      beepVolLbl,
+    ]),
+    beepTipoSel,
+    beepVolInp,
+    beepTestBtn,
+  ]);
   var lockBtn=el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',color:'var(--text3)'},
     onclick:function(){lockApp();}
   },'🔒 Bloquear sistema');
@@ -1572,7 +1605,7 @@ function renderSidebar(){
     el('button',{class:'btn-ghost',style:{flex:'1',fontSize:'11px',padding:'7px 6px',display:'flex',alignItems:'center',gap:'5px',justifyContent:'center',color:'var(--gold)',fontWeight:'700'},onclick:function(){if(typeof _importarAbrir==='function')_importarAbrir();}},'📸 Extrato'),
     el('button',{class:'btn-ghost',style:{flex:'1',fontSize:'11px',padding:'7px 6px',display:'flex',alignItems:'center',gap:'5px',justifyContent:'center',color:'var(--primary)',fontWeight:'700'},onclick:function(){setState({yoogaImportModal:{}});}},'📊 Yooga'),
   ]);
-  var footer=div('sidebar-footer',[collapseBtn,sessionEl,importRow,intensWrap,themeBtn,lockBtn,downloadBtn,renderSyncBadge()].filter(Boolean));
+  var footer=div('sidebar-footer',[collapseBtn,sessionEl,importRow,intensWrap,beepWrap,themeBtn,lockBtn,downloadBtn,renderSyncBadge()].filter(Boolean));
   var sbCls='sidebar'+(state.sidebarCollapsed?' collapsed':'')+(state.sidebarOpen?' mobile-open':'');
 
   // Busca ativa: mostra lista filtrada flat em vez das seções
@@ -3428,25 +3461,45 @@ function render(){
     var hAtual=horaSP.getHours();
     if(horaSP.getMinutes()===0&&horaSP.getSeconds()<2&&window._djfLastBeepHour!==hAtual){
       window._djfLastBeepHour=hAtual;
-      _djfBeepHora();
+      var bc=state.beepConfig||lsGet('beepConfig',{tipo:'classico',volume:60,ativo:true});
+      if(bc.ativo!==false)_djfTocarBipe(bc.tipo,bc.volume);
     }
   },1000);
 }
 
-// Bipe curto ao completar cada hora (ex: 15:00, 16:00, 17:00...)
-function _djfBeepHora(){
+// Bipe configurável (tipo de som + volume) — usado no bipe horário e no botão "Testar"
+function _djfTocarBipe(tipo,volumePct){
   try{
+    var vol=Math.max(0,Math.min(100,volumePct==null?60:volumePct))/100;
+    if(vol<=0)return;
     var ctx=new (window.AudioContext||window.webkitAudioContext)();
-    var osc=ctx.createOscillator();
-    var gain=ctx.createGain();
-    osc.type='sine';
-    osc.frequency.value=880;
-    gain.gain.value=0.001;
-    gain.gain.exponentialRampToValueAtTime(0.18,ctx.currentTime+0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.18);
-    osc.connect(gain);gain.connect(ctx.destination);
-    osc.start();
-    setTimeout(function(){osc.stop();ctx.close();},220);
+    function tom(freq,inicio,duracao,pico){
+      var osc=ctx.createOscillator();
+      var gain=ctx.createGain();
+      osc.type='sine';
+      osc.frequency.value=freq;
+      var t0=ctx.currentTime+inicio;
+      gain.gain.setValueAtTime(0.0001,t0);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001,pico*vol),t0+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001,t0+duracao);
+      osc.connect(gain);gain.connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0+duracao+0.02);
+    }
+    switch(tipo){
+      case 'duplo':
+        tom(880,0,0.12,0.32);tom(880,0.16,0.12,0.32);
+        break;
+      case 'sino':
+        tom(1046.5,0,0.55,0.24);tom(1318.5,0,0.55,0.15);tom(1568,0,0.65,0.10);
+        break;
+      case 'grave':
+        tom(392,0,0.3,0.34);
+        break;
+      default: // classico
+        tom(880,0,0.2,0.32);
+    }
+    setTimeout(function(){ctx.close();},900);
   }catch(e){}
 }
 

@@ -931,11 +931,10 @@ function _cxRenderEntradaModal(m,session){
   idInp.oninput=function(){m.identificacao=idInp.value;};
   box.appendChild(idInp);
 
-  // ── Total da venda (o que é devido) ──
+  // ── Total da venda (o que é devido antes do cupom) ──
   box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Total da venda *'));
   var totalVendaInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'0,00',value:m.totalVenda||'',
     style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'20px',fontWeight:'800',textAlign:'center',marginBottom:'16px'}});
-  totalVendaInp.oninput=function(){m.totalVenda=totalVendaInp.value;atualizaBannerPag();};
   box.appendChild(totalVendaInp);
 
   // ── Cupom de desconto (opcional) ──
@@ -946,17 +945,25 @@ function _cxRenderEntradaModal(m,session){
   cupomRow.appendChild(cupomChk);
   cupomRow.appendChild(document.createTextNode('🎟 Usar cupom de desconto'));
   box.appendChild(cupomRow);
+  var totalDevidoEl=null;
   if(m.cupomAtivo){
-    var cupomWrap=el('div',{style:{display:'flex',gap:'8px',marginBottom:'16px'}});
+    var cupomWrap=el('div',{style:{display:'flex',gap:'8px',marginBottom:'8px'}});
     var cupomCodInp=el('input',{type:'text',placeholder:'Código do cupom',value:m.cupomCodigo||'',
       style:{flex:'1',boxSizing:'border-box',padding:'10px 12px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px'}});
     cupomCodInp.oninput=function(){m.cupomCodigo=cupomCodInp.value;};
     var cupomValInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'Valor desc.',value:m.cupomValor||'',
       style:{width:'110px',boxSizing:'border-box',padding:'10px 12px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px',fontWeight:'700',textAlign:'right'}});
-    cupomValInp.oninput=function(){m.cupomValor=cupomValInp.value;};
     cupomWrap.appendChild(cupomCodInp);cupomWrap.appendChild(cupomValInp);
     box.appendChild(cupomWrap);
+    totalDevidoEl=el('div',{style:{fontSize:'13px',color:'#4ade80',fontWeight:'800',textAlign:'center',marginBottom:'16px'}});
+    box.appendChild(totalDevidoEl);
+    var atualizaTotalDevidoEl=function(){
+      totalDevidoEl.textContent='Total devido (com cupom): '+fmtMoney(calcTotalDevido());
+    };
+    cupomValInp.oninput=function(){m.cupomValor=cupomValInp.value;atualizaBannerPag();atualizaTotalDevidoEl();};
+    atualizaTotalDevidoEl();
   }
+  totalVendaInp.oninput=function(){m.totalVenda=totalVendaInp.value;atualizaBannerPag();if(totalDevidoEl)totalDevidoEl.textContent='Total devido (com cupom): '+fmtMoney(calcTotalDevido());};
 
   if(formas.length===0){
     box.appendChild(el('div',{style:{fontSize:'12px',color:'#fbbf24',background:'rgba(251,191,36,.12)',border:'1px solid rgba(251,191,36,.3)',borderRadius:'8px',padding:'10px 12px',marginBottom:'16px'}},
@@ -983,20 +990,28 @@ function _cxRenderEntradaModal(m,session){
   function calcTotalVenda(){
     return parseFloat((m.totalVenda+'').replace(',','.'))||0;
   }
+  function calcCupomValor(){
+    return m.cupomAtivo?(parseFloat((m.cupomValor+'').replace(',','.'))||0):0;
+  }
+  // Total realmente devido pelo cliente = Total da venda menos o cupom (se houver).
+  // É contra esse valor que o pagamento precisa bater (não contra o total cheio).
+  function calcTotalDevido(){
+    return Math.max(0,Math.round((calcTotalVenda()-calcCupomValor())*100)/100);
+  }
   var totalEl=el('span',{style:{fontSize:'20px',fontWeight:'900',color:'#4ade80'}},fmtMoney(calcTotalPag()));
   var bannerEl=el('div',{style:{fontSize:'13px',fontWeight:'800',textAlign:'center',padding:'10px',borderRadius:'8px',marginBottom:'12px',display:'none'}});
   function atualizaBannerPag(){
-    var totalVenda=calcTotalVenda();
+    var totalDevido=calcTotalDevido();
     var totalPago=calcTotalPag();
-    var dif=Math.round((totalPago-totalVenda)*100)/100;
-    if(totalVenda<=0||totalPago<=0){
+    var dif=Math.round((totalPago-totalDevido)*100)/100;
+    if(totalDevido<=0||totalPago<=0){
       bannerEl.style.display='none';
       return;
     }
     bannerEl.style.display='block';
     if(Math.abs(dif)<0.005){
       bannerEl.style.background='rgba(74,222,128,.12)';bannerEl.style.color='#4ade80';bannerEl.style.border='1px solid rgba(74,222,128,.3)';
-      bannerEl.textContent='✓ Pagamento confere';
+      bannerEl.textContent='✓ Pagamento confere'+(calcCupomValor()>0?' (já descontado o cupom)':'');
     } else if(dif>0){
       bannerEl.style.background='rgba(96,165,250,.12)';bannerEl.style.color='#60a5fa';bannerEl.style.border='1px solid rgba(96,165,250,.3)';
       bannerEl.textContent='💵 Troco a devolver: '+fmtMoney(dif);
@@ -1109,6 +1124,8 @@ function _cxRenderEntradaModal(m,session){
     if(m.cupomAtivo&&cupomValorNum<=0){showToast('Informe o valor do desconto do cupom','error');return;}
     var totalVenda=calcTotalVenda();
     if(!totalVenda||totalVenda<=0){showToast('Informe o total da venda','error');return;}
+    if(m.cupomAtivo&&cupomValorNum>totalVenda){showToast('O desconto do cupom não pode ser maior que o total da venda','error');return;}
+    var totalDevido=Math.max(0,Math.round((totalVenda-(m.cupomAtivo?cupomValorNum:0))*100)/100);
     var pags=[];
     var erro=false;
     m.pagamentos.forEach(function(p){
@@ -1122,7 +1139,9 @@ function _cxRenderEntradaModal(m,session){
     });
     if(erro||pags.length===0){showToast('Preencha a forma e o valor de cada pagamento','error');return;}
     var totalPago=pags.reduce(function(s,p){return s+p.valor;},0);
-    var dif=Math.round((totalPago-totalVenda)*100)/100;
+    // Compara o pago contra o total JÁ COM O CUPOM DESCONTADO — é isso que o
+    // cliente realmente deve, não o total cheio antes do desconto.
+    var dif=Math.round((totalPago-totalDevido)*100)/100;
     var troco=dif>0?dif:0;
     var falta=dif<0?-dif:0;
     // Dinheiro físico que fica na gaveta: soma das formas em dinheiro menos o troco devolvido
@@ -1143,7 +1162,7 @@ function _cxRenderEntradaModal(m,session){
       canal:m.canal,identificacao:(m.identificacao||'').trim(),
       plataforma:m.canal==='delivery'?m.plataforma:'',tipoPedidoYooga:m.tipoPedidoYooga||'',taxaPlataforma:taxaPlataforma,
       cupomCodigo:m.cupomAtivo?(m.cupomCodigo||'').trim():'',cupomValor:m.cupomAtivo?cupomValorNum:0,
-      pagamentos:pags,valor:totalVenda,totalPago:totalPago,troco:troco,falta:falta,
+      pagamentos:pags,valorBruto:totalVenda,valor:totalDevido,totalPago:totalPago,troco:troco,falta:falta,
       valorDinheiroFisico:totalDinheiro,
       funcId:session.funcId,funcNome:session.funcNome,
       horario:agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),

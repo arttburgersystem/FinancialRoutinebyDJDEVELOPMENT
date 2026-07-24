@@ -93,16 +93,23 @@ function renderCaixaDiario(){
     fontSize:'18px',fontWeight:'800',color:'#38bdf8',flex:'1',
     display:'flex',alignItems:'center',gap:'8px',
   }},'💵 Caixa Diário'));
+  var pickerOpen=!!state.cxPickerOpen;
   if(session){
-    hdr.appendChild(el('div',{style:{
-      padding:'7px 16px',background:'#334155',borderRadius:'20px',
-      fontSize:'14px',fontWeight:'700',color:'#f1f5f9',
-    }},'👤 '+session.funcNome));
+    var userBtn=el('button',{title:'Trocar de usuário',style:{
+      display:'flex',alignItems:'center',gap:'8px',
+      padding:'7px 12px 7px 16px',background:'#334155',border:'none',borderRadius:'20px',
+      fontSize:'14px',fontWeight:'700',color:'#f1f5f9',cursor:'pointer',fontFamily:'inherit',
+    }},[
+      document.createTextNode('👤 '+session.funcNome),
+      el('span',{style:{fontSize:'11px',color:'#94a3b8',transition:'transform .15s',display:'inline-block',transform:pickerOpen?'rotate(180deg)':'none'}},'▾'),
+    ]);
+    userBtn.onclick=function(){setState({cxPickerOpen:!pickerOpen});};
+    hdr.appendChild(userBtn);
     var gearBtn=el('button',{title:'Gerenciar formas de pagamento',style:{
       background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'10px',
       padding:'10px 14px',cursor:'pointer',fontSize:'16px',flexShrink:'0',
     }},'⚙');
-    gearBtn.onclick=function(){setState({cxFormasModal:true});};
+    gearBtn.onclick=function(){setState({cxFormasModal:true,cxPickerOpen:false});};
     hdr.appendChild(gearBtn);
   }
   var exitBtn=el('button',{style:{
@@ -111,15 +118,46 @@ function renderCaixaDiario(){
   }},session?'⬅ Sair':'✕ Fechar');
   exitBtn.onclick=function(){
     if(session){
-      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false});
+      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false});
     } else if(window.DJF_KIOSK_BOOT && typeof lockApp==='function'){
       lockApp();
     } else {
-      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false});
+      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false});
     }
   };
   hdr.appendChild(exitBtn);
   root.appendChild(hdr);
+
+  if(session&&pickerOpen){
+    var pickerPanel=el('div',{style:{
+      position:'absolute',top:'62px',right:'150px',zIndex:'250',
+      background:'#1e293b',border:'2px solid #334155',borderRadius:'14px',
+      padding:'8px',minWidth:'220px',maxHeight:'320px',overflowY:'auto',
+      boxShadow:'0 20px 60px rgba(0,0,0,.7)',
+    }});
+    funcs.forEach(function(f){
+      var isAtual=session.funcId===f.id;
+      var item=el('div',{style:{
+        display:'flex',alignItems:'center',gap:'10px',padding:'9px 10px',borderRadius:'9px',
+        cursor:isAtual?'default':'pointer',background:isAtual?'rgba(29,78,216,.25)':'transparent',
+      }});
+      item.onmouseenter=function(){if(!isAtual)item.style.background='rgba(255,255,255,.06)';};
+      item.onmouseleave=function(){item.style.background=isAtual?'rgba(29,78,216,.25)':'transparent';};
+      item.appendChild(el('div',{style:{fontSize:'22px'}},'👤'));
+      item.appendChild(el('div',{style:{flex:'1',minWidth:'0'}},[
+        el('div',{style:{fontSize:'13px',fontWeight:'700',color:'#f1f5f9'}},f.nome+(isAtual?' (você)':'')),
+        f.cargo?el('div',{style:{fontSize:'11px',color:'#94a3b8'}},f.cargo):null,
+      ].filter(Boolean)));
+      if(isAtual)item.appendChild(el('span',{style:{color:'#4ade80',fontSize:'14px'}},'✓'));
+      if(!isAtual){
+        !function(fn){
+          item.onclick=function(){setState({cxPin:{funcId:fn.id,value:'',erro:false},cxPickerOpen:false});};
+        }(f);
+      }
+      pickerPanel.appendChild(item);
+    });
+    root.appendChild(pickerPanel);
+  }
 
   // ── LOGIN ───────────────────────────────────────────────────────────────
   if(!session){
@@ -167,106 +205,7 @@ function renderCaixaDiario(){
       loginWrap.appendChild(empGrid);
     }
     root.appendChild(loginWrap);
-
-    if(pinSt){
-      var pinFunc=funcs.find(function(x){return x.id===pinSt.funcId;});
-      if(pinFunc){
-        var pinOv=el('div',{tabIndex:'-1',style:{
-          position:'absolute',inset:'0',background:'rgba(0,0,0,.82)',
-          display:'flex',alignItems:'center',justifyContent:'center',zIndex:'200',outline:'none',
-        }});
-        var pinBox=el('div',{style:{
-          background:'#1e293b',borderRadius:'22px',padding:'32px 28px',
-          width:'300px',maxWidth:'90vw',border:'2px solid #334155',
-          boxShadow:'0 30px 80px rgba(0,0,0,.9)',
-        }});
-        var isSetup=!pinFunc.pin;
-        pinBox.appendChild(el('div',{style:{textAlign:'center',marginBottom:'22px'}},[
-          el('div',{style:{fontSize:'52px',lineHeight:'1'}},'👤'),
-          el('div',{style:{fontWeight:'800',fontSize:'19px',marginTop:'10px'}},pinFunc.nome),
-          isSetup?el('div',{style:{fontSize:'12px',color:'#fbbf24',marginTop:'6px',fontWeight:'700'}},'🆕 Primeiro acesso — crie seu PIN de 4 dígitos'):null,
-        ].filter(Boolean)));
-        var dotsEl=el('div',{style:{display:'flex',gap:'14px',justifyContent:'center',marginBottom:'8px'}});
-        for(var d=0;d<4;d++){
-          dotsEl.appendChild(el('div',{style:{
-            width:'20px',height:'20px',borderRadius:'50%',transition:'all .12s',
-            background:d<pinSt.value.length?'#60a5fa':'transparent',
-            border:'2px solid '+(d<pinSt.value.length?'#60a5fa':'#475569'),
-          }}));
-        }
-        pinBox.appendChild(dotsEl);
-        pinBox.appendChild(el('div',{style:{
-          textAlign:'center',minHeight:'22px',fontSize:'13px',fontWeight:'700',
-          color:'#f87171',marginBottom:'14px',
-        }},pinSt.erro?'❌ PIN incorreto — tente novamente':''));
-
-        function pressCxPinKey(key,fn){
-          var cur=(state.cxPin||{}).value||'';
-          var setup=!fn.pin;
-          function tentaConcluir(v){
-            if(setup){
-              _cxSalvarPinUsuario(fn,v);
-              setState({cxSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},cxPin:null});
-            } else if(v===fn.pin){
-              setState({cxSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},cxPin:null});
-            } else {
-              setState({cxPin:{funcId:fn.id,value:'',erro:true}});
-            }
-          }
-          if(key==='←'){
-            setState({cxPin:{funcId:fn.id,value:cur.slice(0,-1),erro:false}});
-          } else if(key==='✓'){
-            var v=(state.cxPin||{}).value||'';
-            if(v.length===4)tentaConcluir(v);
-          } else if(cur.length<4){
-            var nova=cur+key;
-            setState({cxPin:{funcId:fn.id,value:nova,erro:false}});
-            if(nova.length===4){
-              setTimeout(function(){
-                var st=state.cxPin;
-                if(!st||st.funcId!==fn.id)return;
-                tentaConcluir(st.value);
-              },300);
-            }
-          }
-        }
-        pinOv.onkeydown=function(ev){
-          var key=ev.key;
-          if(key>='0'&&key<='9'){ev.preventDefault();pressCxPinKey(key,pinFunc);}
-          else if(key==='Backspace'){ev.preventDefault();pressCxPinKey('←',pinFunc);}
-          else if(key==='Enter'){ev.preventDefault();pressCxPinKey('✓',pinFunc);}
-          else if(key==='Escape'){ev.preventDefault();setState({cxPin:null});}
-        };
-
-        var kpad=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'9px'}});
-        ['1','2','3','4','5','6','7','8','9','←','0','✓'].forEach(function(k){
-          var bgK=k==='✓'?'#1d4ed8':k==='←'?'#374151':'#334155';
-          var kb=el('button',{style:{
-            background:bgK,color:'#f1f5f9',border:'none',borderRadius:'12px',
-            padding:'19px 10px',fontSize:'22px',fontWeight:'700',cursor:'pointer',lineHeight:'1',
-          }},k);
-          kb.onmouseenter=function(){kb.style.opacity='.8';};
-          kb.onmouseleave=function(){kb.style.opacity='1';};
-          !function(key,fn){
-            kb.onclick=function(){pressCxPinKey(key,fn);};
-          }(k,pinFunc);
-          kpad.appendChild(kb);
-        });
-        pinBox.appendChild(kpad);
-        var cancelPin=el('button',{style:{
-          width:'100%',marginTop:'14px',background:'transparent',color:'#64748b',
-          border:'1px solid #334155',borderRadius:'10px',padding:'12px',cursor:'pointer',
-          fontSize:'14px',fontWeight:'600',
-        }},'Cancelar');
-        cancelPin.onclick=function(){setState({cxPin:null});};
-        pinBox.appendChild(cancelPin);
-        pinOv.appendChild(pinBox);
-        root.appendChild(pinOv);
-        setTimeout(function(){pinOv.focus();},0);
-      }
-    }
-    return root;
-  }
+  } else {
 
   // ── ÁREA PRINCIPAL (logado) ───────────────────────────────────────────────
   var dia  = _cxDiaAtual();
@@ -382,6 +321,106 @@ function renderCaixaDiario(){
   if(contModal)root.appendChild(_cxRenderContagemModal(contModal,dia,session,totalDinheiroFisico,totalSaidas));
   if(movModal)root.appendChild(movModal.tipo==='entrada'?_cxRenderEntradaModal(movModal,session):_cxRenderSaidaModal(movModal,session));
   if(formasModal)root.appendChild(_cxRenderFormasModal());
+  }
+
+  // ── PIN overlay: usado tanto no login inicial quanto ao trocar de usuário ──
+  if(pinSt){
+    var pinFunc=funcs.find(function(x){return x.id===pinSt.funcId;});
+    if(pinFunc){
+      var pinOv=el('div',{tabIndex:'-1',style:{
+        position:'absolute',inset:'0',background:'rgba(0,0,0,.82)',
+        display:'flex',alignItems:'center',justifyContent:'center',zIndex:'200',outline:'none',
+      }});
+      var pinBox=el('div',{style:{
+        background:'#1e293b',borderRadius:'22px',padding:'32px 28px',
+        width:'300px',maxWidth:'90vw',border:'2px solid #334155',
+        boxShadow:'0 30px 80px rgba(0,0,0,.9)',
+      }});
+      var isSetup=!pinFunc.pin;
+      pinBox.appendChild(el('div',{style:{textAlign:'center',marginBottom:'22px'}},[
+        el('div',{style:{fontSize:'52px',lineHeight:'1'}},'👤'),
+        el('div',{style:{fontWeight:'800',fontSize:'19px',marginTop:'10px'}},pinFunc.nome),
+        isSetup?el('div',{style:{fontSize:'12px',color:'#fbbf24',marginTop:'6px',fontWeight:'700'}},'🆕 Primeiro acesso — crie seu PIN de 4 dígitos'):null,
+      ].filter(Boolean)));
+      var dotsEl=el('div',{style:{display:'flex',gap:'14px',justifyContent:'center',marginBottom:'8px'}});
+      for(var d=0;d<4;d++){
+        dotsEl.appendChild(el('div',{style:{
+          width:'20px',height:'20px',borderRadius:'50%',transition:'all .12s',
+          background:d<pinSt.value.length?'#60a5fa':'transparent',
+          border:'2px solid '+(d<pinSt.value.length?'#60a5fa':'#475569'),
+        }}));
+      }
+      pinBox.appendChild(dotsEl);
+      pinBox.appendChild(el('div',{style:{
+        textAlign:'center',minHeight:'22px',fontSize:'13px',fontWeight:'700',
+        color:'#f87171',marginBottom:'14px',
+      }},pinSt.erro?'❌ PIN incorreto — tente novamente':''));
+
+      function pressCxPinKey(key,fn){
+        var cur=(state.cxPin||{}).value||'';
+        var setup=!fn.pin;
+        function tentaConcluir(v){
+          if(setup){
+            _cxSalvarPinUsuario(fn,v);
+            setState({cxSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},cxPin:null});
+          } else if(v===fn.pin){
+            setState({cxSession:{funcId:fn.id,funcNome:fn.nome,funcCargo:fn.cargo||''},cxPin:null});
+          } else {
+            setState({cxPin:{funcId:fn.id,value:'',erro:true}});
+          }
+        }
+        if(key==='←'){
+          setState({cxPin:{funcId:fn.id,value:cur.slice(0,-1),erro:false}});
+        } else if(key==='✓'){
+          var v=(state.cxPin||{}).value||'';
+          if(v.length===4)tentaConcluir(v);
+        } else if(cur.length<4){
+          var nova=cur+key;
+          setState({cxPin:{funcId:fn.id,value:nova,erro:false}});
+          if(nova.length===4){
+            setTimeout(function(){
+              var st=state.cxPin;
+              if(!st||st.funcId!==fn.id)return;
+              tentaConcluir(st.value);
+            },300);
+          }
+        }
+      }
+      pinOv.onkeydown=function(ev){
+        var key=ev.key;
+        if(key>='0'&&key<='9'){ev.preventDefault();pressCxPinKey(key,pinFunc);}
+        else if(key==='Backspace'){ev.preventDefault();pressCxPinKey('←',pinFunc);}
+        else if(key==='Enter'){ev.preventDefault();pressCxPinKey('✓',pinFunc);}
+        else if(key==='Escape'){ev.preventDefault();setState({cxPin:null});}
+      };
+
+      var kpad=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'9px'}});
+      ['1','2','3','4','5','6','7','8','9','←','0','✓'].forEach(function(k){
+        var bgK=k==='✓'?'#1d4ed8':k==='←'?'#374151':'#334155';
+        var kb=el('button',{style:{
+          background:bgK,color:'#f1f5f9',border:'none',borderRadius:'12px',
+          padding:'19px 10px',fontSize:'22px',fontWeight:'700',cursor:'pointer',lineHeight:'1',
+        }},k);
+        kb.onmouseenter=function(){kb.style.opacity='.8';};
+        kb.onmouseleave=function(){kb.style.opacity='1';};
+        !function(key,fn){
+          kb.onclick=function(){pressCxPinKey(key,fn);};
+        }(k,pinFunc);
+        kpad.appendChild(kb);
+      });
+      pinBox.appendChild(kpad);
+      var cancelPin=el('button',{style:{
+        width:'100%',marginTop:'14px',background:'transparent',color:'#64748b',
+        border:'1px solid #334155',borderRadius:'10px',padding:'12px',cursor:'pointer',
+        fontSize:'14px',fontWeight:'600',
+      }},'Cancelar');
+      cancelPin.onclick=function(){setState({cxPin:null});};
+      pinBox.appendChild(cancelPin);
+      pinOv.appendChild(pinBox);
+      root.appendChild(pinOv);
+      setTimeout(function(){pinOv.focus();},0);
+    }
+  }
 
   return root;
 }

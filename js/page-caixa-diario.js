@@ -255,11 +255,11 @@ function renderCaixaDiario(){
   }},session?'⬅ Sair':'✕ Fechar');
   exitBtn.onclick=function(){
     if(session){
-      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null});
+      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null});
     } else if(window.DJF_KIOSK_BOOT && typeof lockApp==='function'){
       lockApp();
     } else {
-      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null});
+      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null});
     }
   };
   hdr.appendChild(exitBtn);
@@ -369,8 +369,17 @@ function renderCaixaDiario(){
   var dataAtiva=_cxDataAtiva();
   var _dtDisp=typeof fmtDate==='function'?fmtDate(dataAtiva):dataAtiva;
   var _isRetro=dataAtiva!==today();
-  mainArea.appendChild(el('div',{style:{fontSize:'14px',color:'#94a3b8',marginBottom:'16px',fontWeight:'700'}},
-    '📅 '+_dtDisp));
+  var dataRow=el('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px',flexWrap:'wrap'}});
+  dataRow.appendChild(el('div',{style:{fontSize:'14px',color:'#94a3b8',fontWeight:'700'}},'📅 '+_dtDisp));
+  if(_cxIsDev(session)){
+    var importXlsBtn=el('button',{type:'button',title:'Importar todas as vendas do dia via planilha XLS',style:{
+      background:'#1d4ed8',color:'#fff',border:'none',borderRadius:'8px',
+      padding:'6px 12px',cursor:'pointer',fontSize:'12px',fontWeight:'700',
+    }},'📊 Importar XLS');
+    importXlsBtn.onclick=function(){setState({cxImportModal:{}});};
+    dataRow.appendChild(importXlsBtn);
+  }
+  mainArea.appendChild(dataRow);
   if(_isRetro){
     mainArea.appendChild(el('div',{style:{
       background:'rgba(251,191,36,.15)',border:'1px solid rgba(251,191,36,.4)',color:'#fbbf24',
@@ -498,6 +507,7 @@ function renderCaixaDiario(){
   root.appendChild(mainArea);
 
   if(contModal)root.appendChild(_cxRenderContagemModal(contModal,dia,session,totalDinheiroFisico,totalSaidas));
+  if(state.cxImportModal&&_cxIsDev(session))root.appendChild(_cxRenderImportVendasModal(session));
   if(movModal)root.appendChild(
     movModal.tipo==='entrada'?_cxRenderEntradaModal(movModal,session):
     movModal.tipo==='sangria'?_cxRenderSangriaModal(movModal,session):
@@ -1179,6 +1189,12 @@ function _cxRenderEntradaModal(m,session){
       horario:agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),
       criadoEm:agora.toISOString(),
     };
+    if(m._cxImportIdx!==undefined){
+      novo.origemImportCodigo=m._cxImportCodigo||'';
+      if(state.cxImportModal&&state.cxImportModal.rows&&state.cxImportModal.rows[m._cxImportIdx]){
+        state.cxImportModal.rows[m._cxImportIdx].importado=true;
+      }
+    }
     var lista=(state.caixaDiarioMovs||[]).concat([novo]);
     lsSet('caixaDiarioMovs',lista);
     setState({caixaDiarioMovs:lista,cxMovModal:null});
@@ -1187,6 +1203,172 @@ function _cxRenderEntradaModal(m,session){
   };
   actsRow.appendChild(cancelBtn);actsRow.appendChild(confirmBtn);
   box.appendChild(actsRow);
+
+  ov.appendChild(box);
+  return ov;
+}
+
+// ── IMPORTAÇÃO DE VENDAS DO DIA VIA XLS (somente desenvolvedor) ─────────────
+// Lê o relatório detalhado "Histórico de vendas" do Yooga, filtra os pedidos
+// da data ativa do Caixa Diário e monta uma fila para o dev revisar/editar
+// pedido a pedido antes de salvar — cada edição reaproveita o mesmo modal e
+// lógica de "Nova Entrada" já existente (_cxRenderEntradaModal).
+
+function _cxGuessCanalPlataforma(row){
+  var txt=((row.canal||'')+' '+(row.formaPagamento||'')).toLowerCase();
+  if(txt.indexOf('ifood')>=0)return {canal:'delivery',plataforma:'ifood'};
+  if(txt.indexOf('yooga')>=0||txt.indexOf('delivery')>=0)return {canal:'delivery',plataforma:'yooga'};
+  return {canal:'salao',plataforma:''};
+}
+
+function _cxGuessFormaId(nomeTxt){
+  var formas=state.formasPagamento||[];
+  var txt=(nomeTxt||'').toLowerCase().trim();
+  if(txt){
+    var f=formas.find(function(x){
+      var n=(x.nome||'').toLowerCase();
+      return n&&(txt.indexOf(n)>=0||n.indexOf(txt)>=0);
+    });
+    if(f)return f.id;
+  }
+  return (formas[0]||{}).id||'';
+}
+
+function _cxRenderImportVendasModal(session){
+  var m=state.cxImportModal;
+  if(!m)return null;
+
+  var ov=el('div',{style:{
+    position:'absolute',inset:'0',background:'rgba(0,0,0,.85)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:'300',padding:'20px',overflowY:'auto',
+  }});
+  var box=el('div',{style:{
+    background:'#1e293b',borderRadius:'20px',padding:'26px 24px',
+    width:'640px',maxWidth:'96vw',maxHeight:'92vh',overflowY:'auto',border:'2px solid #334155',
+  }});
+  var dataAlvo=_cxDataAtiva();
+  var dataAlvoDisp=typeof fmtDate==='function'?fmtDate(dataAlvo):dataAlvo;
+  box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center',color:'#38bdf8'}},'📊 Importar Vendas do Dia'));
+  box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'18px'}},'Data selecionada: '+dataAlvoDisp));
+
+  if(!m.rows){
+    box.appendChild(el('div',{style:{
+      background:'#0f172a',borderRadius:'10px',padding:'12px 14px',fontSize:'12px',color:'#94a3b8',
+      lineHeight:'1.7',marginBottom:'16px',borderLeft:'3px solid #38bdf8',
+    }},[
+      el('strong',{style:{color:'#f1f5f9',display:'block',marginBottom:'4px'}},'Como funciona:'),
+      'No Yooga, exporte em Excel o relatório detalhado "Histórico de vendas" (por pedido). '
+      +'O sistema lista aqui todos os pedidos da data selecionada acima, para você editar e salvar um a um — conferindo canal, plataforma e forma de pagamento antes de confirmar cada venda.',
+    ]));
+
+    var fileInp=el('input',{type:'file',accept:'.xlsx,.xls',style:{display:'none'}});
+    function handleFile(f){
+      if(!f)return;
+      showToast('Lendo arquivo…','info');
+      _parseYoogaFile(f,function(err,raw){
+        if(err){showToast('Erro: '+err.message,'error');return;}
+        try{
+          var parsed=_parseYoogaAny(raw);
+          if(parsed.tipo!=='detalhado'){
+            showToast('Envie o relatório detalhado "Histórico de vendas" (por pedido), não o resumo por forma de pagamento.','error');
+            return;
+          }
+          var pf=state.profile;
+          var doDia=parsed.rows.filter(function(r){return r.data===dataAlvo;});
+          if(!doDia.length){showToast('Nenhum pedido encontrado para '+dataAlvoDisp+' neste arquivo.','error');return;}
+          var jaLancados={};
+          (state.caixaDiarioMovs||[]).forEach(function(mv){
+            if(mv.profile===pf&&mv.origemImportCodigo)jaLancados[mv.origemImportCodigo]=true;
+          });
+          doDia.forEach(function(r){
+            var gp=_cxGuessCanalPlataforma(r);
+            r.guessCanal=gp.canal;r.guessPlataforma=gp.plataforma;
+            r.guessFormaId=_cxGuessFormaId(r.formaPagamento);
+            r.jaExistia=!!(r.codigo&&jaLancados[r.codigo]);
+            r.importado=r.jaExistia;
+          });
+          setState({cxImportModal:{rows:doDia}});
+        }catch(ex){showToast(ex.message,'error');}
+      });
+    }
+    fileInp.onchange=function(){handleFile(fileInp.files[0]);};
+
+    var dropZone=el('div',{style:{
+      border:'2px dashed #334155',borderRadius:'12px',padding:'32px 20px',
+      textAlign:'center',cursor:'pointer',background:'#0f172a',marginBottom:'16px',
+    }});
+    dropZone.innerHTML='<div style="font-size:36px;margin-bottom:10px">📂</div>'
+      +'<div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:4px">Clique para selecionar o arquivo Excel</div>'
+      +'<div style="font-size:12px;color:#64748b">Relatório "Histórico de vendas" exportado do Yooga</div>';
+    dropZone.onclick=function(){fileInp.click();};
+    dropZone.ondragover=function(e){e.preventDefault();dropZone.style.borderColor='#38bdf8';};
+    dropZone.ondragleave=function(){dropZone.style.borderColor='#334155';};
+    dropZone.ondrop=function(e){
+      e.preventDefault();dropZone.style.borderColor='#334155';
+      handleFile(e.dataTransfer.files[0]);
+    };
+    box.appendChild(dropZone);
+    box.appendChild(fileInp);
+
+    var cancelBtn=el('button',{style:{width:'100%',background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
+    cancelBtn.onclick=function(){setState({cxImportModal:null});};
+    box.appendChild(cancelBtn);
+
+  } else {
+    var pendentes=m.rows.filter(function(r){return !r.importado;}).length;
+    var salvosAgora=m.rows.filter(function(r){return r.importado&&!r.jaExistia;}).length;
+    var existentes=m.rows.filter(function(r){return r.jaExistia;}).length;
+
+    var summary=el('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}});
+    summary.appendChild(el('span',{style:{background:'rgba(96,165,250,.15)',color:'#60a5fa',padding:'6px 12px',borderRadius:'20px',fontSize:'12px',fontWeight:'700'}},pendentes+' pendente(s)'));
+    summary.appendChild(el('span',{style:{background:'rgba(74,222,128,.15)',color:'#4ade80',padding:'6px 12px',borderRadius:'20px',fontSize:'12px',fontWeight:'700'}},salvosAgora+' salvo(s) agora'));
+    if(existentes>0)summary.appendChild(el('span',{style:{background:'rgba(251,191,36,.15)',color:'#fbbf24',padding:'6px 12px',borderRadius:'20px',fontSize:'12px',fontWeight:'700'}},existentes+' já lançado(s) antes'));
+    box.appendChild(summary);
+
+    var listWrap=el('div',{style:{maxHeight:'50vh',overflowY:'auto',border:'1px solid #334155',borderRadius:'10px',marginBottom:'16px'}});
+    m.rows.forEach(function(r,idx){
+      var statusTxt=r.jaExistia?'✅ Já lançado':(r.importado?'✅ Salvo':'⏳ Pendente');
+      var statusCor=r.jaExistia?'#fbbf24':(r.importado?'#4ade80':'#94a3b8');
+      var line=el('div',{style:{
+        display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',
+        borderBottom:'1px solid #334155',opacity:r.importado?'0.55':'1',flexWrap:'wrap',
+      }});
+      var info=el('div',{style:{flex:'1',minWidth:'140px'}},[
+        el('div',{style:{fontSize:'13px',fontWeight:'700',color:'#f1f5f9',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},(r.codigo?'#'+r.codigo+' — ':'')+r.cliente),
+        el('div',{style:{fontSize:'11px',color:'#64748b'}},(r.canal||'—')+' · '+(r.formaPagamento||'—')+(r.hora?' · '+r.hora:'')),
+      ]);
+      var valEl=el('div',{style:{fontSize:'14px',fontWeight:'800',color:'#4ade80',whiteSpace:'nowrap'}},fmtMoney(r.valorRecebido));
+      var statusEl=el('div',{style:{fontSize:'11px',fontWeight:'700',color:statusCor,minWidth:'86px',textAlign:'right'}},statusTxt);
+      var editBtn=el('button',{type:'button',style:{
+        background:r.importado?'#334155':'#1d4ed8',color:'#fff',border:'none',borderRadius:'8px',
+        padding:'8px 12px',cursor:'pointer',fontSize:'12px',fontWeight:'700',flexShrink:'0',
+      }},r.importado?'✏ Editar':'Editar e Salvar');
+      editBtn.onclick=function(){
+        var cupomVal=r.desconto>0?r.desconto:0;
+        setState({cxMovModal:{
+          tipo:'entrada',canal:r.guessCanal,plataforma:r.guessPlataforma,
+          tipoPedidoYooga:r.guessPlataforma==='yooga'?'manual':'',
+          identificacao:((r.codigo?'Pedido #'+r.codigo:'')+(r.cliente&&r.cliente!=='Não identificado'?' — '+r.cliente:'')).trim()||('Pedido importado '+(idx+1)),
+          totalVenda:r.valorTotal>0?r.valorTotal:r.valorRecebido,
+          cupomAtivo:cupomVal>0,cupomCodigo:cupomVal>0?'Importado':'',cupomValor:cupomVal>0?cupomVal:'',
+          misto:false,
+          pagamentos:[{formaId:r.guessFormaId,valor:r.valorRecebido}],
+          _cxImportIdx:idx,_cxImportCodigo:r.codigo||'',
+        }});
+      };
+      line.appendChild(info);line.appendChild(valEl);line.appendChild(statusEl);line.appendChild(editBtn);
+      listWrap.appendChild(line);
+    });
+    box.appendChild(listWrap);
+
+    var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
+    var trocarBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'← Trocar arquivo');
+    trocarBtn.onclick=function(){setState({cxImportModal:{}});};
+    var fecharBtn=el('button',{style:{background:'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'✓ Concluir');
+    fecharBtn.onclick=function(){setState({cxImportModal:null});};
+    actsRow.appendChild(trocarBtn);actsRow.appendChild(fecharBtn);
+    box.appendChild(actsRow);
+  }
 
   ov.appendChild(box);
   return ov;

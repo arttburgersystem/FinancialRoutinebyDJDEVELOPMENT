@@ -1500,6 +1500,91 @@ function _parseStoneRows(raw){
 
 // Soma o que foi recebido no Caixa Diário na data, por modalidade (crédito/
 // débito/pix), olhando as formas de pagamento de cada venda lançada.
+// ── LEITURA DO PDF "Resumo de vendas" da Stone ──────────────────────────────
+// Esse é o relatório real que a Stone emite (Portal/app → Vendas → Resumo):
+// já traz os totais prontos por forma de pagamento (Crédito, Débito, Pix na
+// maquininha, Voucher), então não precisamos somar linha a linha — só ler o
+// texto do PDF e pegar os números de cada rótulo.
+function _loadPdfJs(cb){
+  if(window.pdfjsLib)return cb(null);
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  s.onload=function(){
+    try{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}catch(e){}
+    cb(null);
+  };
+  s.onerror=function(){cb(new Error('Falha ao carregar leitor de PDF. Verifique sua conexão.'));};
+  document.head.appendChild(s);
+}
+
+function _parseStonePdfFile(file,onDone){
+  _loadPdfJs(function(err){
+    if(err){onDone(err);return;}
+    var reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        window.pdfjsLib.getDocument({data:new Uint8Array(e.target.result)}).promise.then(function(pdf){
+          var promessas=[];
+          for(var i=1;i<=pdf.numPages;i++){
+            promessas.push(pdf.getPage(i).then(function(page){
+              return page.getTextContent().then(function(tc){
+                return tc.items.map(function(it){return it.str;}).join(' ');
+              });
+            }));
+          }
+          Promise.all(promessas).then(function(textos){onDone(null,textos.join(' \n '));}).catch(onDone);
+        }).catch(onDone);
+      }catch(ex){onDone(ex);}
+    };
+    reader.onerror=function(){onDone(new Error('Falha ao ler o arquivo.'));};
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function _parseBRLTexto(v){
+  return parseFloat((v+'').replace(/\./g,'').replace(',','.'))||0;
+}
+
+// Extrai os totais do "Resumo de vendas" da Stone a partir do texto do PDF.
+function _parseStoneResumoPdf(texto){
+  var t=(texto||'').replace(/\s+/g,' ');
+
+  function normAno(a){a=String(a);return a.length===2?('20'+a):a;}
+  var dataInicio='',dataFim='';
+  var mPer=t.match(/Per[íi]odo:?\s*de\s*(\d{2})\/(\d{2})\/(\d{2,4})\s*a\s*(\d{2})\/(\d{2})\/(\d{2,4})/i);
+  if(mPer){
+    dataInicio=normAno(mPer[3])+'-'+mPer[2]+'-'+mPer[1];
+    dataFim=normAno(mPer[6])+'-'+mPer[5]+'-'+mPer[4];
+  }
+
+  // Os totais por forma de pagamento ficam entre esses dois marcadores no
+  // relatório — evita confundir com as linhas "Elo Crédito"/"Visa Débito" etc.
+  // da tabela de Detalhes, que usam os mesmos rótulos.
+  var mBloco=t.match(/Total vendido por forma de pagamento([\s\S]*?)Detalhes/i);
+  var bloco=mBloco?mBloco[1]:t;
+
+  var mCred=bloco.match(/Cr[ée]dito\s*R?\$?\s*([\d.,]+)/i);
+  var mDeb=bloco.match(/D[ée]bito\s*R?\$?\s*([\d.,]+)/i);
+  var mPix=bloco.match(/Pix na maquininha\s*R?\$?\s*([\d.,]+)/i);
+  var mVou=bloco.match(/Voucher\s*R?\$?\s*([\d.,]+)/i);
+  if(!mCred&&!mDeb&&!mPix){
+    throw new Error('Não consegui reconhecer os totais por forma de pagamento neste PDF. Confirme que é o "Resumo de vendas" da Stone.');
+  }
+
+  var mTotalVendido=t.match(/Total vendido(?!\s*por)\s*R?\$?\s*([\d.,]+)/i);
+  var mQtdVendas=t.match(/Vendas realizadas\D*?(\d+)\s*vendas/i);
+
+  return {
+    credito:mCred?_parseBRLTexto(mCred[1]):0,
+    debito:mDeb?_parseBRLTexto(mDeb[1]):0,
+    pix:mPix?_parseBRLTexto(mPix[1]):0,
+    voucher:mVou?_parseBRLTexto(mVou[1]):0,
+    totalVendido:mTotalVendido?_parseBRLTexto(mTotalVendido[1]):0,
+    vendasRealizadas:mQtdVendas?parseInt(mQtdVendas[1]):0,
+    dataInicio:dataInicio,dataFim:dataFim,
+  };
+}
+
 function _cxCalcRecebidoCaixaPorTipo(dataAlvo){
   var pf=state.profile;
   var diasDaData=(state.caixaDiario||[]).filter(function(d){return d.data===dataAlvo&&d.profile===pf;}).map(function(d){return d.id;});
@@ -1536,35 +1621,57 @@ function _cxRenderStoneModal(session){
   box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center',color:'#2dd4bf'}},'💳 Conferência Extrato Stone'));
   box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'18px'}},'Data selecionada: '+dataAlvoDisp));
 
-  if(!m.rows){
+  if(!m.resumo&&!m.semDados){
     box.appendChild(el('div',{style:{
       background:'#0f172a',borderRadius:'10px',padding:'12px 14px',fontSize:'12px',color:'#94a3b8',
       lineHeight:'1.7',marginBottom:'16px',borderLeft:'3px solid #2dd4bf',
     }},[
       el('strong',{style:{color:'#f1f5f9',display:'block',marginBottom:'4px'}},'Como funciona:'),
-      'No Portal Stone (site ou app), exporte em Excel o relatório de "Vendas" do dia (com colunas de Data, Modalidade/Tipo e Valor). '
-      +'O sistema soma o total de Crédito, Débito e Pix que passou na maquininha e compara com o que foi lançado no Caixa Diário — assim você vê na hora se falta lançar alguma venda no caixa (ou se sobrou algo lançado que não bateu na maquininha).',
+      'No Portal/app Stone, em Vendas, exporte o "Resumo de vendas" em PDF do dia que você está lançando no caixa (o mesmo PDF que a Stone te manda — com Crédito, Débito e Pix na maquininha já totalizados). '
+      +'O sistema lê esses totais e compara com o que foi lançado no Caixa Diário, pra você ver na hora se falta lançar alguma venda (ou se sobrou algo lançado que não bateu na maquininha).',
     ]));
 
-    var fileInp=el('input',{type:'file',accept:'.xlsx,.xls,.csv',style:{display:'none'}});
+    var fileInp=el('input',{type:'file',accept:'.pdf,.xlsx,.xls,.csv',style:{display:'none'}});
+    function aplicarResumo(resumo){
+      if(resumo.dataInicio&&resumo.dataFim&&(resumo.dataInicio!==dataAlvo||resumo.dataFim!==dataAlvo)){
+        setState({cxStoneModal:{semDados:true,periodoEncontrado:resumo.dataInicio+'|'+resumo.dataFim}});
+        return;
+      }
+      setState({cxStoneModal:{resumo:{
+        totais:{credito:resumo.credito||0,debito:resumo.debito||0,pix:resumo.pix||0,outro:resumo.voucher||0},
+        qtds:{},fonte:'pdf',totalVendido:resumo.totalVendido||0,vendasRealizadas:resumo.vendasRealizadas||0,
+      }}});
+    }
     function handleFile(f){
       if(!f)return;
+      var nome=(f.name||'').toLowerCase();
       showToast('Lendo arquivo…','info');
-      _parseYoogaFile(f,function(err,raw){
-        if(err){showToast('Erro: '+err.message,'error');return;}
-        try{
-          var todasLinhas=_parseStoneRows(raw);
-          var doDia=todasLinhas.filter(function(r){return r.data===dataAlvo;});
-          if(!doDia.length){
-            var datasSet={};
-            todasLinhas.forEach(function(r){datasSet[r.data]=(datasSet[r.data]||0)+1;});
-            var datasEncontradas=Object.keys(datasSet).sort().map(function(d){return {data:d,qtd:datasSet[d]};});
-            setState({cxStoneModal:{semDados:true,datasEncontradas:datasEncontradas}});
-            return;
-          }
-          setState({cxStoneModal:{rows:doDia}});
-        }catch(ex){showToast(ex.message,'error');}
-      });
+      if(nome.indexOf('.pdf')>=0){
+        _parseStonePdfFile(f,function(err,texto){
+          if(err){showToast('Erro: '+err.message,'error');return;}
+          try{ aplicarResumo(_parseStoneResumoPdf(texto)); }
+          catch(ex){showToast(ex.message,'error');}
+        });
+      } else {
+        _parseYoogaFile(f,function(err,raw){
+          if(err){showToast('Erro: '+err.message,'error');return;}
+          try{
+            var todasLinhas=_parseStoneRows(raw);
+            var doDia=todasLinhas.filter(function(r){return r.data===dataAlvo;});
+            if(!doDia.length){
+              var datasSet={};
+              todasLinhas.forEach(function(r){datasSet[r.data]=(datasSet[r.data]||0)+1;});
+              var datasEncontradas=Object.keys(datasSet).sort().map(function(d){return {data:d,qtd:datasSet[d]};});
+              setState({cxStoneModal:{semDados:true,datasEncontradas:datasEncontradas}});
+              return;
+            }
+            var extrato={credito:0,debito:0,pix:0,outro:0},qtds={credito:0,debito:0,pix:0,outro:0};
+            doDia.forEach(function(r){extrato[r.tipo]+=r.valorLiquido;qtds[r.tipo]++;});
+            Object.keys(extrato).forEach(function(k){extrato[k]=Math.round(extrato[k]*100)/100;});
+            setState({cxStoneModal:{resumo:{totais:extrato,qtds:qtds,fonte:'xlsx'}}});
+          }catch(ex){showToast(ex.message,'error');}
+        });
+      }
     }
     fileInp.onchange=function(){handleFile(fileInp.files[0]);};
 
@@ -1572,9 +1679,9 @@ function _cxRenderStoneModal(session){
       border:'2px dashed #334155',borderRadius:'12px',padding:'32px 20px',
       textAlign:'center',cursor:'pointer',background:'#0f172a',marginBottom:'16px',
     }});
-    dropZone.innerHTML='<div style="font-size:36px;margin-bottom:10px">📂</div>'
-      +'<div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:4px">Clique para selecionar o arquivo do extrato Stone</div>'
-      +'<div style="font-size:12px;color:#64748b">Relatório de vendas exportado do Portal Stone (Excel)</div>';
+    dropZone.innerHTML='<div style="font-size:36px;margin-bottom:10px">📄</div>'
+      +'<div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:4px">Clique para selecionar o Resumo de vendas (PDF)</div>'
+      +'<div style="font-size:12px;color:#64748b">Também aceita relatório detalhado em Excel, se você tiver um</div>';
     dropZone.onclick=function(){fileInp.click();};
     dropZone.ondragover=function(e){e.preventDefault();dropZone.style.borderColor='#2dd4bf';};
     dropZone.ondragleave=function(){dropZone.style.borderColor='#334155';};
@@ -1587,36 +1694,50 @@ function _cxRenderStoneModal(session){
     box.appendChild(cancelBtn);
 
   } else if(m.semDados){
-    box.appendChild(el('div',{style:{
-      background:'rgba(248,113,113,.12)',border:'1px solid rgba(248,113,113,.35)',color:'#f87171',
-      borderRadius:'10px',padding:'14px',marginBottom:'16px',fontSize:'13px',fontWeight:'700',
-    }},'⚠ Nenhuma venda encontrada para '+dataAlvoDisp+' neste arquivo.'));
-    if(m.datasEncontradas&&m.datasEncontradas.length){
-      box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',marginBottom:'8px',fontWeight:'700'}},'Datas encontradas no arquivo:'));
-      var datasList=el('div',{style:{marginBottom:'14px',border:'1px solid #334155',borderRadius:'10px',overflow:'hidden'}});
-      m.datasEncontradas.forEach(function(d){
-        datasList.appendChild(el('div',{style:{fontSize:'13px',color:'#f1f5f9',padding:'8px 12px',borderBottom:'1px solid #334155'}},
-          (typeof fmtDate==='function'?fmtDate(d.data):d.data)+' — '+d.qtd+' venda(s)'));
-      });
-      box.appendChild(datasList);
+    if(m.periodoEncontrado){
+      var partes=m.periodoEncontrado.split('|');
+      var pIni=typeof fmtDate==='function'?fmtDate(partes[0]):partes[0];
+      var pFim=typeof fmtDate==='function'?fmtDate(partes[1]):partes[1];
+      box.appendChild(el('div',{style:{
+        background:'rgba(248,113,113,.12)',border:'1px solid rgba(248,113,113,.35)',color:'#f87171',
+        borderRadius:'10px',padding:'14px',marginBottom:'16px',fontSize:'13px',fontWeight:'700',lineHeight:'1.6',
+      }},'⚠ Esse PDF cobre o período de '+pIni+' a '+pFim+', não '+dataAlvoDisp+'. Exporte na Stone o Resumo de vendas apenas do dia '+dataAlvoDisp+' e importe de novo.'));
+    } else {
+      box.appendChild(el('div',{style:{
+        background:'rgba(248,113,113,.12)',border:'1px solid rgba(248,113,113,.35)',color:'#f87171',
+        borderRadius:'10px',padding:'14px',marginBottom:'16px',fontSize:'13px',fontWeight:'700',
+      }},'⚠ Nenhuma venda encontrada para '+dataAlvoDisp+' neste arquivo.'));
+      if(m.datasEncontradas&&m.datasEncontradas.length){
+        box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',marginBottom:'8px',fontWeight:'700'}},'Datas encontradas no arquivo:'));
+        var datasList=el('div',{style:{marginBottom:'14px',border:'1px solid #334155',borderRadius:'10px',overflow:'hidden'}});
+        m.datasEncontradas.forEach(function(d){
+          datasList.appendChild(el('div',{style:{fontSize:'13px',color:'#f1f5f9',padding:'8px 12px',borderBottom:'1px solid #334155'}},
+            (typeof fmtDate==='function'?fmtDate(d.data):d.data)+' — '+d.qtd+' venda(s)'));
+        });
+        box.appendChild(datasList);
+      }
     }
     var voltarBtn=el('button',{style:{width:'100%',background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'← Tentar outro arquivo');
     voltarBtn.onclick=function(){setState({cxStoneModal:{}});};
     box.appendChild(voltarBtn);
 
   } else {
-    var extrato={credito:0,debito:0,pix:0,outro:0};
-    var qtdsExtrato={credito:0,debito:0,pix:0,outro:0};
-    m.rows.forEach(function(r){extrato[r.tipo]+=r.valorLiquido;qtdsExtrato[r.tipo]++;});
-    Object.keys(extrato).forEach(function(k){extrato[k]=Math.round(extrato[k]*100)/100;});
+    var extrato=m.resumo.totais;
+    var qtdsExtrato=m.resumo.qtds||{};
 
     var caixaCalc=_cxCalcRecebidoCaixaPorTipo(dataAlvo);
     var caixa=caixaCalc.totais,qtdsCaixa=caixaCalc.qtds;
 
-    var linhas=[['credito','💳 Crédito'],['debito','💵 Débito'],['pix','⚡ Pix']];
-    if(extrato.outro>0||qtdsCaixa.outro>0)linhas.push(['outro','❓ Outro']);
+    if(m.resumo.fonte==='pdf'&&m.resumo.totalVendido>0){
+      box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'14px'}},
+        'Resumo Stone: '+fmtMoney(m.resumo.totalVendido)+' total vendido em '+(m.resumo.vendasRealizadas||0)+' venda(s).'));
+    }
+
+    var linhas=[['credito','💳 Crédito'],['debito','💵 Débito'],['pix','⚡ Pix na maquininha']];
+    if(extrato.outro>0||qtdsCaixa.outro>0)linhas.push(['outro','❓ Outro (voucher, etc.)']);
 
     var tbl=el('table',{style:{width:'100%',borderCollapse:'collapse',marginBottom:'16px'}});
+    var temQtd=m.resumo.fonte==='xlsx';
     var thead=el('thead',{},[el('tr',{},[
       el('th',{style:{textAlign:'left',padding:'8px',fontSize:'11px',color:'#64748b',textTransform:'uppercase'}},'Modalidade'),
       el('th',{style:{textAlign:'right',padding:'8px',fontSize:'11px',color:'#64748b',textTransform:'uppercase'}},'Extrato Stone'),
@@ -1632,8 +1753,9 @@ function _cxRenderStoneModal(session){
       var dif=Math.round((vExtrato-vCaixa)*100)/100;
       totalDif+=Math.abs(dif);
       var bate=Math.abs(dif)<0.02;
+      var rotulo=pair[1]+(temQtd?' ('+(qtdsExtrato[k]||0)+' venda(s) / '+(qtdsCaixa[k]||0)+' lanç.)':' ('+(qtdsCaixa[k]||0)+' lançamento(s) no caixa)');
       tbody.appendChild(el('tr',{style:{borderBottom:'1px solid #334155'}},[
-        el('td',{style:{padding:'10px 8px',fontSize:'13px',fontWeight:'700',color:'#f1f5f9'}},pair[1]+' ('+(qtdsExtrato[k]||0)+' venda(s) / '+(qtdsCaixa[k]||0)+' lanç.)'),
+        el('td',{style:{padding:'10px 8px',fontSize:'13px',fontWeight:'700',color:'#f1f5f9'}},rotulo),
         el('td',{style:{padding:'10px 8px',fontSize:'13px',textAlign:'right',color:'#f1f5f9',fontWeight:'700'}},fmtMoney(vExtrato)),
         el('td',{style:{padding:'10px 8px',fontSize:'13px',textAlign:'right',color:'#f1f5f9',fontWeight:'700'}},fmtMoney(vCaixa)),
         el('td',{style:{padding:'10px 8px',fontSize:'13px',textAlign:'right',fontWeight:'800',color:bate?'#4ade80':'#f87171'}},bate?'✓ Bate':((dif>0?'−':'+')+fmtMoney(Math.abs(dif)))),
@@ -1649,7 +1771,7 @@ function _cxRenderStoneModal(session){
     }
 
     box.appendChild(el('div',{style:{fontSize:'10px',color:'#64748b',marginBottom:'16px',lineHeight:'1.6'}},
-      'A coluna "Lançado no Caixa" considera todas as formas de pagamento cadastradas cujo nome contenha "Débito", "Crédito" ou "Pix" (salão e delivery). Se algum nome de forma estiver diferente, o total pode não bater por causa disso — confira em ⚙ Gerenciar formas de pagamento.'));
+      'A coluna "Lançado no Caixa" considera as formas de pagamento cadastradas cujo nome contenha "Débito", "Crédito" ou "Pix" (salão e delivery). Se a loja também recebe Pix direto (fora da maquininha Stone), esse total pode não bater com o "Pix na maquininha" por serem contas diferentes — isso é esperado, não é erro.'));
 
     var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
     var trocarBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'← Trocar arquivo');

@@ -4,6 +4,10 @@
 // Acessível via state.caixaDiarioMode = true (login por PIN de funcionário,
 // reaproveita o mesmo PIN de 4 dígitos já usado na Requisição de Estoque).
 
+// Fundo de caixa padrão: toda abertura deve totalizar esse valor. Abrir com
+// mais ou menos exige autorização (senha) do Desenvolvedor.
+var _CX_ABERTURA_PADRAO=390.00;
+
 // Permite múltiplas sessões de caixa no mesmo dia (ex: turno almoço + jantar).
 // Retorna a sessão aberta da data se existir; senão, a última sessão da data
 // (fechada) para exibir o resumo; senão null (nenhuma sessão nessa data).
@@ -367,6 +371,14 @@ function renderCaixaDiario(){
       display:'flex',alignItems:'center',gap:'8px',
     }},'⚠ Modo retroativo — lançando dados de '+_dtDisp+', não de hoje.'));
   }
+  if(dia&&dia.foraDoPadrao){
+    var _dp=dia.diferencaPadrao||0;
+    mainArea.appendChild(el('div',{style:{
+      background:'rgba(248,113,113,.12)',border:'1px solid rgba(248,113,113,.35)',color:'#f87171',
+      borderRadius:'10px',padding:'10px 14px',marginBottom:'16px',fontSize:'13px',fontWeight:'700',
+      display:'flex',alignItems:'center',gap:'8px',
+    }},'⚠ Abertura fora do padrão de '+fmtMoney(_CX_ABERTURA_PADRAO)+': '+(_dp>0?'+':'')+fmtMoney(_dp)+' — autorizado por '+(dia.autorizadoPorDev||'desenvolvedor')+'.'));
+  }
 
   if(!dia||dia.status!=='aberto'){
     if(dia&&dia.status==='fechado'){
@@ -415,7 +427,12 @@ function renderCaixaDiario(){
       borderRadius:'12px',padding:'14px',cursor:'pointer',fontSize:'15px',fontWeight:'800',
     }},'− Saída');
     addSaiBtn.onclick=function(){setState({cxMovModal:{tipo:'saida',descricao:'',valor:''}});};
-    actsRow.appendChild(addEntBtn);actsRow.appendChild(addSaiBtn);
+    var addSangriaBtn=el('button',{style:{
+      flex:'1',minWidth:'140px',background:'#7c2d12',color:'#fff',border:'none',
+      borderRadius:'12px',padding:'14px',cursor:'pointer',fontSize:'15px',fontWeight:'800',
+    }},'🩸 Sangria');
+    addSangriaBtn.onclick=function(){setState({cxMovModal:{tipo:'sangria',motivo:'',valor:''}});};
+    actsRow.appendChild(addEntBtn);actsRow.appendChild(addSaiBtn);actsRow.appendChild(addSangriaBtn);
     mainArea.appendChild(actsRow);
 
     mainArea.appendChild(el('div',{style:{fontSize:'14px',fontWeight:'700',color:'#94a3b8',marginBottom:'10px'}},'Movimentações de hoje'));
@@ -427,7 +444,7 @@ function renderCaixaDiario(){
           display:'flex',alignItems:'center',gap:'12px',padding:'12px 16px',
           background:'#1e293b',border:'1px solid #334155',borderRadius:'12px',marginBottom:'8px',
         }});
-        row.appendChild(el('div',{style:{fontSize:'20px'}},m.tipo==='entrada'?'⬆':'⬇'));
+        row.appendChild(el('div',{style:{fontSize:'20px'}},m.tipo==='entrada'?'⬆':m.subtipo==='sangria'?'🩸':'⬇'));
         var titulo, sub;
         if(m.tipo==='entrada'&&m.pagamentos){
           var canalLabel=m.canal==='delivery'?'🛵 Delivery':'🏠 Salão';
@@ -471,7 +488,11 @@ function renderCaixaDiario(){
   root.appendChild(mainArea);
 
   if(contModal)root.appendChild(_cxRenderContagemModal(contModal,dia,session,totalDinheiroFisico,totalSaidas));
-  if(movModal)root.appendChild(movModal.tipo==='entrada'?_cxRenderEntradaModal(movModal,session):_cxRenderSaidaModal(movModal,session));
+  if(movModal)root.appendChild(
+    movModal.tipo==='entrada'?_cxRenderEntradaModal(movModal,session):
+    movModal.tipo==='sangria'?_cxRenderSangriaModal(movModal,session):
+    _cxRenderSaidaModal(movModal,session)
+  );
   if(formasModal)root.appendChild(_cxRenderFormasModal());
   if(state.cxKpiDetalhe)root.appendChild(_cxRenderKpiModal(state.cxKpiDetalhe,dia,movs,aberturaTotal,totalEntradas,totalSaidas,totalDinheiroFisico,saldoFisicoEsperado));
   if(state.cxRelatorioModal)root.appendChild(_cxRenderRelatorioFiltroModal());
@@ -563,6 +584,38 @@ function _cxResumoFechado(dia){
 }
 
 // ── MODAL DE CONTAGEM DE CÉDULAS/MOEDAS (abertura ou fechamento) ─────────────
+// Grava a abertura/fechamento já validados (chamado direto, ou após autorização do dev)
+function _cxSalvarContagem(m,session,total,qtds,isFechamento,foraDoPadrao,diferencaPadrao,autorizadoPorNome){
+  var pf=state.profile, dt=_cxDataAtiva(), agora=new Date();
+  var horario=agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  var dias=(state.caixaDiario||[]).slice();
+  if(isFechamento){
+    var idx=-1;
+    for(var i=0;i<dias.length;i++){if(dias[i].data===dt&&dias[i].profile===pf&&dias[i].status==='aberto'){idx=i;break;}}
+    if(idx<0)return;
+    dias[idx]=Object.assign({},dias[idx],{
+      fechamentoCedulas:Object.assign({},qtds),fechamentoTotal:total,
+      fechamentoFuncId:session.funcId,fechamentoFuncNome:session.funcNome,
+      fechamentoHorario:horario,status:'fechado',
+    });
+  } else {
+    // Sempre cria uma nova sessão (permite mais de uma abertura no mesmo dia)
+    var novo={
+      id:uid(),profile:pf,data:dt,
+      aberturaCedulas:Object.assign({},qtds),aberturaTotal:total,
+      aberturaFuncId:session.funcId,aberturaFuncNome:session.funcNome,aberturaHorario:horario,
+      status:'aberto',
+      foraDoPadrao:!!foraDoPadrao,diferencaPadrao:diferencaPadrao||0,
+      autorizadoPorDev:autorizadoPorNome||'',
+    };
+    dias.push(novo);
+  }
+  lsSet('caixaDiario',dias);
+  setState({caixaDiario:dias,cxContagemModal:null});
+  scheduleSave();
+  showToast(isFechamento?'Caixa fechado!':(foraDoPadrao?'Caixa aberto fora do padrão (autorizado)!':'Caixa aberto!'),isFechamento||!foraDoPadrao?'success':'info');
+}
+
 function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
   var isFechamento=m.tipo==='fechamento';
   var qtds=m.qtds||{};
@@ -574,13 +627,51 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
   }});
   var box=el('div',{style:{
     background:'#1e293b',borderRadius:'20px',padding:'26px 24px',
-    width:'660px',maxWidth:'96vw',border:'2px solid #334155',
+    width:m.autorizando?'380px':'660px',maxWidth:'96vw',border:'2px solid #334155',
     maxHeight:'92vh',overflowY:'auto',
   }});
+
+  // ── Etapa de autorização: abertura fora do padrão de R$390,00 ──────────────
+  if(m.autorizando){
+    var diff=m._totalPendente-_CX_ABERTURA_PADRAO;
+    box.appendChild(el('div',{style:{fontSize:'40px',textAlign:'center',marginBottom:'8px'}},'🔐'));
+    box.appendChild(el('div',{style:{fontSize:'17px',fontWeight:'800',textAlign:'center',marginBottom:'12px'}},'Autorização do Desenvolvedor'));
+    box.appendChild(el('div',{style:{
+      fontSize:'13px',color:'#fbbf24',background:'rgba(251,191,36,.12)',border:'1px solid rgba(251,191,36,.3)',
+      borderRadius:'10px',padding:'12px 14px',marginBottom:'18px',lineHeight:'1.6',textAlign:'center',
+    }},'Abertura de '+fmtMoney(m._totalPendente)+' está '+(diff>0?(fmtMoney(diff)+' ACIMA'):(fmtMoney(-diff)+' ABAIXO'))+' do padrão ('+fmtMoney(_CX_ABERTURA_PADRAO)+'). Digite a senha do desenvolvedor pra autorizar.'));
+
+    var senhaInp=el('input',{type:'password',placeholder:'Senha do desenvolvedor',
+      style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'15px',textAlign:'center',marginBottom:'8px'}});
+    senhaInp.oninput=function(){m._senhaAutorizacao=senhaInp.value;};
+    box.appendChild(senhaInp);
+    var errAut=el('div',{style:{fontSize:'12px',color:'#f87171',textAlign:'center',minHeight:'18px',marginBottom:'10px',fontWeight:'700'}},m._erroAutorizacao?'❌ Senha incorreta':'');
+    box.appendChild(errAut);
+
+    var actsAut=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
+    var voltarBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'← Voltar');
+    voltarBtn.onclick=function(){m.autorizando=false;m._erroAutorizacao=false;setState({cxContagemModal:m});};
+    var autorizarBtn=el('button',{style:{background:'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'✓ Autorizar');
+    autorizarBtn.onclick=function(){
+      var dev=(state.usuarios||[]).find(function(u){return u.papel==='desenvolvedor';});
+      if(!dev||typeof verificaSenha!=='function'||!verificaSenha(m._senhaAutorizacao||'',dev.senhaHash)){
+        m._erroAutorizacao=true;
+        setState({cxContagemModal:m});
+        return;
+      }
+      _cxSalvarContagem(m,session,m._totalPendente,m._qtdsPendente,false,true,diff,dev.nome);
+    };
+    actsAut.appendChild(voltarBtn);actsAut.appendChild(autorizarBtn);
+    box.appendChild(actsAut);
+
+    ov.appendChild(box);
+    return ov;
+  }
+
   box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center'}},
     isFechamento?'🔒 Contagem de Fechamento':'🔓 Contagem de Abertura'));
   box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'18px'}},
-    'Conte as cédulas e moedas do caixa'));
+    isFechamento?'Conte as cédulas e moedas do caixa':'Conte as cédulas e moedas do caixa — padrão: '+fmtMoney(_CX_ABERTURA_PADRAO)));
 
   function calcTotal(){
     var t=0;
@@ -625,32 +716,18 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
     isFechamento?'🔒 Confirmar Fechamento':'🔓 Confirmar Abertura');
   confirmBtn.onclick=function(){
     var total=calcTotal();
-    var pf=state.profile, dt=_cxDataAtiva(), agora=new Date();
-    var horario=agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    var dias=(state.caixaDiario||[]).slice();
-    if(isFechamento){
-      var idx=-1;
-      for(var i=0;i<dias.length;i++){if(dias[i].data===dt&&dias[i].profile===pf&&dias[i].status==='aberto'){idx=i;break;}}
-      if(idx<0)return;
-      dias[idx]=Object.assign({},dias[idx],{
-        fechamentoCedulas:Object.assign({},qtds),fechamentoTotal:total,
-        fechamentoFuncId:session.funcId,fechamentoFuncNome:session.funcNome,
-        fechamentoHorario:horario,status:'fechado',
-      });
-    } else {
-      // Sempre cria uma nova sessão (permite mais de uma abertura no mesmo dia)
-      var novo={
-        id:uid(),profile:pf,data:dt,
-        aberturaCedulas:Object.assign({},qtds),aberturaTotal:total,
-        aberturaFuncId:session.funcId,aberturaFuncNome:session.funcNome,aberturaHorario:horario,
-        status:'aberto',
-      };
-      dias.push(novo);
+    if(!isFechamento){
+      var diffPadrao=Math.round((total-_CX_ABERTURA_PADRAO)*100)/100;
+      if(Math.abs(diffPadrao)>0.005){
+        m.autorizando=true;
+        m._totalPendente=total;
+        m._qtdsPendente=Object.assign({},qtds);
+        m._erroAutorizacao=false;
+        setState({cxContagemModal:m});
+        return;
+      }
     }
-    lsSet('caixaDiario',dias);
-    setState({caixaDiario:dias,cxContagemModal:null});
-    scheduleSave();
-    showToast(isFechamento?'Caixa fechado!':'Caixa aberto!','success');
+    _cxSalvarContagem(m,session,total,qtds,isFechamento,false,0,'');
   };
   actsRow.appendChild(cancelBtn);actsRow.appendChild(confirmBtn);
   box.appendChild(actsRow);
@@ -706,6 +783,59 @@ function _cxRenderSaidaModal(m,session){
   actsRow.appendChild(cancelBtn);actsRow.appendChild(confirmBtn);
 
   box.appendChild(descInp);box.appendChild(valInp);box.appendChild(actsRow);
+  ov.appendChild(box);
+  return ov;
+}
+
+// ── MODAL DE SANGRIA (retirada de dinheiro do caixa) — liberado a todos ─────
+// Exige motivo obrigatório; entra no caixa como saída (reduz o dinheiro físico).
+function _cxRenderSangriaModal(m,session){
+  var ov=el('div',{style:{
+    position:'absolute',inset:'0',background:'rgba(0,0,0,.85)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:'300',padding:'20px',
+  }});
+  var box=el('div',{style:{
+    background:'#1e293b',borderRadius:'20px',padding:'26px 24px',
+    width:'360px',maxWidth:'94vw',border:'2px solid #334155',
+  }});
+  box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'6px',textAlign:'center',color:'#fb923c'}},'🩸 Sangria'));
+  box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'16px'}},'Retirada de dinheiro do caixa — o motivo é obrigatório'));
+
+  var motivoInp=el('input',{type:'text',placeholder:'Motivo da sangria (obrigatório)',value:m.motivo||'',
+    style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'14px',marginBottom:'12px'}});
+  motivoInp.oninput=function(){m.motivo=motivoInp.value;};
+
+  var valInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'0,00',value:m.valor||'',
+    style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'18px',fontWeight:'700',textAlign:'center',marginBottom:'18px'}});
+  valInp.oninput=function(){m.valor=valInp.value;};
+
+  var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
+  var cancelBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
+  cancelBtn.onclick=function(){setState({cxMovModal:null});};
+  var confirmBtn=el('button',{style:{background:'#7c2d12',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'✓ Confirmar Sangria');
+  confirmBtn.onclick=function(){
+    var motivo=(m.motivo||'').trim();
+    var val=parseFloat((m.valor+'').replace(',','.'))||0;
+    if(!motivo){showToast('Informe o motivo da sangria','error');return;}
+    if(!val||val<=0){showToast('Informe um valor válido','error');return;}
+    var diaAtual=_cxDiaAtual();
+    var agora=new Date();
+    var novo={
+      id:uid(),profile:state.profile,data:_cxDataAtiva(),diaId:diaAtual?diaAtual.id:null,
+      tipo:'saida',subtipo:'sangria',descricao:'Sangria — '+motivo,motivo:motivo,valor:val,
+      funcId:session.funcId,funcNome:session.funcNome,
+      horario:agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),
+      criadoEm:agora.toISOString(),
+    };
+    var lista=(state.caixaDiarioMovs||[]).concat([novo]);
+    lsSet('caixaDiarioMovs',lista);
+    setState({caixaDiarioMovs:lista,cxMovModal:null});
+    scheduleSave();
+    showToast('Sangria registrada!','success');
+  };
+  actsRow.appendChild(cancelBtn);actsRow.appendChild(confirmBtn);
+
+  box.appendChild(motivoInp);box.appendChild(valInp);box.appendChild(actsRow);
   ov.appendChild(box);
   return ov;
 }
@@ -1136,6 +1266,11 @@ function _cxRenderKpiModal(tipo,dia,movs,aberturaTotal,totalEntradas,totalSaidas
     } else {
       body.appendChild(el('div',{style:{marginBottom:'14px',fontSize:'13px',color:'#94a3b8'}},
         'Aberto por '+(dia.aberturaFuncNome||'—')+' às '+(dia.aberturaHorario||'—')));
+      if(dia.foraDoPadrao){
+        var _dpk=dia.diferencaPadrao||0;
+        body.appendChild(el('div',{style:{fontSize:'12px',color:'#f87171',background:'rgba(248,113,113,.1)',border:'1px solid rgba(248,113,113,.3)',borderRadius:'8px',padding:'8px 10px',marginBottom:'14px'}},
+          '⚠ Fora do padrão de '+fmtMoney(_CX_ABERTURA_PADRAO)+' ('+(_dpk>0?'+':'')+fmtMoney(_dpk)+'), autorizado por '+(dia.autorizadoPorDev||'desenvolvedor')+'.'));
+      }
       var ced=dia.aberturaCedulas||{};
       _CEDULAS.forEach(function(c){
         var q=parseInt(ced[c.val.toFixed(2)])||0;
@@ -1354,6 +1489,7 @@ function _cxExportarRelatorio(dataFiltro){
       '<div class="kpi"><div class="label">Saídas</div><div class="value red">'+M(totalSaidas)+'</div></div>'+
       '<div class="kpi"><div class="label">Dinheiro esperado</div><div class="value gold">'+M(saldoFisicoEsperado)+'</div></div>'+
     '</div>'+
+    (dia&&dia.foraDoPadrao?'<div class="sub" style="margin-bottom:16px;color:#dc2626">⚠ Abertura fora do padrão de '+M(_CX_ABERTURA_PADRAO)+' ('+((dia.diferencaPadrao||0)>0?'+':'')+M(dia.diferencaPadrao||0)+'), autorizado por '+(dia.autorizadoPorDev||'desenvolvedor')+'.</div>':'')+
     (totalTaxaPlataforma>0?'<div class="sub" style="margin-bottom:16px">💸 Taxas retidas por plataforma (pedidos automáticos Yooga): <strong>'+M(totalTaxaPlataforma)+'</strong></div>':'')+
     (dia&&dia.status==='fechado'?
       '<div class="kpis" style="grid-template-columns:repeat(2,1fr)">'+

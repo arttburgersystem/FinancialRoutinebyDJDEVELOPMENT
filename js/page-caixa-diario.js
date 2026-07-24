@@ -118,11 +118,11 @@ function renderCaixaDiario(){
   }},session?'⬅ Sair':'✕ Fechar');
   exitBtn.onclick=function(){
     if(session){
-      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false});
+      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null});
     } else if(window.DJF_KIOSK_BOOT && typeof lockApp==='function'){
       lockApp();
     } else {
-      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false});
+      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null});
     }
   };
   hdr.appendChild(exitBtn);
@@ -244,16 +244,20 @@ function renderCaixaDiario(){
     }
   } else {
     var kpis=el('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:'12px',marginBottom:'20px'}});
-    function kpiCard(label,val,cor){
-      return el('div',{style:{background:'#1e293b',border:'1px solid #334155',borderRadius:'14px',padding:'16px'}},[
+    function kpiCard(label,val,cor,tipo){
+      var card=el('div',{style:{background:'#1e293b',border:'1px solid #334155',borderRadius:'14px',padding:'16px',cursor:'pointer',transition:'border-color .15s'},title:'Ver histórico'},[
         el('div',{style:{fontSize:'11px',color:'#94a3b8',fontWeight:'700',textTransform:'uppercase',marginBottom:'6px'}},label),
         el('div',{style:{fontSize:'20px',fontWeight:'800',color:cor||'#f1f5f9'}},fmtMoney(val)),
       ]);
+      card.onmouseenter=function(){card.style.borderColor='#60a5fa';};
+      card.onmouseleave=function(){card.style.borderColor='#334155';};
+      card.onclick=function(){setState({cxKpiDetalhe:tipo});};
+      return card;
     }
-    kpis.appendChild(kpiCard('Abertura',aberturaTotal,'#60a5fa'));
-    kpis.appendChild(kpiCard('Vendas do dia',totalEntradas,'#4ade80'));
-    kpis.appendChild(kpiCard('Saídas',totalSaidas,'#f87171'));
-    kpis.appendChild(kpiCard('Dinheiro esperado no caixa',saldoFisicoEsperado,'#fbbf24'));
+    kpis.appendChild(kpiCard('Abertura',aberturaTotal,'#60a5fa','abertura'));
+    kpis.appendChild(kpiCard('Vendas do dia',totalEntradas,'#4ade80','vendas'));
+    kpis.appendChild(kpiCard('Saídas',totalSaidas,'#f87171','saidas'));
+    kpis.appendChild(kpiCard('Dinheiro esperado no caixa',saldoFisicoEsperado,'#fbbf24','dinheiro'));
     mainArea.appendChild(kpis);
 
     var actsRow=el('div',{style:{display:'flex',gap:'10px',marginBottom:'20px',flexWrap:'wrap'}});
@@ -321,6 +325,7 @@ function renderCaixaDiario(){
   if(contModal)root.appendChild(_cxRenderContagemModal(contModal,dia,session,totalDinheiroFisico,totalSaidas));
   if(movModal)root.appendChild(movModal.tipo==='entrada'?_cxRenderEntradaModal(movModal,session):_cxRenderSaidaModal(movModal,session));
   if(formasModal)root.appendChild(_cxRenderFormasModal());
+  if(state.cxKpiDetalhe)root.appendChild(_cxRenderKpiModal(state.cxKpiDetalhe,dia,movs,aberturaTotal,totalEntradas,totalSaidas,totalDinheiroFisico,saldoFisicoEsperado));
   }
 
   // ── PIN overlay: usado tanto no login inicial quanto ao trocar de usuário ──
@@ -848,6 +853,107 @@ function _cxRenderFormasModal(){
   };
   actsRow.appendChild(cancelBtn);actsRow.appendChild(saveBtn);
   box.appendChild(actsRow);
+
+  ov.appendChild(box);
+  return ov;
+}
+
+// ── MODAL DE HISTÓRICO: detalhe por trás de cada KPI do dia ─────────────────
+function _cxRenderKpiModal(tipo,dia,movs,aberturaTotal,totalEntradas,totalSaidas,totalDinheiroFisico,saldoFisicoEsperado){
+  var titulos={abertura:'🔓 Abertura do Caixa',vendas:'⬆ Vendas do Dia',saidas:'⬇ Saídas do Dia',dinheiro:'💰 Dinheiro Esperado no Caixa'};
+
+  var ov=el('div',{style:{
+    position:'absolute',inset:'0',background:'rgba(0,0,0,.85)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:'300',padding:'20px',overflowY:'auto',
+  }});
+  var box=el('div',{style:{
+    background:'#1e293b',borderRadius:'20px',padding:'24px',
+    width:'440px',maxWidth:'94vw',border:'2px solid #334155',maxHeight:'88vh',overflowY:'auto',
+  }});
+  box.appendChild(el('div',{style:{fontSize:'17px',fontWeight:'800',marginBottom:'16px',textAlign:'center'}},titulos[tipo]||'Histórico'));
+
+  var body=el('div',{});
+
+  function linha(label,val,cor){
+    return el('div',{style:{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid #334155',fontSize:'14px'}},[
+      el('span',{style:{color:'#94a3b8'}},label),
+      el('span',{style:{fontWeight:'700',color:cor||'#f1f5f9'}},fmtMoney(val)),
+    ]);
+  }
+  function totalRow(label,val,cor){
+    return el('div',{style:{display:'flex',justifyContent:'space-between',padding:'12px 0 0',marginTop:'8px',borderTop:'2px solid #334155',fontSize:'15px',fontWeight:'800'}},[
+      el('span',{},label),el('span',{style:{color:cor||'#f1f5f9'}},fmtMoney(val)),
+    ]);
+  }
+  function movRow(m){
+    var titulo,sub;
+    if(m.tipo==='entrada'&&m.pagamentos){
+      var canalLabel=m.canal==='delivery'?'🛵 Delivery':'🏠 Salão';
+      titulo=canalLabel+(m.identificacao?' · '+m.identificacao:'');
+      sub=(m.horario||'')+' · '+(m.funcNome||'')+' · '+m.pagamentos.map(function(p){return p.formaNome+' '+fmtMoney(p.valor);}).join(' + ');
+    } else {
+      titulo=m.descricao||'—';
+      sub=(m.horario||'')+' · '+(m.funcNome||'');
+    }
+    return el('div',{style:{padding:'10px 0',borderBottom:'1px solid #334155'}},[
+      el('div',{style:{display:'flex',justifyContent:'space-between',gap:'8px'}},[
+        el('div',{style:{fontSize:'13px',fontWeight:'700'}},titulo),
+        el('div',{style:{fontSize:'14px',fontWeight:'800',color:m.tipo==='entrada'?'#4ade80':'#f87171',whiteSpace:'nowrap'}},
+          (m.tipo==='entrada'?'+':'−')+fmtMoney(m.valor)),
+      ]),
+      el('div',{style:{fontSize:'11px',color:'#64748b',marginTop:'2px'}},sub),
+    ]);
+  }
+
+  if(tipo==='abertura'){
+    if(!dia||!dia.aberturaTotal){
+      body.appendChild(el('div',{style:{textAlign:'center',color:'#64748b',padding:'20px',fontSize:'13px'}},'Caixa ainda não foi aberto hoje.'));
+    } else {
+      body.appendChild(el('div',{style:{marginBottom:'14px',fontSize:'13px',color:'#94a3b8'}},
+        'Aberto por '+(dia.aberturaFuncNome||'—')+' às '+(dia.aberturaHorario||'—')));
+      var ced=dia.aberturaCedulas||{};
+      _CEDULAS.forEach(function(c){
+        var q=parseInt(ced[c.val.toFixed(2)])||0;
+        if(q<=0)return;
+        body.appendChild(linha(c.label+' × '+q,q*c.val));
+      });
+      body.appendChild(totalRow('Total',aberturaTotal,'#60a5fa'));
+    }
+  } else if(tipo==='vendas'||tipo==='saidas'){
+    var lista=movs.filter(function(m){return m.tipo===(tipo==='vendas'?'entrada':'saida');});
+    if(lista.length===0){
+      body.appendChild(el('div',{style:{textAlign:'center',color:'#64748b',padding:'20px',fontSize:'13px'}},'Nenhum registro ainda.'));
+    } else {
+      lista.forEach(function(m){body.appendChild(movRow(m));});
+      body.appendChild(totalRow('Total',tipo==='vendas'?totalEntradas:totalSaidas,tipo==='vendas'?'#4ade80':'#f87171'));
+    }
+  } else if(tipo==='dinheiro'){
+    body.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',marginBottom:'14px',lineHeight:'1.6'}},
+      'Só as vendas em formas marcadas como "$ físico" (ex: Dinheiro) entram nessa conta — cartão/Pix/apps não ficam na gaveta.'));
+    body.appendChild(linha('Abertura',aberturaTotal,'#60a5fa'));
+    body.appendChild(linha('+ Dinheiro em vendas',totalDinheiroFisico,'#4ade80'));
+    body.appendChild(linha('− Saídas',totalSaidas,'#f87171'));
+    body.appendChild(totalRow('Dinheiro esperado',saldoFisicoEsperado,'#fbbf24'));
+
+    var comFisico=[];
+    movs.filter(function(m){return m.tipo==='entrada';}).forEach(function(m){
+      (m.pagamentos||[]).forEach(function(p){if(p.ehDinheiroFisico)comFisico.push({m:m,p:p});});
+    });
+    if(comFisico.length>0){
+      body.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',margin:'16px 0 8px'}},'Vendas que contaram como dinheiro:'));
+      comFisico.forEach(function(x){
+        body.appendChild(el('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'12px',padding:'4px 0',color:'#cbd5e1'}},[
+          el('span',{},(x.m.identificacao||(x.m.canal==='delivery'?'Delivery':'Salão'))+' · '+x.p.formaNome),
+          el('span',{},fmtMoney(x.p.valor)),
+        ]));
+      });
+    }
+  }
+
+  box.appendChild(body);
+  var closeBtn=el('button',{style:{width:'100%',marginTop:'18px',background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'12px',cursor:'pointer',fontWeight:'700'}},'Fechar');
+  closeBtn.onclick=function(){setState({cxKpiDetalhe:null});};
+  box.appendChild(closeBtn);
 
   ov.appendChild(box);
   return ov;

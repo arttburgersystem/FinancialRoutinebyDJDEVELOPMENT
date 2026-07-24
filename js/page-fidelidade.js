@@ -571,7 +571,7 @@ function _fidModalCliente(c) {
       var clientes=(state.clientes||[]).filter(function(x){return !(x.id===c.id&&x.profile===perfil);});
       var logs=(state.fidelidadeLog||[]).filter(function(x){return !(x.clienteId===c.id&&x.profile===perfil);});
       _fidClienteModal=null;
-      _fidSave({fidelidadeClientes:clientes,fidelidadeLog:logs});
+      _fidSave({clientes:clientes,fidelidadeLog:logs});
       showToast('Cliente excluído','error');
     };
     btns.appendChild(delBtn);
@@ -610,7 +610,7 @@ function _fidModalCliente(c) {
       }
     }
     _fidClienteModal=null;
-    _fidSave({fidelidadeClientes:clientes});
+    _fidSave({clientes:clientes});
     showToast(isNew?'Cliente cadastrado!':'Cliente atualizado!');
   };
   btns.appendChild(saveBtn);
@@ -712,7 +712,7 @@ function _fidModalCarimbo(clienteId,todos,cfg) {
       obs:tmp.obs||'',data:new Date().toISOString()
     });
     _fidCarimboModal=null;
-    _fidSave({fidelidadeClientes:clientes,fidelidadeLog:logs});
+    _fidSave({clientes:clientes,fidelidadeLog:logs});
     var msg=qtd+' carimbo(s) adicionado(s) para '+c.nome+' ⭐';
     if (cashbackGerado>0) msg+=' | Cashback: '+_fidFmt(cashbackGerado);
     showToast(msg);
@@ -777,7 +777,7 @@ function _fidModalLog(clienteId,todos,log,cfg) {
         tipo:'resgate',quantidade:cfg.carimbosParaRecompensar,
         obs:'Resgate: '+cfg.descricaoRecompensa,data:new Date().toISOString()});
       _fidLogModal=null;
-      _fidSave({fidelidadeClientes:clientes,fidelidadeLog:logs2});
+      _fidSave({clientes:clientes,fidelidadeLog:logs2});
       showToast('🎉 Recompensa resgatada para '+c.nome+'!');
     };
     modal.appendChild(rBanner);
@@ -806,7 +806,7 @@ function _fidModalLog(clienteId,todos,log,cfg) {
         tipo:'cashback-resgate',quantidade:valorUso,valorPedido:0,cashbackGerado:0,
         obs:'Desconto cashback utilizado',data:new Date().toISOString()});
       _fidLogModal=null;
-      _fidSave({fidelidadeClientes:clientes,fidelidadeLog:logs2});
+      _fidSave({clientes:clientes,fidelidadeLog:logs2});
       showToast('💰 '+_fidFmt(valorUso)+' de cashback utilizado para '+c.nome+'!');
     };
     modal.appendChild(cbBanner);

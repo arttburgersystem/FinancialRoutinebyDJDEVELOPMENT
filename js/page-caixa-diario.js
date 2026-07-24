@@ -176,8 +176,9 @@ function _cxSalvarPinUsuario(fn,pin){
 // uma única vez (a pedido do próprio dev). Limpa o PIN atual, o que faz a
 // tela de login mostrar "🆕 Criar PIN" de novo — basta digitar um PIN novo
 // pra confirmar. Roda só uma vez por causa da flag em localStorage.
+var _CX_PIN_RESET_V=2;
 function _cxLiberarRedefinicaoPinDev(){
-  if(lsGet('cxPinResetV',0)>=1)return;
+  if(lsGet('cxPinResetV',0)>=_CX_PIN_RESET_V)return;
   var mudou=false;
   var usuarios=(state.usuarios||[]).map(function(u){
     if(u.papel==='desenvolvedor'&&u.pinCaixa){mudou=true;return Object.assign({},u,{pinCaixa:''});}
@@ -188,7 +189,12 @@ function _cxLiberarRedefinicaoPinDev(){
     state.usuarios=usuarios;
     scheduleSave();
   }
-  lsSet('cxPinResetV',1);
+  // Também derruba a sessão ativa (se houver), pra garantir que a tela de
+  // login apareça de novo e o selo "Criar PIN" fique visível na hora.
+  // (mutação direta, sem setState/render recursivo — o render em andamento
+  // já lê o state atualizado na sequência.)
+  if(state.cxSession){state.cxSession=null;state.cxPin=null;state.cxPickerOpen=false;}
+  lsSet('cxPinResetV',_CX_PIN_RESET_V);
 }
 
 function renderCaixaDiario(){

@@ -3423,7 +3423,31 @@ function render(){
     var ck=document.getElementById('djf-clock');
     if(!ck){clearInterval(window._djfClockTimer);return;}
     ck.textContent=new Date().toLocaleTimeString('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    // Bipe a cada hora cheia (00 min), 24h por dia
+    var horaSP=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));
+    var hAtual=horaSP.getHours();
+    if(horaSP.getMinutes()===0&&horaSP.getSeconds()<2&&window._djfLastBeepHour!==hAtual){
+      window._djfLastBeepHour=hAtual;
+      _djfBeepHora();
+    }
   },1000);
+}
+
+// Bipe curto ao completar cada hora (ex: 15:00, 16:00, 17:00...)
+function _djfBeepHora(){
+  try{
+    var ctx=new (window.AudioContext||window.webkitAudioContext)();
+    var osc=ctx.createOscillator();
+    var gain=ctx.createGain();
+    osc.type='sine';
+    osc.frequency.value=880;
+    gain.gain.value=0.001;
+    gain.gain.exponentialRampToValueAtTime(0.18,ctx.currentTime+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.18);
+    osc.connect(gain);gain.connect(ctx.destination);
+    osc.start();
+    setTimeout(function(){osc.stop();ctx.close();},220);
+  }catch(e){}
 }
 
 </script>

@@ -1362,23 +1362,15 @@ function _cxRenderImportVendasModal(session){
   }});
   if(m.rows){
     var toggleExpand=function(){setState({cxImportModal:Object.assign({},m,{expandido:!expandido})});};
-    // Botão de canto (compacto)
-    var expandBtn=el('button',{type:'button',title:expandido?'Reduzir':'Expandir',style:{
+    // Único botão de expandir/reduzir a TELA (fica no canto, sem se misturar
+    // visualmente com os pedidos da lista — a setinha lateral foi removida
+    // porque ficava no meio da lista e parecia uma ação de um pedido específico).
+    var expandBtn=el('button',{type:'button',title:expandido?'Reduzir tela':'Expandir tela',style:{
       position:'absolute',top:'20px',right:'22px',background:'#334155',color:'#f1f5f9',border:'none',
       borderRadius:'8px',width:'32px',height:'32px',fontSize:'15px',cursor:'pointer',lineHeight:'1',
     }},expandido?'🗗':'🗖');
     expandBtn.onclick=toggleExpand;
     box.appendChild(expandBtn);
-    // Setinha lateral, sempre visível na borda direita, para abrir/fechar rapidamente
-    var arrowBtn=el('button',{type:'button',title:expandido?'Fechar (reduzir)':'Abrir (expandir)',style:{
-      position:'absolute',top:'50%',right:expandido?'0':'-16px',transform:'translateY(-50%)',
-      background:'#1d4ed8',color:'#fff',border:'2px solid #1e293b',
-      borderRadius:'50%',width:'34px',height:'34px',fontSize:'16px',fontWeight:'800',
-      cursor:'pointer',boxShadow:'0 4px 12px rgba(0,0,0,.5)',display:'flex',alignItems:'center',justifyContent:'center',
-      zIndex:'2',
-    }},expandido?'◀':'▶');
-    arrowBtn.onclick=toggleExpand;
-    box.appendChild(arrowBtn);
   }
   var dataAlvo=_cxDataAtiva();
   var dataAlvoDisp=typeof fmtDate==='function'?fmtDate(dataAlvo):dataAlvo;

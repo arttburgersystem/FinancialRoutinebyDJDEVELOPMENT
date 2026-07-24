@@ -41,20 +41,45 @@ function _cxPressPinKey(key,fn){
   }
 }
 
-// Teclado físico do PIN: listener global (não depende de foco em nenhum
-// elemento específico, evitando perder digitação em re-renders do kiosk)
+// Teclado físico do kiosk: listener global (não depende de foco em nenhum
+// elemento específico, evitando perder digitação em re-renders do kiosk).
+// Cobre tanto a digitação do PIN quanto a navegação por setas na tela de login.
 if(!window._cxKeydownBound){
   window._cxKeydownBound=true;
   document.addEventListener('keydown',function(e){
-    if(!state.caixaDiarioMode||!state.cxPin)return;
-    var funcs=typeof _cxListaLogin==='function'?_cxListaLogin():[];
-    var fn=funcs.find(function(x){return x.id===state.cxPin.funcId;});
-    if(!fn)return;
+    if(!state.caixaDiarioMode)return;
     var k=e.key;
-    if(k>='0'&&k<='9'){e.preventDefault();_cxPressPinKey(k,fn);}
-    else if(k==='Backspace'){e.preventDefault();_cxPressPinKey('←',fn);}
-    else if(k==='Enter'){e.preventDefault();_cxPressPinKey('✓',fn);}
-    else if(k==='Escape'){e.preventDefault();setState({cxPin:null});}
+
+    if(state.cxPin){
+      var funcsPin=typeof _cxListaLogin==='function'?_cxListaLogin():[];
+      var fn=funcsPin.find(function(x){return x.id===state.cxPin.funcId;});
+      if(!fn)return;
+      if(k>='0'&&k<='9'){e.preventDefault();_cxPressPinKey(k,fn);}
+      else if(k==='Backspace'){e.preventDefault();_cxPressPinKey('←',fn);}
+      else if(k==='Enter'){e.preventDefault();_cxPressPinKey('✓',fn);}
+      else if(k==='Escape'){e.preventDefault();setState({cxPin:null});}
+      return;
+    }
+
+    if(!state.cxSession){
+      var funcsNav=typeof _cxListaLogin==='function'?_cxListaLogin():[];
+      if(funcsNav.length===0)return;
+      var curId=state.cxLoginSel||funcsNav[0].id;
+      var idx=funcsNav.findIndex(function(x){return x.id===curId;});
+      if(idx<0)idx=0;
+      if(k==='ArrowRight'||k==='ArrowDown'){
+        e.preventDefault();
+        idx=(idx+1)%funcsNav.length;
+        setState({cxLoginSel:funcsNav[idx].id});
+      } else if(k==='ArrowLeft'||k==='ArrowUp'){
+        e.preventDefault();
+        idx=(idx-1+funcsNav.length)%funcsNav.length;
+        setState({cxLoginSel:funcsNav[idx].id});
+      } else if(k==='Enter'||k===' '){
+        e.preventDefault();
+        setState({cxPin:{funcId:funcsNav[idx].id,value:'',erro:false},cxLoginSel:funcsNav[idx].id});
+      }
+    }
   });
 }
 
@@ -237,25 +262,31 @@ function renderCaixaDiario(){
           'Vá em Funcionários → edite um funcionário ativo → defina o PIN de 4 dígitos na seção "Acesso ao Tablet".'),
       ]));
     } else {
+      if(!state.cxLoginSel||!funcs.some(function(f){return f.id===state.cxLoginSel;})){
+        state.cxLoginSel=funcs[0].id;
+      }
       var empGrid=el('div',{style:{
         display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',
         gap:'16px',maxWidth:'700px',width:'100%',
       }});
       funcs.forEach(function(f){
+        var isSel=f.id===state.cxLoginSel;
         var card=el('div',{style:{
-          background:'#1e293b',border:'2px solid #334155',borderRadius:'18px',
+          background:isSel?'rgba(29,78,216,.18)':'#1e293b',
+          border:'2px solid '+(isSel?'#60a5fa':'#334155'),
+          borderRadius:'18px',boxShadow:isSel?'0 0 0 3px rgba(96,165,250,.25)':'none',
           padding:'28px 14px',display:'flex',flexDirection:'column',
           alignItems:'center',gap:'10px',cursor:'pointer',minHeight:'150px',justifyContent:'center',
           transition:'border-color .15s,background .15s',
         }});
         card.onmouseenter=function(){card.style.borderColor='#60a5fa';card.style.background='rgba(29,78,216,.15)';};
-        card.onmouseleave=function(){card.style.borderColor='#334155';card.style.background='#1e293b';};
+        card.onmouseleave=function(){card.style.borderColor=isSel?'#60a5fa':'#334155';card.style.background=isSel?'rgba(29,78,216,.18)':'#1e293b';};
         card.appendChild(el('div',{style:{fontSize:'44px'}},'👤'));
         card.appendChild(el('div',{style:{fontWeight:'800',fontSize:'16px',textAlign:'center',lineHeight:'1.3'}},f.nome));
         if(f.cargo)card.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8'}},f.cargo));
         if(!f.pin)card.appendChild(el('div',{style:{fontSize:'10px',fontWeight:'700',color:'#fbbf24',background:'rgba(251,191,36,.12)',border:'1px solid rgba(251,191,36,.3)',borderRadius:'6px',padding:'2px 8px'}},'🆕 Criar PIN'));
         !function(fn){
-          card.onclick=function(){setState({cxPin:{funcId:fn.id,value:'',erro:false}});};
+          card.onclick=function(){setState({cxPin:{funcId:fn.id,value:'',erro:false},cxLoginSel:fn.id});};
         }(f);
         empGrid.appendChild(card);
       });

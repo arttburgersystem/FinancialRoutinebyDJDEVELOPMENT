@@ -1516,7 +1516,7 @@ function renderSidebar(){
   beepAtivoChk.checked=_beepCfg.ativo!==false;
   beepAtivoChk.onchange=function(){_beepCfg.ativo=beepAtivoChk.checked;_salvarBeepCfg();};
   var beepTipoSel=el('select',{class:'form-input',style:{fontSize:'11px',padding:'5px 6px',width:'100%',marginBottom:'6px'}});
-  [['classico','Clássico'],['duplo','Duplo'],['sino','Sino'],['grave','Grave']].forEach(function(o){
+  [['classico','Clássico'],['duplo','Duplo'],['sino','Sino'],['grave','Grave'],['relogio','Relógio (beep beep)']].forEach(function(o){
     var opt=el('option',{},o[1]);opt.value=o[0];if(o[0]===_beepCfg.tipo)opt.selected=true;beepTipoSel.appendChild(opt);
   });
   beepTipoSel.onchange=function(){_beepCfg.tipo=beepTipoSel.value;_salvarBeepCfg();};
@@ -3473,14 +3473,14 @@ function _djfTocarBipe(tipo,volumePct){
     var vol=Math.max(0,Math.min(100,volumePct==null?60:volumePct))/100;
     if(vol<=0)return;
     var ctx=new (window.AudioContext||window.webkitAudioContext)();
-    function tom(freq,inicio,duracao,pico){
+    function tom(freq,inicio,duracao,pico,onda){
       var osc=ctx.createOscillator();
       var gain=ctx.createGain();
-      osc.type='sine';
+      osc.type=onda||'sine';
       osc.frequency.value=freq;
       var t0=ctx.currentTime+inicio;
       gain.gain.setValueAtTime(0.0001,t0);
-      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001,pico*vol),t0+0.02);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001,pico*vol),t0+0.015);
       gain.gain.exponentialRampToValueAtTime(0.0001,t0+duracao);
       osc.connect(gain);gain.connect(ctx.destination);
       osc.start(t0);
@@ -3496,10 +3496,14 @@ function _djfTocarBipe(tipo,volumePct){
       case 'grave':
         tom(392,0,0.3,0.34);
         break;
+      case 'relogio':
+        // "beep beep beep" digital de relógio/despertador — onda quadrada, seco e repetido
+        [0,0.18,0.36,0.54].forEach(function(t){tom(1000,t,0.1,0.28,'square');});
+        break;
       default: // classico
         tom(880,0,0.2,0.32);
     }
-    setTimeout(function(){ctx.close();},900);
+    setTimeout(function(){ctx.close();},1200);
   }catch(e){}
 }
 

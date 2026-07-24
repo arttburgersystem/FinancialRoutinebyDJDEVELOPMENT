@@ -1306,6 +1306,86 @@ function _cxFinalizarFilaImportacao(doDia,map){
   setState({cxImportModal:{rows:doDia}});
 }
 
+// Monta o objeto do modal de Nova Entrada a partir de um pedido importado
+// (usado tanto pelo botão "Editar e Salvar" da lista quanto pela tela de
+// detalhes do pedido individual).
+function _cxBuildMovModalFromImportRow(r,idx){
+  var cupomVal=r.desconto>0?r.desconto:0;
+  return {
+    tipo:'entrada',canal:r.guessCanal,plataforma:r.guessPlataforma,
+    tipoPedidoYooga:r.guessPlataforma==='yooga'?'manual':'',
+    identificacao:((r.codigo?'Pedido #'+r.codigo:'')+(r.cliente&&r.cliente!=='Não identificado'?' — '+r.cliente:'')).trim()||('Pedido importado '+(idx+1)),
+    totalVenda:r.valorTotal>0?r.valorTotal:r.valorRecebido,
+    cupomAtivo:cupomVal>0,cupomCodigo:cupomVal>0?'Importado':'',cupomValor:cupomVal>0?cupomVal:'',
+    misto:false,
+    pagamentos:[{formaId:r.guessFormaId,valor:r.valorRecebido}],
+    _cxImportIdx:idx,_cxImportCodigo:r.codigo||'',
+  };
+}
+
+// Tela de detalhes de um pedido individual importado: mostra todos os campos
+// lidos do XLS e a sugestão de lançamento, com atalho para editar e salvar.
+function _cxRenderImportDetalhePedido(m){
+  var idx=m.detalheIdx;
+  var r=(idx!==undefined&&idx!==null)?m.rows[idx]:null;
+  if(!r)return null;
+
+  var ov2=el('div',{style:{
+    position:'absolute',inset:'0',background:'rgba(0,0,0,.88)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:'320',padding:'20px',overflowY:'auto',
+  }});
+  var box2=el('div',{style:{
+    background:'#1e293b',borderRadius:'20px',padding:'24px',
+    width:'420px',maxWidth:'94vw',maxHeight:'90vh',overflowY:'auto',border:'2px solid #334155',
+  }});
+  box2.appendChild(el('div',{style:{fontSize:'17px',fontWeight:'800',marginBottom:'2px',textAlign:'center',color:'#38bdf8'}},'📋 Detalhes do Pedido'));
+  box2.appendChild(el('div',{style:{fontSize:'12px',color:'#64748b',textAlign:'center',marginBottom:'16px'}},r.codigo?'#'+r.codigo:'sem código'));
+
+  function linha(label,val,cor){
+    return el('div',{style:{display:'flex',justifyContent:'space-between',gap:'12px',padding:'8px 0',borderBottom:'1px solid #334155',fontSize:'13px'}},[
+      el('span',{style:{color:'#94a3b8',fontWeight:'700'}},label),
+      el('span',{style:{color:cor||'#f1f5f9',fontWeight:'700',textAlign:'right'}},val),
+    ]);
+  }
+
+  var infoBox=el('div',{style:{marginBottom:'16px'}});
+  infoBox.appendChild(linha('Cliente',r.cliente||'—'));
+  infoBox.appendChild(linha('Data / Hora',(typeof fmtDate==='function'?fmtDate(r.data):r.data)+(r.hora?' às '+r.hora:'')));
+  infoBox.appendChild(linha('Canal (planilha)',r.canal||'—'));
+  infoBox.appendChild(linha('Forma de pagamento (planilha)',r.formaPagamento||'—'));
+  infoBox.appendChild(linha('Valor total',fmtMoney(r.valorTotal||0)));
+  if(r.acrescimo>0)infoBox.appendChild(linha('Acréscimo',fmtMoney(r.acrescimo),'#60a5fa'));
+  if(r.taxa>0)infoBox.appendChild(linha('Taxa marketplace',fmtMoney(r.taxa),'#fb923c'));
+  if(r.desconto>0)infoBox.appendChild(linha('Desconto',fmtMoney(r.desconto),'#f87171'));
+  infoBox.appendChild(linha('Valor recebido',fmtMoney(r.valorRecebido||0),'#4ade80'));
+  box2.appendChild(infoBox);
+
+  box2.appendChild(el('div',{style:{fontSize:'11px',fontWeight:'700',color:'#64748b',marginBottom:'8px',textTransform:'uppercase',letterSpacing:'.05em'}},'Sugestão para o lançamento'));
+  var sugForma=(state.formasPagamento||[]).find(function(f){return f.id===r.guessFormaId;});
+  var sugBox=el('div',{style:{marginBottom:'18px'}});
+  sugBox.appendChild(linha('Canal sugerido',r.guessCanal==='delivery'?'🛵 Delivery':'🏠 Salão'));
+  if(r.guessCanal==='delivery')sugBox.appendChild(linha('Plataforma sugerida',r.guessPlataforma==='ifood'?'iFood':'Yooga'));
+  sugBox.appendChild(linha('Forma de pagamento sugerida',sugForma?sugForma.nome:'—'));
+  box2.appendChild(sugBox);
+
+  var statusTxt=r.jaExistia?'✅ Já lançado antes':(r.importado?'✅ Salvo':'⏳ Pendente');
+  var statusCor=r.jaExistia?'#fbbf24':(r.importado?'#4ade80':'#94a3b8');
+  box2.appendChild(el('div',{style:{textAlign:'center',fontSize:'12px',fontWeight:'800',color:statusCor,marginBottom:'16px'}},statusTxt));
+
+  var acts2=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
+  var fecharBtn2=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'← Voltar');
+  fecharBtn2.onclick=function(){setState({cxImportModal:Object.assign({},m,{detalheIdx:null})});};
+  var editarBtn2=el('button',{style:{background:'#1d4ed8',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},r.importado?'✏ Editar':'Editar e Salvar');
+  editarBtn2.onclick=function(){
+    setState({cxImportModal:Object.assign({},m,{detalheIdx:null}),cxMovModal:_cxBuildMovModalFromImportRow(r,idx)});
+  };
+  acts2.appendChild(fecharBtn2);acts2.appendChild(editarBtn2);
+  box2.appendChild(acts2);
+
+  ov2.appendChild(box2);
+  return ov2;
+}
+
 // Lança automaticamente um pedido importado como Entrada no Caixa Diário,
 // usando os dados sugeridos (canal/plataforma/forma de pagamento) sem abrir
 // o formulário — usado pelo botão "Concluir" para dar baixa em todos os
@@ -1602,24 +1682,21 @@ function _cxRenderImportVendasModal(session){
       ]);
       var valEl=el('div',{style:{fontSize:'14px',fontWeight:'800',color:'#4ade80',whiteSpace:'nowrap'}},fmtMoney(r.valorRecebido));
       var statusEl=el('div',{style:{fontSize:'11px',fontWeight:'700',color:statusCor,minWidth:'86px',textAlign:'right'}},statusTxt);
+      // Setinha: abre a janela com todos os dados do pedido individual (todo pedido tem a sua)
+      var verBtn=el('button',{type:'button',title:'Ver detalhes deste pedido',style:{
+        background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'8px',
+        width:'32px',height:'32px',cursor:'pointer',fontSize:'14px',flexShrink:'0',
+        display:'flex',alignItems:'center',justifyContent:'center',
+      }},'▶');
+      verBtn.onclick=function(){setState({cxImportModal:Object.assign({},m,{detalheIdx:idx})});};
       var editBtn=el('button',{type:'button',style:{
         background:r.importado?'#334155':'#1d4ed8',color:'#fff',border:'none',borderRadius:'8px',
         padding:'8px 12px',cursor:'pointer',fontSize:'12px',fontWeight:'700',flexShrink:'0',
       }},r.importado?'✏ Editar':'Editar e Salvar');
       editBtn.onclick=function(){
-        var cupomVal=r.desconto>0?r.desconto:0;
-        setState({cxMovModal:{
-          tipo:'entrada',canal:r.guessCanal,plataforma:r.guessPlataforma,
-          tipoPedidoYooga:r.guessPlataforma==='yooga'?'manual':'',
-          identificacao:((r.codigo?'Pedido #'+r.codigo:'')+(r.cliente&&r.cliente!=='Não identificado'?' — '+r.cliente:'')).trim()||('Pedido importado '+(idx+1)),
-          totalVenda:r.valorTotal>0?r.valorTotal:r.valorRecebido,
-          cupomAtivo:cupomVal>0,cupomCodigo:cupomVal>0?'Importado':'',cupomValor:cupomVal>0?cupomVal:'',
-          misto:false,
-          pagamentos:[{formaId:r.guessFormaId,valor:r.valorRecebido}],
-          _cxImportIdx:idx,_cxImportCodigo:r.codigo||'',
-        }});
+        setState({cxMovModal:_cxBuildMovModalFromImportRow(r,idx)});
       };
-      line.appendChild(info);line.appendChild(valEl);line.appendChild(statusEl);line.appendChild(editBtn);
+      line.appendChild(info);line.appendChild(valEl);line.appendChild(statusEl);line.appendChild(verBtn);line.appendChild(editBtn);
       listWrap.appendChild(line);
     });
     box.appendChild(listWrap);
@@ -1654,6 +1731,10 @@ function _cxRenderImportVendasModal(session){
   }
 
   ov.appendChild(box);
+  if(m.rows&&m.detalheIdx!==undefined&&m.detalheIdx!==null){
+    var detalheOv=_cxRenderImportDetalhePedido(m);
+    if(detalheOv)ov.appendChild(detalheOv);
+  }
   return ov;
 }
 

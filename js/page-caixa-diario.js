@@ -176,30 +176,33 @@ function _cxSalvarPinUsuario(fn,pin){
 // uma única vez (a pedido do próprio dev). Limpa o PIN atual, o que faz a
 // tela de login mostrar "🆕 Criar PIN" de novo — basta digitar um PIN novo
 // pra confirmar. Roda só uma vez por causa da flag em localStorage.
-var _CX_PIN_RESET_V=2;
+//
+// IMPORTANTE: precisa rodar DEPOIS que loadFromFirebase() termina (chamado
+// pelo initApp() em index.html), nunca antes — o boot faz render() com o
+// cache local e só then busca o Firebase, que sobrescreve state.usuarios
+// inteiro por cima. Se essa função limpasse o PIN antes disso, a busca do
+// Firebase (com o PIN antigo ainda lá) desfazia a limpeza segundos depois
+// (por isso o selo "Criar PIN" parecia "sumir sozinho").
+var _CX_PIN_RESET_V=3;
 function _cxLiberarRedefinicaoPinDev(){
   if(lsGet('cxPinResetV',0)>=_CX_PIN_RESET_V)return;
+  lsSet('cxPinResetV',_CX_PIN_RESET_V);
   var mudou=false;
   var usuarios=(state.usuarios||[]).map(function(u){
     if(u.papel==='desenvolvedor'&&u.pinCaixa){mudou=true;return Object.assign({},u,{pinCaixa:''});}
     return u;
   });
-  if(mudou){
-    lsSet('usuarios',usuarios);
-    state.usuarios=usuarios;
-    scheduleSave();
-  }
-  // Também derruba a sessão ativa (se houver), pra garantir que a tela de
-  // login apareça de novo e o selo "Criar PIN" fique visível na hora.
-  // (mutação direta, sem setState/render recursivo — o render em andamento
-  // já lê o state atualizado na sequência.)
-  if(state.cxSession){state.cxSession=null;state.cxPin=null;state.cxPickerOpen=false;}
-  lsSet('cxPinResetV',_CX_PIN_RESET_V);
+  if(!mudou)return;
+  var patch={usuarios:usuarios};
+  // Também derruba a sessão ativa (se houver), pra tela de login aparecer
+  // na hora com o selo "Criar PIN" visível.
+  if(state.cxSession){patch.cxSession=null;patch.cxPin=null;patch.cxPickerOpen=false;}
+  setState(patch);
+  scheduleSave();
 }
 
 function renderCaixaDiario(){
   _cxSeedFormasPagamento();
-  _cxLiberarRedefinicaoPinDev();
   var pf=state.profile;
   var funcs=_cxListaLogin();
 

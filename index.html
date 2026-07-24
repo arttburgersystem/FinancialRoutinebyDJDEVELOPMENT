@@ -3613,8 +3613,8 @@ function initApp(){
   window.addEventListener('resize',window._djfResizeHandler);
   initWeatherLocation();
   loadFromFirebase()
-    .then(function(){runRecorrencia();migrarVendasStone();if(typeof setupTarefasNotificacoes==='function')setupTarefasNotificacoes();if(typeof iniciarBackgroundSync==='function')iniciarBackgroundSync();})
-    .catch(function(){runRecorrencia();migrarVendasStone();if(typeof setupTarefasNotificacoes==='function')setupTarefasNotificacoes();if(typeof iniciarBackgroundSync==='function')iniciarBackgroundSync();});
+    .then(function(){if(typeof _cxLiberarRedefinicaoPinDev==='function')_cxLiberarRedefinicaoPinDev();runRecorrencia();migrarVendasStone();if(typeof setupTarefasNotificacoes==='function')setupTarefasNotificacoes();if(typeof iniciarBackgroundSync==='function')iniciarBackgroundSync();})
+    .catch(function(){if(typeof _cxLiberarRedefinicaoPinDev==='function')_cxLiberarRedefinicaoPinDev();runRecorrencia();migrarVendasStone();if(typeof setupTarefasNotificacoes==='function')setupTarefasNotificacoes();if(typeof iniciarBackgroundSync==='function')iniciarBackgroundSync();});
 }
 
 function lockApp(){

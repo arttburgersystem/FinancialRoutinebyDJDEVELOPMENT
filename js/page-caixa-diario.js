@@ -1251,7 +1251,7 @@ function _cxRenderImportVendasModal(session){
   box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center',color:'#38bdf8'}},'📊 Importar Vendas do Dia'));
   box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'18px'}},'Data selecionada: '+dataAlvoDisp));
 
-  if(!m.rows){
+  if(!m.rows&&!m.semDados){
     box.appendChild(el('div',{style:{
       background:'#0f172a',borderRadius:'10px',padding:'12px 14px',fontSize:'12px',color:'#94a3b8',
       lineHeight:'1.7',marginBottom:'16px',borderLeft:'3px solid #38bdf8',
@@ -1275,7 +1275,13 @@ function _cxRenderImportVendasModal(session){
           }
           var pf=state.profile;
           var doDia=parsed.rows.filter(function(r){return r.data===dataAlvo;});
-          if(!doDia.length){showToast('Nenhum pedido encontrado para '+dataAlvoDisp+' neste arquivo.','error');return;}
+          if(!doDia.length){
+            var datasSet={};
+            parsed.rows.forEach(function(r){if(r.data)datasSet[r.data]=(datasSet[r.data]||0)+1;});
+            var datasEncontradas=Object.keys(datasSet).sort().map(function(d){return {data:d,qtd:datasSet[d]};});
+            setState({cxImportModal:{semDados:true,datasEncontradas:datasEncontradas}});
+            return;
+          }
           var jaLancados={};
           (state.caixaDiarioMovs||[]).forEach(function(mv){
             if(mv.profile===pf&&mv.origemImportCodigo)jaLancados[mv.origemImportCodigo]=true;
@@ -1313,6 +1319,31 @@ function _cxRenderImportVendasModal(session){
     var cancelBtn=el('button',{style:{width:'100%',background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
     cancelBtn.onclick=function(){setState({cxImportModal:null});};
     box.appendChild(cancelBtn);
+
+  } else if(m.semDados){
+    box.appendChild(el('div',{style:{
+      background:'rgba(248,113,113,.12)',border:'1px solid rgba(248,113,113,.35)',color:'#f87171',
+      borderRadius:'10px',padding:'14px',marginBottom:'16px',fontSize:'13px',fontWeight:'700',
+    }},'⚠ Nenhum pedido encontrado para '+dataAlvoDisp+' neste arquivo.'));
+
+    if(m.datasEncontradas&&m.datasEncontradas.length){
+      box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',marginBottom:'8px',fontWeight:'700'}},'Datas encontradas no arquivo:'));
+      var datasList=el('div',{style:{marginBottom:'14px',border:'1px solid #334155',borderRadius:'10px',overflow:'hidden'}});
+      m.datasEncontradas.forEach(function(d){
+        datasList.appendChild(el('div',{style:{fontSize:'13px',color:'#f1f5f9',padding:'8px 12px',borderBottom:'1px solid #334155'}},
+          (typeof fmtDate==='function'?fmtDate(d.data):d.data)+' — '+d.qtd+' pedido(s)'));
+      });
+      box.appendChild(datasList);
+      box.appendChild(el('div',{style:{fontSize:'11px',color:'#64748b',marginBottom:'16px',lineHeight:'1.6'}},
+        'Se a data desejada estiver na lista acima, use o botão 🕓 (lançamento retroativo) no topo para mudar a data ativa do caixa para uma dessas datas e importe novamente.'));
+    } else {
+      box.appendChild(el('div',{style:{fontSize:'12px',color:'#64748b',marginBottom:'16px'}},
+        'Não foi possível identificar nenhuma data válida neste arquivo. Confira se o relatório exportado do Yooga é o correto.'));
+    }
+
+    var voltarBtn=el('button',{style:{width:'100%',background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'← Tentar outro arquivo');
+    voltarBtn.onclick=function(){setState({cxImportModal:{}});};
+    box.appendChild(voltarBtn);
 
   } else {
     var pendentes=m.rows.filter(function(r){return !r.importado;}).length;

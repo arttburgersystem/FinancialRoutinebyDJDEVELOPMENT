@@ -76,6 +76,82 @@ function _parseYoogaRows(raw){
   return {rows:rows,data:dataImport};
 }
 
+// ── Relatório detalhado por pedido (ex: "Histórico de vendas") ──────────────
+function _parseYoogaDetalhadoRows(raw){
+  // Localiza linha de cabeçalho (contém CLIENTE e CANAL)
+  var hIdx=-1;
+  for(var i=0;i<Math.min(raw.length,15);i++){
+    var joined=raw[i].map(function(c){return(c+'').toUpperCase();}).join('|');
+    if(joined.indexOf('CLIENTE')>=0&&joined.indexOf('CANAL')>=0){hIdx=i;break;}
+  }
+  if(hIdx<0)throw new Error('Formato não reconhecido. Certifique-se de exportar o relatório detalhado de vendas por pedido do Yooga.');
+
+  var hdrs=raw[hIdx].map(function(h){return(h+'').trim().toUpperCase();});
+  function col(){
+    var candidatos=Array.prototype.slice.call(arguments);
+    for(var i=0;i<hdrs.length;i++){
+      for(var c=0;c<candidatos.length;c++){if(hdrs[i].indexOf(candidatos[c])>=0)return i;}
+    }
+    return -1;
+  }
+  var cCodigo=col('CÓDIGO','CODIGO'), cCliente=col('CLIENTE'), cTotal=col('VALOR TOTAL'),
+      cAcresc=col('ACRÉSCIMO','ACRESCIMO'), cTaxa=col('TAXA'), cDesc=col('DESCONTO'),
+      cReceb=col('VALOR RECEBIDO','RECEBIDO'), cForma=col('FORMA DE PAGAMENTO'),
+      cCanal=col('CANAL'), cData=col('DATA');
+
+  function parseBRL(v){
+    if(typeof v==='number')return Math.round(v*100)/100;
+    return parseFloat((v+'').replace(/[R$\s]/g,'').replace(/\./g,'').replace(',','.'))||0;
+  }
+
+  var rows=[];
+  for(var j=hIdx+1;j<raw.length;j++){
+    var r=raw[j];
+    var cliente=(r[cCliente]||'').toString().trim();
+    var codigo=(r[cCodigo]||'').toString().trim();
+    if(!codigo&&!cliente)continue;
+    if(cliente.toLowerCase()==='total')continue;
+    var dataRaw=(r[cData]||'').toString().trim();
+    var dm=dataRaw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    var dataISO=dm?(dm[3]+'-'+dm[2]+'-'+dm[1]):today();
+    var horaMatch=dataRaw.match(/(\d{2}:\d{2})/);
+    rows.push({
+      codigo:codigo,
+      cliente:cliente||'Não identificado',
+      valorTotal:parseBRL(r[cTotal]),
+      acrescimo:parseBRL(r[cAcresc]),
+      taxa:parseBRL(r[cTaxa]),
+      desconto:parseBRL(r[cDesc]),
+      valorRecebido:parseBRL(r[cReceb]),
+      formaPagamento:(r[cForma]||'').toString().trim(),
+      canal:(r[cCanal]||'').toString().trim(),
+      data:dataISO,
+      hora:horaMatch?horaMatch[1]:'',
+      incluir:parseBRL(r[cReceb])>0,
+    });
+  }
+  if(!rows.length)throw new Error('Nenhuma linha de dados encontrada no arquivo.');
+  return {rows:rows};
+}
+
+// Detecta automaticamente qual dos dois formatos foi exportado
+function _parseYoogaAny(raw){
+  var joined0=(raw.slice(0,15)||[]).map(function(row){
+    return row.map(function(c){return(c+'').toUpperCase();}).join('|');
+  }).join('|');
+  var isDetalhado=joined0.indexOf('CLIENTE')>=0&&joined0.indexOf('CANAL')>=0;
+  var isAgregado=joined0.indexOf('NOME')>=0&&joined0.indexOf('FATURADO')>=0;
+  if(isDetalhado){
+    var d=_parseYoogaDetalhadoRows(raw);
+    return {tipo:'detalhado',rows:d.rows};
+  }
+  if(isAgregado){
+    var a=_parseYoogaRows(raw);
+    return {tipo:'agregado',rows:a.rows,data:a.data};
+  }
+  throw new Error('Formato não reconhecido. Exporte "Venda por Forma de Pagamento" (resumo) ou o relatório detalhado de vendas por pedido do Yooga.');
+}
+
 function _yoogaConfirmar(){
   var m=state.yoogaImportModal;
   if(!m||!m.rows)return;
@@ -109,6 +185,52 @@ function _yoogaConfirmar(){
   showToast(novas.length+' lançamentos Yooga importados!','success');
 }
 
+function _yoogaConfirmarDetalhado(){
+  var m=state.yoogaImportModal;
+  if(!m||!m.rows)return;
+  var toImport=m.rows.filter(function(r){return r.incluir&&r.valorRecebido>0;});
+  if(!toImport.length){showToast('Selecione ao menos um pedido para importar','error');return;}
+
+  // Evita duplicar pedidos já importados antes (por código do pedido, não por data)
+  var jaImportados={};
+  (state.contas||[]).forEach(function(c){
+    if(!c.notas||c.notas.indexOf('[Yooga-Pedido]')<0||c.profile!==state.profile)return;
+    var mch=c.notas.match(/Pedido #(\S+)/);
+    if(mch)jaImportados[mch[1]]=true;
+  });
+
+  var novas=[];
+  var duplicados=0;
+  toImport.forEach(function(r){
+    if(r.codigo&&jaImportados[r.codigo]){duplicados++;return;}
+    var notasParts=['[Yooga-Pedido]','Pedido #'+(r.codigo||'—'),r.canal||'',r.formaPagamento||''];
+    if(r.acrescimo>0)notasParts.push('Acréscimo: '+fmtMoney(r.acrescimo));
+    if(r.taxa>0)notasParts.push('Taxa marketplace: -'+fmtMoney(r.taxa));
+    if(r.desconto>0)notasParts.push('Desconto: -'+fmtMoney(r.desconto));
+    novas.push({
+      id:uid(),
+      tipo:'receber',
+      descricao:'Yooga — '+r.cliente+(r.codigo?' (#'+r.codigo+')':''),
+      valor:r.valorRecebido,
+      vencimento:r.data,
+      status:'recebido',
+      categoria:'Vendas PDV',
+      profile:state.profile,
+      banco:'',
+      notas:notasParts.filter(Boolean).join(' | '),
+    });
+  });
+
+  if(!novas.length){
+    showToast(duplicados>0?('Todos os '+duplicados+' pedidos selecionados já haviam sido importados antes.'):'Nenhum pedido novo para importar.','error');
+    return;
+  }
+
+  setState({contas:(state.contas||[]).concat(novas),yoogaImportModal:null});
+  scheduleSave();
+  showToast(novas.length+' pedido(s) importado(s)!'+(duplicados>0?' ('+duplicados+' já existiam e foram ignorados)':''),'success');
+}
+
 function renderImportYoogaModal(){
   if(!state.yoogaImportModal)return null;
   var m=state.yoogaImportModal;
@@ -130,8 +252,8 @@ function renderImportYoogaModal(){
       _parseYoogaFile(f,function(err,raw){
         if(err){showToast('Erro: '+err.message,'error');return;}
         try{
-          var parsed=_parseYoogaRows(raw);
-          setState({yoogaImportModal:{rows:parsed.rows,data:parsed.data}});
+          var parsed=_parseYoogaAny(raw);
+          setState({yoogaImportModal:{tipo:parsed.tipo,rows:parsed.rows,data:parsed.data}});
         }catch(ex){showToast(ex.message,'error');}
       });
     }
@@ -162,15 +284,71 @@ function renderImportYoogaModal(){
         borderLeft:'3px solid var(--primary)',
       }},[
         el('strong',{style:{color:'var(--text)',display:'block',marginBottom:'4px'}},'Como exportar:'),
-        '1. No Yooga acesse Relatórios → Venda por Forma de Pagamento',el('br',{}),
-        '2. Filtre pela data ou período desejado',el('br',{}),
-        '3. Clique em "Exportar Excel" (canto superior direito)',el('br',{}),
-        '4. Selecione o arquivo baixado abaixo',
+        'No Yooga, exporte em Excel um destes relatórios (o sistema detecta automaticamente qual foi enviado):',el('br',{}),
+        '• Venda por Forma de Pagamento — lançamento resumido por forma de pagamento',el('br',{}),
+        '• Histórico de vendas (detalhado por pedido) — um lançamento por pedido, com cliente e código',
       ]),
       dropZone,
       fileInp,
     ]);
     footer=div('modal-actions',[btn('btn-ghost','Cancelar',function(){setState({yoogaImportModal:null});})]);
+
+  } else if(m.tipo==='detalhado'){
+    // ── Passo 2 (detalhado): prévia por pedido ────────────────────────────
+    var totalValD=m.rows.reduce(function(s,r){return s+(r.incluir?r.valorRecebido:0);},0);
+    var totalElD=el('span',{style:{fontWeight:'700',color:'var(--green)',fontVariantNumeric:'tabular-nums'}},fmtMoney(totalValD));
+    var countElD=el('span',{style:{fontWeight:'700',color:'var(--text)'}},String(m.rows.filter(function(r){return r.incluir;}).length));
+
+    var tbodyD=el('tbody',{});
+    m.rows.forEach(function(r,i){
+      var chk=el('input',{type:'checkbox',style:{cursor:'pointer',accentColor:'var(--primary)',marginTop:'1px'}});
+      chk.checked=r.incluir;
+      chk.onchange=function(){
+        m.rows[i].incluir=chk.checked;
+        var t=m.rows.reduce(function(s,rx){return s+(rx.incluir?rx.valorRecebido:0);},0);
+        totalElD.textContent=fmtMoney(t);
+        countElD.textContent=String(m.rows.filter(function(rx){return rx.incluir;}).length);
+      };
+      var dim=r.valorRecebido===0?'0.35':'1';
+      tbodyD.appendChild(el('tr',{style:{opacity:dim,borderBottom:'1px solid var(--border)'}},[
+        el('td',{style:{padding:'6px 8px',verticalAlign:'middle'}},[chk]),
+        el('td',{style:{padding:'6px 8px',fontSize:'11px',color:'var(--text3)',fontVariantNumeric:'tabular-nums'}},r.codigo||'—'),
+        el('td',{style:{padding:'6px 8px',fontSize:'12px',fontWeight:'600'}},r.cliente),
+        el('td',{style:{padding:'6px 8px',fontSize:'11px',color:'var(--text3)'}},r.formaPagamento+(r.canal?' · '+r.canal:'')),
+        el('td',{style:{padding:'6px 8px',fontSize:'13px',fontWeight:'700',textAlign:'right',fontVariantNumeric:'tabular-nums',color:r.valorRecebido>0?'var(--green)':'var(--text3)'}},fmtMoney(r.valorRecebido)),
+        el('td',{style:{padding:'6px 8px',fontSize:'11px',color:'var(--text3)',textAlign:'right',whiteSpace:'nowrap'}},(r.data?r.data.split('-').reverse().join('/'):'')+(r.hora?' '+r.hora:'')),
+      ]));
+    });
+
+    var thD=function(txt,align){return el('th',{style:{padding:'6px 8px',textAlign:align||'left',fontSize:'10px',color:'var(--text3)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'.05em',whiteSpace:'nowrap'}},txt);};
+
+    body=el('div',{},[
+      el('div',{style:{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',flexWrap:'wrap'}},[
+        el('span',{style:{fontSize:'12px',color:'var(--text3)'}},[countElD,' pedido(s) selecionado(s)']),
+        el('button',{type:'button',class:'btn-ghost',style:{fontSize:'11px',padding:'5px 10px',marginLeft:'auto'},
+          onclick:function(){setState({yoogaImportModal:{}});}
+        },'← Trocar arquivo'),
+      ]),
+      el('div',{style:{overflowX:'auto',maxHeight:'340px',overflowY:'auto',border:'1px solid var(--border)',borderRadius:'8px'}},[
+        el('table',{style:{width:'100%',borderCollapse:'collapse'}},[
+          el('thead',{style:{position:'sticky',top:'0',background:'var(--bg2)',zIndex:'1'}},[
+            el('tr',{},[thD(''),thD('Código'),thD('Cliente'),thD('Pagamento'),thD('Recebido','right'),thD('Data','right')]),
+          ]),
+          tbodyD,
+          el('tfoot',{},[
+            el('tr',{style:{borderTop:'2px solid var(--border)',background:'var(--bg3)'}},[
+              el('td',{colspan:'4',style:{padding:'8px',fontSize:'12px',fontWeight:'700',color:'var(--text3)'}},'Total a importar'),
+              el('td',{colspan:'2',style:{padding:'8px',textAlign:'right'}},[totalElD]),
+            ]),
+          ]),
+        ]),
+      ]),
+    ]);
+
+    footer=div('modal-actions',[
+      btn('btn-ghost','Cancelar',function(){setState({yoogaImportModal:null});}),
+      btn('btn-primary','✅ Importar pedidos',_yoogaConfirmarDetalhado),
+    ]);
 
   } else {
     // ── Passo 2: prévia dos dados ─────────────────────────────────────────

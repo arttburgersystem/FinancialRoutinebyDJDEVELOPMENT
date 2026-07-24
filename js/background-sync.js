@@ -23,7 +23,27 @@ function registrarSW() {
         reg.waiting.postMessage({ tipo: 'skip-waiting' });
       }
     });
+    // Se já tem um SW esperando (versão nova já baixada), manda assumir agora
+    if (reg.waiting) reg.waiting.postMessage({ tipo: 'skip-waiting' });
+    reg.addEventListener('updatefound', function() {
+      var novo = reg.installing;
+      if (!novo) return;
+      novo.addEventListener('statechange', function() {
+        if (novo.state === 'installed' && navigator.serviceWorker.controller) {
+          novo.postMessage({ tipo: 'skip-waiting' });
+        }
+      });
+    });
   }).catch(function() {});
+
+  // Quando o novo SW assume o controle, recarrega a página automaticamente
+  // (evita telas "desatualizadas" tendo que fechar/reabrir o app manualmente)
+  var _swReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', function() {
+    if (_swReloaded) return;
+    _swReloaded = true;
+    location.reload();
+  });
 }
 
 // Envia lista de tarefas ao SW para ele checar e disparar notificação do sistema

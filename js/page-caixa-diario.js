@@ -1238,14 +1238,23 @@ function _cxRenderImportVendasModal(session){
   var m=state.cxImportModal;
   if(!m)return null;
 
+  var expandido=!!m.expandido;
   var ov=el('div',{style:{
     position:'absolute',inset:'0',background:'rgba(0,0,0,.85)',
     display:'flex',alignItems:'center',justifyContent:'center',zIndex:'300',padding:'20px',overflowY:'auto',
   }});
   var box=el('div',{style:{
-    background:'#1e293b',borderRadius:'20px',padding:'26px 24px',
-    width:'640px',maxWidth:'96vw',maxHeight:'92vh',overflowY:'auto',border:'2px solid #334155',
+    position:'relative',background:'#1e293b',borderRadius:'20px',padding:'26px 24px',
+    width:expandido?'96vw':'640px',maxWidth:'96vw',maxHeight:'92vh',overflowY:'auto',border:'2px solid #334155',
   }});
+  if(m.rows){
+    var expandBtn=el('button',{type:'button',title:expandido?'Reduzir':'Expandir',style:{
+      position:'absolute',top:'20px',right:'22px',background:'#334155',color:'#f1f5f9',border:'none',
+      borderRadius:'8px',width:'32px',height:'32px',fontSize:'15px',cursor:'pointer',lineHeight:'1',
+    }},expandido?'🗗':'🗖');
+    expandBtn.onclick=function(){setState({cxImportModal:Object.assign({},m,{expandido:!expandido})});};
+    box.appendChild(expandBtn);
+  }
   var dataAlvo=_cxDataAtiva();
   var dataAlvoDisp=typeof fmtDate==='function'?fmtDate(dataAlvo):dataAlvo;
   box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center',color:'#38bdf8'}},'📊 Importar Vendas do Dia'));
@@ -1356,7 +1365,7 @@ function _cxRenderImportVendasModal(session){
     if(existentes>0)summary.appendChild(el('span',{style:{background:'rgba(251,191,36,.15)',color:'#fbbf24',padding:'6px 12px',borderRadius:'20px',fontSize:'12px',fontWeight:'700'}},existentes+' já lançado(s) antes'));
     box.appendChild(summary);
 
-    var listWrap=el('div',{style:{maxHeight:'50vh',overflowY:'auto',border:'1px solid #334155',borderRadius:'10px',marginBottom:'16px'}});
+    var listWrap=el('div',{style:{maxHeight:expandido?'calc(100vh - 300px)':'50vh',overflowY:'auto',border:'1px solid #334155',borderRadius:'10px',marginBottom:'16px'}});
     m.rows.forEach(function(r,idx){
       var statusTxt=r.jaExistia?'✅ Já lançado':(r.importado?'✅ Salvo':'⏳ Pendente');
       var statusCor=r.jaExistia?'#fbbf24':(r.importado?'#4ade80':'#94a3b8');

@@ -5,14 +5,17 @@
 // reaproveita o mesmo PIN de 4 dígitos já usado na Requisição de Estoque).
 
 // Permite múltiplas sessões de caixa no mesmo dia (ex: turno almoço + jantar).
-// Retorna a sessão aberta de hoje se existir; senão, a última sessão de hoje
-// (fechada) para exibir o resumo; senão null (nenhuma sessão hoje ainda).
-function _cxDiaAtual(){
-  var pf=state.profile, dt=today();
+// Retorna a sessão aberta da data se existir; senão, a última sessão da data
+// (fechada) para exibir o resumo; senão null (nenhuma sessão nessa data).
+function _cxDiaPorData(dt){
+  var pf=state.profile;
   var todos=(state.caixaDiario||[]).filter(function(d){return d.data===dt&&d.profile===pf;});
   if(todos.length===0)return null;
   var aberto=todos.find(function(d){return d.status==='aberto';});
   return aberto||todos[todos.length-1];
+}
+function _cxDiaAtual(){
+  return _cxDiaPorData(today());
 }
 
 // Processa uma tecla do teclado numérico do PIN (clique no botão ou teclado físico)
@@ -204,7 +207,7 @@ function renderCaixaDiario(){
         background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'10px',
         padding:'10px 14px',cursor:'pointer',fontSize:'16px',flexShrink:'0',
       }},'📄');
-      relBtn.onclick=function(){setState({cxPickerOpen:false});_cxExportarRelatorio();};
+      relBtn.onclick=function(){setState({cxPickerOpen:false,cxRelatorioModal:{data:today()}});};
       hdr.appendChild(relBtn);
       var gearBtn=el('button',{title:'Gerenciar formas de pagamento',style:{
         background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'10px',
@@ -220,11 +223,11 @@ function renderCaixaDiario(){
   }},session?'⬅ Sair':'✕ Fechar');
   exitBtn.onclick=function(){
     if(session){
-      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null});
+      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null});
     } else if(window.DJF_KIOSK_BOOT && typeof lockApp==='function'){
       lockApp();
     } else {
-      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null});
+      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null});
     }
   };
   hdr.appendChild(exitBtn);
@@ -438,6 +441,7 @@ function renderCaixaDiario(){
   if(movModal)root.appendChild(movModal.tipo==='entrada'?_cxRenderEntradaModal(movModal,session):_cxRenderSaidaModal(movModal,session));
   if(formasModal)root.appendChild(_cxRenderFormasModal());
   if(state.cxKpiDetalhe)root.appendChild(_cxRenderKpiModal(state.cxKpiDetalhe,dia,movs,aberturaTotal,totalEntradas,totalSaidas,totalDinheiroFisico,saldoFisicoEsperado));
+  if(state.cxRelatorioModal)root.appendChild(_cxRenderRelatorioFiltroModal());
   }
 
   // ── PIN overlay: usado tanto no login inicial quanto ao trocar de usuário ──
@@ -1080,13 +1084,52 @@ function _cxRenderKpiModal(tipo,dia,movs,aberturaTotal,totalEntradas,totalSaidas
   return ov;
 }
 
+// ── MODAL: filtrar a data antes de gerar o relatório ─────────────────────────
+function _cxRenderRelatorioFiltroModal(){
+  var m=state.cxRelatorioModal;
+  if(!m)return null;
+
+  var ov=el('div',{style:{
+    position:'absolute',inset:'0',background:'rgba(0,0,0,.85)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:'350',padding:'20px',
+  }});
+  var box=el('div',{style:{
+    background:'#1e293b',borderRadius:'20px',padding:'26px 24px',
+    width:'340px',maxWidth:'94vw',border:'2px solid #334155',
+  }});
+  box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center'}},'📄 Relatório de Vendas'));
+  box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'20px'}},'Escolha o dia que deseja imprimir'));
+
+  box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Data'));
+  var dataInp=el('input',{type:'date',value:m.data||today(),max:today(),
+    style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'16px',fontWeight:'700',textAlign:'center',marginBottom:'20px'}});
+  dataInp.oninput=function(){m.data=dataInp.value;};
+  box.appendChild(dataInp);
+
+  var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
+  var cancelBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
+  cancelBtn.onclick=function(){setState({cxRelatorioModal:null});};
+  var confirmBtn=el('button',{style:{background:'#1d4ed8',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'📥 Gerar PDF');
+  confirmBtn.onclick=function(){
+    var dt=dataInp.value||today();
+    setState({cxRelatorioModal:null});
+    _cxExportarRelatorio(dt);
+  };
+  actsRow.appendChild(cancelBtn);actsRow.appendChild(confirmBtn);
+  box.appendChild(actsRow);
+
+  ov.appendChild(box);
+  return ov;
+}
+
 // ── RELATÓRIO DE VENDAS DO DIA — impressão/PDF (somente Desenvolvedor) ──────
-function _cxExportarRelatorio(){
+function _cxExportarRelatorio(dataFiltro){
   if(!_cxIsDev(state.cxSession)){showToast('Restrito ao desenvolvedor','error');return;}
+  dataFiltro=dataFiltro||today();
 
   var pf=state.profile;
-  var dia=_cxDiaAtual();
-  var movs=(state.caixaDiarioMovs||[]).filter(function(m){return m.data===today()&&m.profile===pf;})
+  var dia=_cxDiaPorData(dataFiltro);
+  var movs=(state.caixaDiarioMovs||[]).filter(function(m){return m.data===dataFiltro&&m.profile===pf;})
     .sort(function(a,b){return (a.criadoEm||'').localeCompare(b.criadoEm||'');});
   var entradas=movs.filter(function(m){return m.tipo==='entrada';});
   var saidas=movs.filter(function(m){return m.tipo==='saida';});
@@ -1137,7 +1180,7 @@ function _cxExportarRelatorio(){
 
   var w=window.open('','_blank','width=800,height=1000');
   w.document.write(
-    '<html><head><meta charset="UTF-8"><title>Relatório de Vendas — '+fmtDate(today())+'</title><style>'+
+    '<html><head><meta charset="UTF-8"><title>Relatório de Vendas — '+fmtDate(dataFiltro)+'</title><style>'+
     'body{font-family:system-ui,sans-serif;padding:32px;color:#111;max-width:820px;margin:0 auto}'+
     'h1{font-size:20px;font-weight:900;margin:0}'+
     '.sub{font-size:12px;color:#666;margin-bottom:4px}'+
@@ -1157,7 +1200,7 @@ function _cxExportarRelatorio(){
     '</style></head><body>'+
     '<h1>'+nomeEmp+'</h1>'+
     (emp.cnpj?'<div class="sub">CNPJ: '+emp.cnpj+'</div>':'')+
-    '<div class="data">📄 Relatório de Vendas — Caixa Diário — '+fmtDate(today())+'</div>'+
+    '<div class="data">📄 Relatório de Vendas — Caixa Diário — '+fmtDate(dataFiltro)+'</div>'+
     '<div class="kpis">'+
       '<div class="kpi"><div class="label">Abertura</div><div class="value blue">'+M(aberturaTotal)+'</div></div>'+
       '<div class="kpi"><div class="label">Vendas</div><div class="value green">'+M(totalVendas)+'</div></div>'+

@@ -110,10 +110,11 @@ function _parseYoogaDetalhadoRows(raw){
     var cliente=(r[cCliente]||'').toString().trim();
     var codigo=(r[cCodigo]||'').toString().trim();
     if(!codigo&&!cliente)continue;
-    if(cliente.toLowerCase()==='total')continue;
+    if(cliente.toLowerCase()==='total'||codigo.toLowerCase()==='total')continue;
     var dataRaw=(r[cData]||'').toString().trim();
     var dm=dataRaw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-    var dataISO=dm?(dm[3]+'-'+dm[2]+'-'+dm[1]):today();
+    if(!dm)continue; // linha sem data válida = rodapé/total da planilha, não é um pedido
+    var dataISO=dm[3]+'-'+dm[2]+'-'+dm[1];
     var horaMatch=dataRaw.match(/(\d{2}:\d{2})/);
     rows.push({
       codigo:codigo,
@@ -131,6 +132,16 @@ function _parseYoogaDetalhadoRows(raw){
     });
   }
   if(!rows.length)throw new Error('Nenhuma linha de dados encontrada no arquivo.');
+
+  // Yooga exporta valores em centavos (inteiros) — dividir por 100 para obter reais
+  rows.forEach(function(r){
+    r.valorTotal=Math.round(r.valorTotal)/100;
+    r.acrescimo=Math.round(r.acrescimo)/100;
+    r.taxa=Math.round(r.taxa)/100;
+    r.desconto=Math.round(r.desconto)/100;
+    r.valorRecebido=Math.round(r.valorRecebido)/100;
+  });
+
   return {rows:rows};
 }
 
@@ -235,10 +246,18 @@ function renderImportYoogaModal(){
   if(!state.yoogaImportModal)return null;
   var m=state.yoogaImportModal;
 
+  var expandido=!!m.expandido;
+  var titleBarBtns=[];
+  if(m.rows){
+    titleBarBtns.push(el('button',{class:'modal-close',title:expandido?'Reduzir':'Expandir',
+      style:{fontSize:'16px'},
+      onclick:function(){setState({yoogaImportModal:Object.assign({},m,{expandido:!expandido})});}
+    }, expandido?'🗗':'🗖'));
+  }
+  titleBarBtns.push(el('button',{class:'modal-close',onclick:function(){setState({yoogaImportModal:null});}}, '×'));
   var titleBar=div('modal-title',[
     el('span',{style:{flex:'1'}},'📊 Importar Vendas Yooga'),
-    el('button',{class:'modal-close',onclick:function(){setState({yoogaImportModal:null});}}, '×'),
-  ]);
+  ].concat(titleBarBtns));
 
   var body,footer;
 
@@ -314,7 +333,7 @@ function renderImportYoogaModal(){
         el('td',{style:{padding:'6px 8px',verticalAlign:'middle'}},[chk]),
         el('td',{style:{padding:'6px 8px',fontSize:'11px',color:'var(--text3)',fontVariantNumeric:'tabular-nums'}},r.codigo||'—'),
         el('td',{style:{padding:'6px 8px',fontSize:'12px',fontWeight:'600'}},r.cliente),
-        el('td',{style:{padding:'6px 8px',fontSize:'11px',color:'var(--text3)'}},r.formaPagamento+(r.canal?' · '+r.canal:'')),
+        el('td',{style:{padding:'6px 8px',fontSize:'11px',color:'var(--text3)',whiteSpace:'nowrap'}},r.formaPagamento+(r.canal?' · '+r.canal:'')),
         el('td',{style:{padding:'6px 8px',fontSize:'13px',fontWeight:'700',textAlign:'right',fontVariantNumeric:'tabular-nums',color:r.valorRecebido>0?'var(--green)':'var(--text3)'}},fmtMoney(r.valorRecebido)),
         el('td',{style:{padding:'6px 8px',fontSize:'11px',color:'var(--text3)',textAlign:'right',whiteSpace:'nowrap'}},(r.data?r.data.split('-').reverse().join('/'):'')+(r.hora?' '+r.hora:'')),
       ]));
@@ -329,8 +348,8 @@ function renderImportYoogaModal(){
           onclick:function(){setState({yoogaImportModal:{}});}
         },'← Trocar arquivo'),
       ]),
-      el('div',{style:{overflowX:'auto',maxHeight:'340px',overflowY:'auto',border:'1px solid var(--border)',borderRadius:'8px'}},[
-        el('table',{style:{width:'100%',borderCollapse:'collapse'}},[
+      el('div',{style:{overflowX:'auto',maxHeight:expandido?'calc(100vh - 260px)':'340px',overflowY:'auto',border:'1px solid var(--border)',borderRadius:'8px'}},[
+        el('table',{style:{width:'100%',borderCollapse:'collapse',minWidth:'620px'}},[
           el('thead',{style:{position:'sticky',top:'0',background:'var(--bg2)',zIndex:'1'}},[
             el('tr',{},[thD(''),thD('Código'),thD('Cliente'),thD('Pagamento'),thD('Recebido','right'),thD('Data','right')]),
           ]),
@@ -416,7 +435,8 @@ function renderImportYoogaModal(){
   }
 
   var modal=div('modal',[titleBar,body,footer]);
-  modal.style.maxWidth='600px';
+  modal.style.maxWidth=expandido?'96vw':'600px';
+  if(expandido)modal.style.width='96vw';
   var ov=div('modal-overlay',[modal]);
   ov.onclick=function(e){if(e.target===ov)setState({yoogaImportModal:null});};
   return ov;

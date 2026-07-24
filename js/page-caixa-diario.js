@@ -128,6 +128,13 @@ function _cxCalcLiquido(val,f){
 function _cxFormatTaxa(f){
   return f.taxaTipo==='fixo'?fmtMoney(f.taxaValor||0):(f.taxaValor||0)+'%';
 }
+// Rótulo da plataforma de delivery (iFood/Yooga + tipo de pedido) pra exibir nas listas
+function _cxPlataformaLabel(m){
+  if(!m.plataforma)return '';
+  var nome=m.plataforma==='yooga'?'Yooga':'iFood';
+  var tipo=m.plataforma==='yooga'&&m.tipoPedidoYooga?(m.tipoPedidoYooga==='automatico'?' (Automático)':' (Manual)'):'';
+  return nome+tipo;
+}
 
 // Junta funcionários (PIN da Requisição de Estoque) + usuários admin/dev
 // (PIN próprio do Caixa, "pinCaixa") numa única lista de login, em ordem alfabética
@@ -400,8 +407,10 @@ function renderCaixaDiario(){
         var titulo, sub;
         if(m.tipo==='entrada'&&m.pagamentos){
           var canalLabel=m.canal==='delivery'?'🛵 Delivery':'🏠 Salão';
-          titulo=canalLabel+(m.identificacao?' · '+m.identificacao:'');
+          var platLabel=_cxPlataformaLabel(m);
+          titulo=canalLabel+(platLabel?' · '+platLabel:'')+(m.identificacao?' · '+m.identificacao:'');
           var formasTxt=m.pagamentos.map(function(p){return p.formaNome+' '+fmtMoney(p.valor);}).join(' + ');
+          if(m.taxaPlataforma>0)formasTxt+=' (taxa plataforma '+fmtMoney(m.taxaPlataforma)+')';
           if(m.troco>0)formasTxt+=' (troco '+fmtMoney(m.troco)+')';
           if(m.falta>0)formasTxt+=' (falta '+fmtMoney(m.falta)+')';
           sub=(m.horario||'')+' · '+(m.funcNome||'')+' · '+formasTxt;
@@ -704,10 +713,61 @@ function _cxRenderEntradaModal(m,session){
       background:m.canal===pair[0]?'rgba(29,78,216,.25)':'#0f172a',color:'#f1f5f9',
       fontWeight:'700',fontSize:'13px',cursor:'pointer',
     }},pair[1]);
-    b.onclick=function(){m.canal=pair[0];rerenderMov();};
+    b.onclick=function(){m.canal=pair[0];if(pair[0]==='salao'){m.plataforma='';m.tipoPedidoYooga='';}rerenderMov();};
     canalRow.appendChild(b);
   });
   box.appendChild(canalRow);
+
+  // ── Plataforma de delivery: iFood ou Yooga ──
+  if(m.canal==='delivery'){
+    var yoogaForma=(state.formasPagamento||[]).find(function(f){return f.id==='fp_yooga'||/yooga/i.test(f.nome||'');});
+    var ifoodForma=(state.formasPagamento||[]).find(function(f){return f.id==='fp_ifood'||/ifood/i.test(f.nome||'');});
+
+    box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Plataforma *'));
+    var platRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'16px'}});
+    [['ifood','iFood','#ea1d2c'],['yooga','Yooga','#7c3aed']].forEach(function(pl){
+      var sel=m.plataforma===pl[0];
+      var b=el('button',{type:'button',style:{
+        display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',
+        padding:'10px',borderRadius:'10px',border:'2px solid '+(sel?pl[2]:'#334155'),
+        background:sel?pl[2]+'33':'#0f172a',color:'#f1f5f9',fontWeight:'700',fontSize:'13px',cursor:'pointer',
+      }},[
+        el('span',{style:{width:'20px',height:'20px',borderRadius:'6px',background:pl[2],display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:'900',color:'#fff',flexShrink:'0'}},pl[1][0]),
+        document.createTextNode(pl[1]),
+      ]);
+      b.onclick=function(){
+        m.plataforma=pl[0];
+        if(pl[0]!=='yooga')m.tipoPedidoYooga='';
+        // Pré-seleciona a forma de pagamento correspondente (já traz a taxa configurada)
+        var formaAuto=pl[0]==='yooga'?yoogaForma:ifoodForma;
+        if(formaAuto&&m.pagamentos&&m.pagamentos[0])m.pagamentos[0].formaId=formaAuto.id;
+        rerenderMov();
+      };
+      platRow.appendChild(b);
+    });
+    box.appendChild(platRow);
+
+    if(m.plataforma==='yooga'){
+      box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Tipo de pedido Yooga *'));
+      var tipoRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'8px'}});
+      [['manual','✋ Manual'],['automatico','🤖 Automático']].forEach(function(tp){
+        var sel=m.tipoPedidoYooga===tp[0];
+        var b=el('button',{type:'button',style:{
+          padding:'10px',borderRadius:'10px',border:'2px solid '+(sel?'#7c3aed':'#334155'),
+          background:sel?'rgba(124,58,237,.25)':'#0f172a',color:'#f1f5f9',fontWeight:'700',fontSize:'13px',cursor:'pointer',
+        }},tp[1]);
+        b.onclick=function(){m.tipoPedidoYooga=tp[0];rerenderMov();};
+        tipoRow.appendChild(b);
+      });
+      box.appendChild(tipoRow);
+      if(m.tipoPedidoYooga==='automatico'&&yoogaForma&&yoogaForma.taxaValor>0){
+        box.appendChild(el('div',{style:{fontSize:'11px',color:'#fbbf24',background:'rgba(251,191,36,.1)',border:'1px solid rgba(251,191,36,.3)',borderRadius:'8px',padding:'8px 10px',marginBottom:'16px'}},
+          '⚠ Pedido automático: taxa de '+_cxFormatTaxa(yoogaForma)+' retida pela Yooga será descontada.'));
+      } else {
+        box.appendChild(el('div',{style:{marginBottom:'8px'}}));
+      }
+    }
+  }
 
   // ── Identificação da venda ──
   box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Identificação da venda *'));
@@ -834,6 +894,8 @@ function _cxRenderEntradaModal(m,session){
   confirmBtn.onclick=function(){
     if(formas.length===0){showToast('Cadastre ao menos uma forma de pagamento primeiro','error');return;}
     if(!(m.identificacao||'').trim()){showToast('Informe a identificação da venda','error');return;}
+    if(m.canal==='delivery'&&!m.plataforma){showToast('Selecione a plataforma de delivery (iFood ou Yooga)','error');return;}
+    if(m.plataforma==='yooga'&&!m.tipoPedidoYooga){showToast('Selecione o tipo de pedido Yooga (Manual ou Automático)','error');return;}
     var totalVenda=calcTotalVenda();
     if(!totalVenda||totalVenda<=0){showToast('Informe o total da venda','error');return;}
     var pags=[];
@@ -854,11 +916,20 @@ function _cxRenderEntradaModal(m,session){
     // Dinheiro físico que fica na gaveta: soma das formas em dinheiro menos o troco devolvido
     var totalDinheiro=pags.filter(function(p){return p.ehDinheiroFisico;}).reduce(function(s,p){return s+p.valor;},0);
     totalDinheiro=Math.max(0,Math.round((totalDinheiro-troco)*100)/100);
+    // Pedido automático Yooga: soma a taxa retida pela plataforma (já cadastrada
+    // na forma de pagamento "Yooga Online"), mesmo que o pagamento em si tenha
+    // sido feito por outra forma.
+    var taxaPlataforma=0;
+    if(m.plataforma==='yooga'&&m.tipoPedidoYooga==='automatico'){
+      var yoogaFormaSave=(state.formasPagamento||[]).find(function(f){return f.id==='fp_yooga'||/yooga/i.test(f.nome||'');});
+      if(yoogaFormaSave)taxaPlataforma=yoogaFormaSave.taxaValor||0;
+    }
     var diaAtual=_cxDiaAtual();
     var agora=new Date();
     var novo={
       id:uid(),profile:state.profile,data:today(),diaId:diaAtual?diaAtual.id:null,tipo:'entrada',
       canal:m.canal,identificacao:(m.identificacao||'').trim(),
+      plataforma:m.canal==='delivery'?m.plataforma:'',tipoPedidoYooga:m.tipoPedidoYooga||'',taxaPlataforma:taxaPlataforma,
       pagamentos:pags,valor:totalVenda,totalPago:totalPago,troco:troco,falta:falta,
       valorDinheiroFisico:totalDinheiro,
       funcId:session.funcId,funcNome:session.funcNome,
@@ -1014,8 +1085,10 @@ function _cxRenderKpiModal(tipo,dia,movs,aberturaTotal,totalEntradas,totalSaidas
     var titulo,sub;
     if(m.tipo==='entrada'&&m.pagamentos){
       var canalLabel=m.canal==='delivery'?'🛵 Delivery':'🏠 Salão';
-      titulo=canalLabel+(m.identificacao?' · '+m.identificacao:'');
+      var platLabel2=_cxPlataformaLabel(m);
+      titulo=canalLabel+(platLabel2?' · '+platLabel2:'')+(m.identificacao?' · '+m.identificacao:'');
       var formasTxt2=m.pagamentos.map(function(p){return p.formaNome+' '+fmtMoney(p.valor);}).join(' + ');
+      if(m.taxaPlataforma>0)formasTxt2+=' (taxa plataforma '+fmtMoney(m.taxaPlataforma)+')';
       if(m.troco>0)formasTxt2+=' (troco '+fmtMoney(m.troco)+')';
       if(m.falta>0)formasTxt2+=' (falta '+fmtMoney(m.falta)+')';
       sub=(m.horario||'')+' · '+(m.funcNome||'')+' · '+formasTxt2;
@@ -1141,6 +1214,7 @@ function _cxExportarRelatorio(dataFiltro){
   var totalSaidas=saidas.reduce(function(s,m){return s+m.valor;},0);
   var totalDinheiroFisico=entradas.reduce(function(s,m){return s+(m.valorDinheiroFisico!==undefined?m.valorDinheiroFisico:m.valor);},0);
   var saldoFisicoEsperado=aberturaTotal+totalDinheiroFisico-totalSaidas;
+  var totalTaxaPlataforma=entradas.reduce(function(s,m){return s+(m.taxaPlataforma||0);},0);
 
   // Totais por forma de pagamento
   var porForma={};
@@ -1155,9 +1229,9 @@ function _cxExportarRelatorio(dataFiltro){
   var M=function(v){return'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});};
 
   var entradasRows=entradas.map(function(m){
-    var canalLabel=m.canal==='delivery'?'Delivery':'Salão';
+    var canalLabel=(m.canal==='delivery'?'Delivery':'Salão')+(_cxPlataformaLabel(m)?' — '+_cxPlataformaLabel(m):'');
     var formasTxt=(m.pagamentos||[]).map(function(p){return p.formaNome+' '+M(p.valor);}).join(' + ');
-    var obs=(m.troco>0?' · troco '+M(m.troco):'')+(m.falta>0?' · falta '+M(m.falta):'');
+    var obs=(m.taxaPlataforma>0?' · taxa plat. '+M(m.taxaPlataforma):'')+(m.troco>0?' · troco '+M(m.troco):'')+(m.falta>0?' · falta '+M(m.falta):'');
     return '<tr>'+
       '<td>'+(m.horario||'')+'</td>'+
       '<td>'+canalLabel+'</td>'+
@@ -1210,6 +1284,7 @@ function _cxExportarRelatorio(dataFiltro){
       '<div class="kpi"><div class="label">Saídas</div><div class="value red">'+M(totalSaidas)+'</div></div>'+
       '<div class="kpi"><div class="label">Dinheiro esperado</div><div class="value gold">'+M(saldoFisicoEsperado)+'</div></div>'+
     '</div>'+
+    (totalTaxaPlataforma>0?'<div class="sub" style="margin-bottom:16px">💸 Taxas retidas por plataforma (pedidos automáticos Yooga): <strong>'+M(totalTaxaPlataforma)+'</strong></div>':'')+
     (dia&&dia.status==='fechado'?
       '<div class="kpis" style="grid-template-columns:repeat(2,1fr)">'+
         '<div class="kpi"><div class="label">Contado no fechamento</div><div class="value">'+M(dia.fechamentoTotal||0)+'</div></div>'+

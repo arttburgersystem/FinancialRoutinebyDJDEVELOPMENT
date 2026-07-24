@@ -555,6 +555,7 @@ var state={
   caixaDiarioMode: false,
   formasPagamento: lsGet('formasPagamento',[]),
   beepConfig: lsGet('beepConfig',{tipo:'classico',volume:60,ativo:true}),
+  vozConfig: lsGet('vozConfig',{ativo:true,vozURI:'',volume:80}),
   sessionUser: null,
   sessionPickerOpen: false,
   auditLog: lsGet('auditLog',[]),
@@ -1540,6 +1541,47 @@ function renderSidebar(){
     beepVolInp,
     beepTestBtn,
   ]);
+
+  // ── Configuração do anúncio de hora por voz (5s depois do bipe horário) ────
+  var _vozCfg=Object.assign({ativo:true,vozURI:'',volume:80},lsGet('vozConfig',{}));
+  function _salvarVozCfg(){lsSet('vozConfig',_vozCfg);state.vozConfig=_vozCfg;}
+  var vozAtivoChk=el('input',{type:'checkbox',style:{cursor:'pointer'}});
+  vozAtivoChk.checked=_vozCfg.ativo!==false;
+  vozAtivoChk.onchange=function(){_vozCfg.ativo=vozAtivoChk.checked;_salvarVozCfg();};
+  var _vozesDisponiveis=('speechSynthesis' in window)?window.speechSynthesis.getVoices():[];
+  var _vozesPt=_vozesDisponiveis.filter(function(v){return /pt/i.test(v.lang);});
+  var _vozesExibir=_vozesPt.length?_vozesPt:_vozesDisponiveis;
+  var vozSel=el('select',{class:'form-input',style:{fontSize:'11px',padding:'5px 6px',width:'100%',marginBottom:'6px'}});
+  if(!_vozesExibir.length){
+    var vozOptNone=el('option',{},'Carregando vozes…');vozOptNone.value='';vozSel.appendChild(vozOptNone);
+  } else {
+    _vozesExibir.forEach(function(v){
+      var opt=el('option',{},v.name+' ('+v.lang+')');opt.value=v.voiceURI;
+      if(v.voiceURI===_vozCfg.vozURI)opt.selected=true;
+      vozSel.appendChild(opt);
+    });
+  }
+  vozSel.onchange=function(){_vozCfg.vozURI=vozSel.value;_salvarVozCfg();};
+  var vozVolInp=el('input',{type:'range',min:'0',max:'100',value:String(_vozCfg.volume),style:{
+    width:'100%',cursor:'pointer',accentColor:pf.color,margin:'0',display:'block',
+  }});
+  var vozVolLbl=el('span',{style:{fontSize:'10px',color:'var(--text3)',fontVariantNumeric:'tabular-nums',fontWeight:'600',minWidth:'30px',textAlign:'right'}},_vozCfg.volume+'%');
+  vozVolInp.oninput=function(){
+    var v=parseInt(vozVolInp.value);
+    vozVolLbl.textContent=v+'%';
+    _vozCfg.volume=v;_salvarVozCfg();
+  };
+  var vozTestBtn=el('button',{class:'btn-ghost',style:{fontSize:'10px',padding:'4px 8px',width:'100%',marginTop:'6px'},type:'button'},'🔊 Testar');
+  vozTestBtn.onclick=function(){if(typeof _djfAnunciarHora==='function')_djfAnunciarHora(_vozCfg);};
+  var vozWrap=el('div',{style:{padding:'8px 10px 4px',borderTop:'1px solid var(--border)'}},[
+    el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}},[
+      el('label',{style:{display:'flex',alignItems:'center',gap:'6px',fontSize:'10px',color:'var(--text3)',cursor:'pointer'}},[vozAtivoChk,document.createTextNode('🗣 Anúncio de hora (voz)')]),
+      vozVolLbl,
+    ]),
+    vozSel,
+    vozVolInp,
+    vozTestBtn,
+  ]);
   var lockBtn=el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',color:'var(--text3)'},
     onclick:function(){lockApp();}
   },'🔒 Bloquear sistema');
@@ -1605,7 +1647,11 @@ function renderSidebar(){
     el('button',{class:'btn-ghost',style:{flex:'1',fontSize:'11px',padding:'7px 6px',display:'flex',alignItems:'center',gap:'5px',justifyContent:'center',color:'var(--gold)',fontWeight:'700'},onclick:function(){if(typeof _importarAbrir==='function')_importarAbrir();}},'📸 Extrato'),
     el('button',{class:'btn-ghost',style:{flex:'1',fontSize:'11px',padding:'7px 6px',display:'flex',alignItems:'center',gap:'5px',justifyContent:'center',color:'var(--primary)',fontWeight:'700'},onclick:function(){setState({yoogaImportModal:{}});}},'📊 Yooga'),
   ]);
-  var footer=div('sidebar-footer',[collapseBtn,sessionEl,importRow,intensWrap,beepWrap,themeBtn,lockBtn,downloadBtn,renderSyncBadge()].filter(Boolean));
+  if('speechSynthesis' in window&&!window._djfVoicesHooked){
+    window._djfVoicesHooked=true;
+    window.speechSynthesis.onvoiceschanged=function(){if(typeof render==='function')render();};
+  }
+  var footer=div('sidebar-footer',[collapseBtn,sessionEl,importRow,intensWrap,beepWrap,vozWrap,themeBtn,lockBtn,downloadBtn,renderSyncBadge()].filter(Boolean));
   var sbCls='sidebar'+(state.sidebarCollapsed?' collapsed':'')+(state.sidebarOpen?' mobile-open':'');
 
   // Busca ativa: mostra lista filtrada flat em vez das seções
@@ -3463,6 +3509,8 @@ function render(){
       window._djfLastBeepHour=hAtual;
       var bc=state.beepConfig||lsGet('beepConfig',{tipo:'classico',volume:60,ativo:true});
       if(bc.ativo!==false)_djfTocarBipe(bc.tipo,bc.volume);
+      // Anuncia a hora por voz 5s depois do bipe
+      setTimeout(function(){if(typeof _djfAnunciarHora==='function')_djfAnunciarHora();},5000);
     }
   },1000);
 }
@@ -3504,6 +3552,27 @@ function _djfTocarBipe(tipo,volumePct){
         tom(880,0,0.2,0.32);
     }
     setTimeout(function(){ctx.close();},1200);
+  }catch(e){}
+}
+
+// Anuncia a hora atual por voz (5s após o bipe horário) — voz e volume configuráveis
+function _djfAnunciarHora(cfgOverride){
+  try{
+    if(!('speechSynthesis' in window))return;
+    var vc=cfgOverride||state.vozConfig||lsGet('vozConfig',{ativo:true,vozURI:'',volume:80});
+    if(vc.ativo===false)return;
+    var horaSP=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));
+    var h=horaSP.getHours();
+    var frase='São '+h+(h===1?' hora':' horas')+' em ponto.';
+    var utt=new SpeechSynthesisUtterance(frase);
+    utt.lang='pt-BR';
+    utt.volume=Math.max(0,Math.min(1,(vc.volume==null?80:vc.volume)/100));
+    var vozes=window.speechSynthesis.getVoices();
+    var voz=vc.vozURI?vozes.find(function(v){return v.voiceURI===vc.vozURI;}):null;
+    if(!voz)voz=vozes.find(function(v){return /pt-BR/i.test(v.lang);})||vozes.find(function(v){return /pt/i.test(v.lang);});
+    if(voz)utt.voice=voz;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utt);
   }catch(e){}
 }
 

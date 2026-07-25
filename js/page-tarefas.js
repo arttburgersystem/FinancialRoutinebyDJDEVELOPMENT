@@ -1005,9 +1005,8 @@ function renderTarefas() {
   }
 
   var content = div('content', contentChildren);
-  var page = div('main', [renderTopbar(), content]);
 
-  var root = div('', [page].concat(containers));
+  var root = div('', [content].concat(containers));
   root.style.display = 'contents';
   return root;
 }

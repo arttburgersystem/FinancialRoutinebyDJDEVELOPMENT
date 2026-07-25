@@ -139,6 +139,28 @@ function _cxCalcLiquido(val,f){
 function _cxFormatTaxa(f){
   return f.taxaTipo==='fixo'?fmtMoney(f.taxaValor||0):(f.taxaValor||0)+'%';
 }
+
+// ── MÁSCARA DE VÍRGULA AUTOMÁTICA (estilo calculadora de caixa) ─────────────
+// O usuário digita só números; os 2 últimos dígitos viram os centavos na
+// hora (ex: digitar 3198 mostra 31,98). Precisa ser input type=text porque
+// type=number não aceita máscara de texto.
+function _cxFmtMoedaDigitada(centavos){
+  return (centavos/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function _cxAplicarMascaraMoeda(inp,onChange){
+  inp.type='text';
+  inp.setAttribute('inputmode','numeric');
+  inp.setAttribute('autocomplete','off');
+  inp.oninput=function(){
+    var digitos=inp.value.replace(/\D/g,'').replace(/^0+(?=\d)/,'');
+    var centavos=parseInt(digitos||'0',10);
+    inp.value=digitos?_cxFmtMoedaDigitada(centavos):'';
+    onChange(centavos/100);
+  };
+  // Formata o valor inicial (quando o input já vem preenchido, ex: editando)
+  var vIni=parseFloat(inp.value)||0;
+  inp.value=vIni>0?_cxFmtMoedaDigitada(Math.round(vIni*100)):'';
+}
 // Rótulo da plataforma de delivery (iFood/Yooga + tipo de pedido) pra exibir nas listas
 function _cxPlataformaLabel(m){
   if(!m.plataforma)return '';
@@ -815,9 +837,9 @@ function _cxRenderSaidaModal(m,session){
     style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'14px',marginBottom:'12px'}});
   descInp.oninput=function(){m.descricao=descInp.value;};
 
-  var valInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'0,00',value:m.valor||'',
+  var valInp=el('input',{placeholder:'0,00',value:m.valor||'',
     style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'18px',fontWeight:'700',textAlign:'center',marginBottom:'18px'}});
-  valInp.oninput=function(){m.valor=valInp.value;};
+  _cxAplicarMascaraMoeda(valInp,function(v){m.valor=v;});
 
   var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
   var cancelBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
@@ -868,9 +890,9 @@ function _cxRenderSangriaModal(m,session){
     style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'14px',marginBottom:'12px'}});
   motivoInp.oninput=function(){m.motivo=motivoInp.value;};
 
-  var valInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'0,00',value:m.valor||'',
+  var valInp=el('input',{placeholder:'0,00',value:m.valor||'',
     style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'18px',fontWeight:'700',textAlign:'center',marginBottom:'18px'}});
-  valInp.oninput=function(){m.valor=valInp.value;};
+  _cxAplicarMascaraMoeda(valInp,function(v){m.valor=v;});
 
   var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
   var cancelBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
@@ -995,7 +1017,7 @@ function _cxRenderEntradaModal(m,session){
 
   // ── Total da venda (o que é devido antes do cupom) ──
   box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'8px'}},'Total da venda *'));
-  var totalVendaInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'0,00',value:m.totalVenda||'',
+  var totalVendaInp=el('input',{placeholder:'0,00',value:m.totalVenda||'',
     style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'20px',fontWeight:'800',textAlign:'center',marginBottom:'16px'}});
   box.appendChild(totalVendaInp);
 
@@ -1013,7 +1035,7 @@ function _cxRenderEntradaModal(m,session){
     var cupomCodInp=el('input',{type:'text',placeholder:'Código do cupom',value:m.cupomCodigo||'',
       style:{flex:'1',boxSizing:'border-box',padding:'10px 12px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px'}});
     cupomCodInp.oninput=function(){m.cupomCodigo=cupomCodInp.value;};
-    var cupomValInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'Valor desc.',value:m.cupomValor||'',
+    var cupomValInp=el('input',{placeholder:'Valor desc.',value:m.cupomValor||'',
       style:{width:'110px',boxSizing:'border-box',padding:'10px 12px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px',fontWeight:'700',textAlign:'right'}});
     cupomWrap.appendChild(cupomCodInp);cupomWrap.appendChild(cupomValInp);
     box.appendChild(cupomWrap);
@@ -1022,10 +1044,10 @@ function _cxRenderEntradaModal(m,session){
     var atualizaTotalDevidoEl=function(){
       totalDevidoEl.textContent='Total devido (com cupom): '+fmtMoney(calcTotalDevido());
     };
-    cupomValInp.oninput=function(){m.cupomValor=cupomValInp.value;atualizaBannerPag();atualizaTotalDevidoEl();};
+    _cxAplicarMascaraMoeda(cupomValInp,function(v){m.cupomValor=v;atualizaBannerPag();atualizaTotalDevidoEl();});
     atualizaTotalDevidoEl();
   }
-  totalVendaInp.oninput=function(){m.totalVenda=totalVendaInp.value;atualizaBannerPag();if(totalDevidoEl)totalDevidoEl.textContent='Total devido (com cupom): '+fmtMoney(calcTotalDevido());};
+  _cxAplicarMascaraMoeda(totalVendaInp,function(v){m.totalVenda=v;atualizaBannerPag();if(totalDevidoEl)totalDevidoEl.textContent='Total devido (com cupom): '+fmtMoney(calcTotalDevido());});
 
   if(formas.length===0){
     box.appendChild(el('div',{style:{fontSize:'12px',color:'#fbbf24',background:'rgba(251,191,36,.12)',border:'1px solid rgba(251,191,36,.3)',borderRadius:'8px',padding:'10px 12px',marginBottom:'16px'}},
@@ -1127,9 +1149,9 @@ function _cxRenderEntradaModal(m,session){
     });
     sel.onchange=function(){p.formaId=sel.value;atualizaTaxasResumo();};
 
-    var valInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'Valor pago',value:p.valor||'',
+    var valInp=el('input',{placeholder:'Valor pago',value:p.valor||'',
       style:{width:'100px',padding:'10px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px',fontWeight:'700',textAlign:'right'}});
-    valInp.oninput=function(){p.valor=valInp.value;totalEl.textContent=fmtMoney(calcTotalPag());atualizaBannerPag();atualizaTaxasResumo();};
+    _cxAplicarMascaraMoeda(valInp,function(v){p.valor=v;totalEl.textContent=fmtMoney(calcTotalPag());atualizaBannerPag();atualizaTaxasResumo();});
 
     var linha=el('div',{style:{display:'flex',gap:'8px',marginBottom:'8px',alignItems:'center'}},[sel,valInp]);
     if(m.misto&&m.pagamentos.length>1){
@@ -2809,14 +2831,13 @@ function _cxRenderFidCarimboModal(session){
   box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'18px'}},c.nome));
 
   box.appendChild(el('div',{style:{fontSize:'12px',fontWeight:'700',color:'#94a3b8',marginBottom:'6px'}},'Valor do pedido (R$) *'));
-  var valInp=el('input',{type:'number',min:'0',step:'0.01',inputmode:'decimal',placeholder:'0,00',value:m.valorPedido||'',
+  var valInp=el('input',{placeholder:'0,00',value:m.valorPedido||'',
     style:{width:'100%',boxSizing:'border-box',padding:'14px',borderRadius:'10px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'22px',fontWeight:'800',textAlign:'center',marginBottom:'8px'}});
   var cashbackPreview=el('div',{style:{fontSize:'13px',color:'#4ade80',textAlign:'center',fontWeight:'800',marginBottom:'16px',minHeight:'18px'}});
-  valInp.oninput=function(){
-    m.valorPedido=valInp.value;
-    var v=parseFloat(valInp.value)||0;
+  _cxAplicarMascaraMoeda(valInp,function(v){
+    m.valorPedido=v;
     cashbackPreview.textContent=v>0?('💰 Cashback ('+(cfg.cashbackPorcentagem||5)+'%): '+fmtMoney(v*(cfg.cashbackPorcentagem||5)/100)):'';
-  };
+  });
   box.appendChild(valInp);
   box.appendChild(cashbackPreview);
 

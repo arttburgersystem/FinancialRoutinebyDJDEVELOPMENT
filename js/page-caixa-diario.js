@@ -306,11 +306,11 @@ function renderCaixaDiario(){
   }},session?'⬅ Sair':'✕ Fechar');
   exitBtn.onclick=function(){
     if(session){
-      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null});
+      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null,cxMovDetalheId:null});
     } else if(window.DJF_KIOSK_BOOT && typeof lockApp==='function'){
       lockApp();
     } else {
-      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null});
+      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null,cxMovDetalheId:null});
     }
   };
   hdr.appendChild(exitBtn);
@@ -535,6 +535,13 @@ function renderCaixaDiario(){
         ]));
         row.appendChild(el('div',{style:{fontSize:'15px',fontWeight:'800',color:m.tipo==='entrada'?'#4ade80':'#f87171',whiteSpace:'nowrap'}},
           (m.tipo==='entrada'?'+':'−')+fmtMoney(m.valor)));
+        var verBtn=el('button',{type:'button',title:'Ver dados da comanda',style:{
+          background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'8px',
+          width:'30px',height:'30px',cursor:'pointer',fontSize:'13px',flexShrink:'0',
+          display:'flex',alignItems:'center',justifyContent:'center',
+        }},'▶');
+        verBtn.onclick=(function(id){return function(){setState({cxMovDetalheId:id});};})(m.id);
+        row.appendChild(verBtn);
         var delBtn=el('button',{style:{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'20px',padding:'0 4px',lineHeight:'1'}},'×');
         delBtn.onclick=(function(id){return function(){
           var novos=(state.caixaDiarioMovs||[]).filter(function(x){return x.id!==id;});
@@ -571,6 +578,10 @@ function renderCaixaDiario(){
   if(state.cxRetroModal)root.appendChild(_cxRenderRetroModal());
   if(state.cxFidCadastroModal)root.appendChild(_cxRenderFidCadastroModal());
   if(state.cxFidCarimboModal)root.appendChild(_cxRenderFidCarimboModal(session));
+  if(state.cxMovDetalheId){
+    var _movDet=(state.caixaDiarioMovs||[]).find(function(x){return x.id===state.cxMovDetalheId;});
+    if(_movDet)root.appendChild(_cxRenderMovDetalheModal(_movDet));
+  }
   }
 
   // ── PIN overlay: usado tanto no login inicial quanto ao trocar de usuário ──
@@ -921,6 +932,72 @@ function _cxRenderSangriaModal(m,session){
   actsRow.appendChild(cancelBtn);actsRow.appendChild(confirmBtn);
 
   box.appendChild(motivoInp);box.appendChild(valInp);box.appendChild(actsRow);
+  ov.appendChild(box);
+  return ov;
+}
+
+// ── DETALHES DE UMA MOVIMENTAÇÃO JÁ LANÇADA (venda, saída ou sangria) ───────
+// Aberto pela setinha ▶ no final de cada linha de "Movimentações de hoje".
+function _cxRenderMovDetalheModal(mov){
+  if(!mov)return null;
+
+  var isEntrada=mov.tipo==='entrada';
+  var cor=isEntrada?'#4ade80':'#f87171';
+  var titulo=isEntrada?'⬆ Detalhes da Venda':(mov.subtipo==='sangria'?'🩸 Detalhes da Sangria':'⬇ Detalhes da Saída');
+
+  var ov=el('div',{style:{
+    position:'absolute',inset:'0',background:'rgba(0,0,0,.88)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:'320',padding:'20px',overflowY:'auto',
+  }});
+  var box=el('div',{style:{
+    background:'#1e293b',borderRadius:'20px',padding:'24px',
+    width:'420px',maxWidth:'94vw',maxHeight:'90vh',overflowY:'auto',border:'2px solid #334155',
+  }});
+  box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center',color:cor}},titulo));
+  box.appendChild(el('div',{style:{fontSize:'12px',color:'#64748b',textAlign:'center',marginBottom:'18px'}},(mov.horario||'')+' · '+(mov.funcNome||'')));
+
+  function linha(label,val,corV){
+    return el('div',{style:{display:'flex',justifyContent:'space-between',gap:'12px',padding:'8px 0',borderBottom:'1px solid #334155',fontSize:'13px'}},[
+      el('span',{style:{color:'#94a3b8',fontWeight:'700'}},label),
+      el('span',{style:{color:corV||'#f1f5f9',fontWeight:'700',textAlign:'right'}},val),
+    ]);
+  }
+
+  var body=el('div',{style:{marginBottom:'16px'}});
+  if(isEntrada){
+    body.appendChild(linha('Canal',mov.canal==='delivery'?'🛵 Delivery':'🏠 Salão'));
+    var platLabel=_cxPlataformaLabel(mov);
+    if(platLabel)body.appendChild(linha('Plataforma',platLabel));
+    body.appendChild(linha('Identificação',mov.identificacao||'—'));
+    body.appendChild(linha('Total da venda',fmtMoney(mov.valorBruto||0)));
+    if(mov.cupomCodigo)body.appendChild(linha('Cupom '+mov.cupomCodigo,'-'+fmtMoney(mov.cupomValor||0),'#f87171'));
+    body.appendChild(linha('Total devido',fmtMoney(mov.valor||0)));
+    body.appendChild(linha('Total pago',fmtMoney(mov.totalPago||0),'#4ade80'));
+    if(mov.troco>0)body.appendChild(linha('Troco',fmtMoney(mov.troco),'#60a5fa'));
+    if(mov.falta>0)body.appendChild(linha('Falta',fmtMoney(mov.falta),'#f87171'));
+    if(mov.taxaPlataforma>0)body.appendChild(linha('Taxa plataforma',fmtMoney(mov.taxaPlataforma),'#fb923c'));
+    body.appendChild(linha('Dinheiro físico na gaveta',fmtMoney(mov.valorDinheiroFisico||0)));
+
+    if((mov.pagamentos||[]).length){
+      body.appendChild(el('div',{style:{fontSize:'11px',fontWeight:'700',color:'#64748b',margin:'10px 0 6px',textTransform:'uppercase',letterSpacing:'.05em'}},'Formas de pagamento'));
+      mov.pagamentos.forEach(function(p){
+        body.appendChild(linha(p.formaNome,fmtMoney(p.valor)+(p.taxaValor>0&&p.valorLiquido!==p.valor?' (líq. '+fmtMoney(p.valorLiquido)+')':'')));
+      });
+    }
+    if(mov.origemImportCodigo){
+      body.appendChild(el('div',{style:{fontSize:'11px',color:'#60a5fa',marginTop:'10px',lineHeight:'1.5'}},
+        '📥 Importado da planilha — pedido #'+mov.origemImportCodigo+(mov.origemImportAuto?' (lançado automaticamente pelo "Concluir")':'')));
+    }
+  } else {
+    body.appendChild(linha(mov.subtipo==='sangria'?'Motivo':'Descrição',mov.motivo||mov.descricao||'—'));
+    body.appendChild(linha('Valor',fmtMoney(mov.valor||0),cor));
+  }
+  box.appendChild(body);
+
+  var fecharBtn=el('button',{style:{width:'100%',background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Fechar');
+  fecharBtn.onclick=function(){setState({cxMovDetalheId:null});};
+  box.appendChild(fecharBtn);
+
   ov.appendChild(box);
   return ov;
 }

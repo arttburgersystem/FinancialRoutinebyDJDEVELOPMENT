@@ -773,7 +773,7 @@ function fbPut(path,data){
 
 function loadFromFirebase(){
   setState({syncStatus:'syncing'});
-  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias'),fbGet('/vendas'),fbGet('/emprestimos'),fbGet('/fornecedores'),fbGet('/funcionarios'),fbGet('/tarefas'),fbGet('/cartoes'),fbGet('/transacoesCartao'),fbGet('/usuarios'),fbGet('/auditLog'),fbGet('/produtos'),fbGet('/movEstoque'),fbGet('/empresaData'),fbGet('/setoresImpressao'),fbGet('/complementos'),fbGet('/kdsConfigs'),fbGet('/pedidos'),fbGet('/notas'),fbGet('/impressorasCadastradas'),fbGet('/configImpressao'),fbGet('/administradores'),fbGet('/estCategorias'),fbGet('/apostas'),fbGet('/orcamentos'),fbGet('/dailyTaskDefs'),fbGet('/dailyOps'),fbGet('/compras'),fbGet('/estoqueItens'),fbGet('/estoqueMovs'),fbGet('/fichaTecnicas'),fbGet('/feriasFuncionarios'),fbGet('/examesFuncionarios'),fbGet('/freelancers'),fbGet('/servicosFreelancer'),fbGet('/flEspecialidades')])
+  return Promise.all([fbGet('/contas'),fbGet('/metas'),fbGet('/receitas'),fbGet('/bancos'),fbGet('/transferencias'),fbGet('/vendas'),fbGet('/emprestimos'),fbGet('/fornecedores'),fbGet('/funcionarios'),fbGet('/tarefas'),fbGet('/cartoes'),fbGet('/transacoesCartao'),fbGet('/usuarios'),fbGet('/auditLog'),fbGet('/produtos'),fbGet('/movEstoque'),fbGet('/empresaData'),fbGet('/setoresImpressao'),fbGet('/complementos'),fbGet('/kdsConfigs'),fbGet('/pedidos'),fbGet('/notas'),fbGet('/impressorasCadastradas'),fbGet('/configImpressao'),fbGet('/administradores'),fbGet('/estCategorias'),fbGet('/apostas'),fbGet('/orcamentos'),fbGet('/dailyTaskDefs'),fbGet('/dailyOps'),fbGet('/compras'),fbGet('/estoqueItens'),fbGet('/estoqueMovs'),fbGet('/fichaTecnicas'),fbGet('/feriasFuncionarios'),fbGet('/examesFuncionarios'),fbGet('/freelancers'),fbGet('/servicosFreelancer'),fbGet('/flEspecialidades'),fbGet('/profiles')])
     .then(function(results){
       var contas=objToArr(results[0]);
       var metas=objToArr(results[1]);
@@ -816,6 +816,16 @@ function loadFromFirebase(){
       var freelancers=objToArr(results[36]||[]);
       var servicosFreelancer=objToArr(results[37]||[]);
       var flEspecialidades=objToArr(results[38]||[]);
+      var profilesRaw=results[39];
+      if(profilesRaw&&Object.keys(profilesRaw).length>0){
+        PROFILES=objToArr(profilesRaw);
+        lsSet('profiles',PROFILES);
+      } else if(PROFILES&&PROFILES.length){
+        // Primeira sincronização: sobe pro Firebase os perfis que já existem
+        // neste aparelho (ex: perfis extras criados antes dessa mudança),
+        // pra aparecerem em qualquer outro computador/aparelho também.
+        fbPut('/profiles',arrToObj(PROFILES)).catch(function(){});
+      }
       lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);lsSet('vendas',vendas);lsSet('emprestimos',emprestimos);lsSet('fornecedores',fornecedores);lsSet('funcionarios',funcionarios);lsSet('tarefas',tarefas);lsSet('cartoes',cartoes);lsSet('transacoesCartao',transacoesCartao);lsSet('usuarios',usuarios);lsSet('auditLog',auditLog);lsSet('produtos',produtos);lsSet('movEstoque',movEstoque);lsSet('empresaData',empresaData);lsSet('setoresImpressao',setoresImpressao);lsSet('complementos',complementos);lsSet('kdsConfigs',kdsConfigs);lsSet('pedidos',pedidos);lsSet('notas',notas);lsSet('impressorasCadastradas',impressorasCadastradas);lsSet('configImpressao',configImpressao);lsSet('administradores',administradores);lsSet('estCategorias',estCategorias);lsSet('apostas',apostas);lsSet('orcamentos',orcamentos);lsSet('dailyTaskDefs',dailyTaskDefs);lsSet('dailyOps',dailyOps);lsSet('compras',compras);lsSet('estoqueItens',estoqueItens);lsSet('estoqueMovs',estoqueMovs);lsSet('fichaTecnicas',fichaTecnicas);lsSet('feriasFuncionarios',feriasFuncionarios);lsSet('examesFuncionarios',examesFuncionarios);lsSet('freelancers',freelancers);lsSet('servicosFreelancer',servicosFreelancer);lsSet('flEspecialidades',flEspecialidades);
       setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,vendas:vendas,emprestimos:emprestimos,fornecedores:fornecedores,funcionarios:funcionarios,tarefas:tarefas,cartoes:cartoes,transacoesCartao:transacoesCartao,usuarios:usuarios,auditLog:auditLog,produtos:produtos,movEstoque:movEstoque,empresaData:empresaData,setoresImpressao:setoresImpressao,complementos:complementos,kdsConfigs:kdsConfigs,pedidos:pedidos,notas:notas,impressorasCadastradas:impressorasCadastradas,configImpressao:configImpressao,administradores:administradores,estCategorias:estCategorias,apostas:apostas,orcamentos:orcamentos,dailyTaskDefs:dailyTaskDefs,dailyOps:dailyOps,compras:compras,estoqueItens:estoqueItens,estoqueMovs:estoqueMovs,fichaTecnicas:fichaTecnicas,feriasFuncionarios:feriasFuncionarios,examesFuncionarios:examesFuncionarios,freelancers:freelancers,servicosFreelancer:servicosFreelancer,flEspecialidades:flEspecialidades,syncStatus:'ok'});
     })
@@ -859,6 +869,7 @@ function scheduleSave(){
       fbPut('/configImpressao',state.configImpressao||{}),
       fbPut('/auditLog',arrToObj(state.auditLog||[])),
       fbPut('/administradores',arrToObj(state.administradores||[])),
+      fbPut('/profiles',arrToObj(PROFILES||[])),
       fbPut('/apostas',arrToObj(state.apostas||[])),
       fbPut('/estCategorias',state.estCategorias||[]),
       fbPut('/orcamentos',arrToObj(state.orcamentos||[])),
@@ -964,12 +975,14 @@ function addProfile(p){
   lsSet('profiles',PROFILES);
   lsSet('pf',p.id);
   setState({profile:p.id,perfilModal:null,showProfiles:true,page:'dashboard'});
+  scheduleSave();
   showToast('Perfil "'+p.label+'" criado!');
 }
 function updateProfile(p){
   PROFILES=PROFILES.map(function(x){return x.id===p.id?p:x;});
   lsSet('profiles',PROFILES);
   setState({perfilModal:null});
+  scheduleSave();
   showToast('Perfil atualizado!');
 }
 function deleteProfile(id){

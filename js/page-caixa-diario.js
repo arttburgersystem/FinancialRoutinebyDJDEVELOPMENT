@@ -474,7 +474,7 @@ function renderCaixaDiario(){
     mainArea.appendChild(_cxRenderFidelidadeTab(session));
   } else if(!dia||dia.status!=='aberto'){
     if(dia&&dia.status==='fechado'){
-      mainArea.appendChild(_cxResumoFechado(dia));
+      mainArea.appendChild(_cxResumoFechado(dia,session));
     } else {
       var abrirCard=el('div',{style:{
         textAlign:'center',padding:'48px 32px',background:'#1e293b',
@@ -702,7 +702,7 @@ function renderCaixaDiario(){
 // ── RESUMO DO DIA JÁ FECHADO ─────────────────────────────────────────────────
 // Visão mínima: o caixa foi encerrado, os números ficam guardados (dev pode
 // consultar pelo Relatório em PDF). A única ação daqui é abrir uma nova sessão.
-function _cxResumoFechado(dia){
+function _cxResumoFechado(dia,session){
   var card=el('div',{style:{
     background:'#1e293b',border:'1px solid #334155',borderRadius:'16px',padding:'32px 24px',
     maxWidth:'420px',margin:'40px auto',textAlign:'center',
@@ -711,6 +711,30 @@ function _cxResumoFechado(dia){
   card.appendChild(el('div',{style:{fontSize:'17px',fontWeight:'800',marginBottom:'6px'}},'Caixa fechado'));
   card.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',marginBottom:'24px'}},
     'Encerrado às '+(dia.fechamentoHorario||'—')+' por '+(dia.fechamentoFuncNome||'—')));
+
+  // Retroativo: caixas fechados ANTES da Conciliação Bancária existir não
+  // tiveram as contas geradas automaticamente — esse botão gera pra esse
+  // dia específico (só dev, e só se ainda não tiver sido gerado antes).
+  if(_cxIsDev(session)){
+    var jaGerado=(state.contas||[]).some(function(c){return c.origemCaixaDiarioDiaId===dia.id;});
+    var conciliarBtn=el('button',{style:{
+      width:'100%',background:jaGerado?'#334155':'#0f766e',color:'#fff',border:'none',borderRadius:'12px',
+      padding:'14px',cursor:jaGerado?'default':'pointer',fontSize:'13px',fontWeight:'800',marginBottom:'12px',
+    }},jaGerado?'✓ Conciliação já gerada pra esse dia':'🏦 Gerar Conciliação Bancária deste dia');
+    if(!jaGerado){
+      conciliarBtn.onclick=function(){
+        var novasContas=_cxGerarConciliacaoFechamento(dia);
+        if(!novasContas.length){showToast('Nada pra gerar — sem vendas ou saídas nesse dia.','info');return;}
+        var contasAtualizadas=(state.contas||[]).concat(novasContas);
+        lsSet('contas',contasAtualizadas);
+        setState({contas:contasAtualizadas});
+        scheduleSave();
+        showToast(novasContas.length+' conta(s) geradas na Conciliação Bancária!','success');
+      };
+    }
+    card.appendChild(conciliarBtn);
+  }
+
   var novaBtn=el('button',{style:{
     width:'100%',background:'#16a34a',color:'#fff',border:'none',borderRadius:'12px',
     padding:'16px',cursor:'pointer',fontSize:'15px',fontWeight:'800',

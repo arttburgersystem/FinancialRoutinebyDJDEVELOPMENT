@@ -123,20 +123,26 @@ var _CX_FORMAS_DEFAULT=[
   {id:'fp_ifood',              nome:'iFood Online',         taxaValor:12,   taxaTipo:'pct', ehDinheiroFisico:false},
   {id:'fp_yooga',              nome:'Yooga Online',         taxaValor:0.99, taxaTipo:'fixo', ehDinheiroFisico:false},
   {id:'fp_notinha_func',      nome:'Notinha Funcionário', taxaValor:0,    taxaTipo:'pct', ehDinheiroFisico:false},
+  {id:'fp_composto',          nome:'Composto',            taxaValor:0,    taxaTipo:'pct', ehDinheiroFisico:false},
 ];
-// Garante que a forma "Notinha Funcionário" (fiado — funcionário consome e
-// desconta do salário depois, não é dinheiro físico) exista mesmo em
-// aparelhos que já tinham o catálogo de formas de pagamento configurado
-// antes dessa forma existir. Roda uma vez só.
-function _cxGarantirFormaNotinhaFuncionario(){
+// Garante que uma forma de pagamento específica (por id ou por regex no
+// nome) exista no catálogo, mesmo em aparelhos que já tinham o catálogo
+// configurado antes dela existir. Roda uma vez só por forma.
+function _cxGarantirFormaPagamento(id,nome,regexNome,extra){
   var formas=state.formasPagamento||[];
   if(formas.length===0)return; // será criada pelo seed normal
-  var jaExiste=formas.some(function(f){return f.id==='fp_notinha_func'||/notinha/i.test(f.nome||'');});
+  var jaExiste=formas.some(function(f){return f.id===id||regexNome.test(f.nome||'');});
   if(jaExiste)return;
-  var novasFormas=formas.concat([{id:'fp_notinha_func',nome:'Notinha Funcionário',taxaValor:0,taxaTipo:'pct',ehDinheiroFisico:false}]);
+  var novasFormas=formas.concat([Object.assign({id:id,nome:nome,taxaValor:0,taxaTipo:'pct',ehDinheiroFisico:false},extra||{})]);
   lsSet('formasPagamento',novasFormas);
   state.formasPagamento=novasFormas;
   scheduleSave();
+}
+function _cxGarantirFormaNotinhaFuncionario(){
+  _cxGarantirFormaPagamento('fp_notinha_func','Notinha Funcionário',/notinha/i);
+}
+function _cxGarantirFormaComposto(){
+  _cxGarantirFormaPagamento('fp_composto','Composto',/composto/i);
 }
 function _cxSeedFormasPagamento(){
   if(state.formasPagamento&&state.formasPagamento.length>0)return;
@@ -241,6 +247,7 @@ function _cxLiberarRedefinicaoPinDev(){
 function renderCaixaDiario(){
   _cxSeedFormasPagamento();
   _cxGarantirFormaNotinhaFuncionario();
+  _cxGarantirFormaComposto();
   var pf=state.profile;
   var funcs=_cxListaLogin();
 
@@ -322,11 +329,11 @@ function renderCaixaDiario(){
   }},session?'⬅ Sair':'✕ Fechar');
   exitBtn.onclick=function(){
     if(session){
-      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null,cxMovDetalheId:null});
+      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null,cxMovDetalheId:null,cxCompostoAjusteModal:null});
     } else if(window.DJF_KIOSK_BOOT && typeof lockApp==='function'){
       lockApp();
     } else {
-      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null,cxMovDetalheId:null});
+      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null,cxMovDetalheId:null,cxCompostoAjusteModal:null});
     }
   };
   hdr.appendChild(exitBtn);
@@ -511,6 +518,13 @@ function renderCaixaDiario(){
     catRow.appendChild(kpiCard('⚡ Pix Yooga',totCategorias.pixYooga,'#3b82f6','pixYooga'));
     catRow.appendChild(kpiCard('⚡ Pix Chave Manual',totCategorias.pixManual,'#a78bfa','pixManual'));
     catRow.appendChild(kpiCard('📝 Notinha Funcionário',totCategorias.notinha,'#fbbf24','notinha'));
+    var compostoCard=kpiCard('🔀 Composto (ajustar)',totCategorias.composto,'#fb923c','composto');
+    if(totCategorias.composto>0){
+      // Pisca pra chamar atenção — tem pagamento composto esperando ajuste manual
+      compostoCard.style.animation='_fldblink 1s ease-in-out infinite';
+      compostoCard.style.borderColor='#f87171';
+    }
+    catRow.appendChild(compostoCard);
     mainArea.appendChild(catRow);
 
     var actsRow=el('div',{style:{display:'flex',gap:'10px',marginBottom:'20px',flexWrap:'wrap'}});
@@ -610,6 +624,7 @@ function renderCaixaDiario(){
   );
   if(formasModal)root.appendChild(_cxRenderFormasModal());
   if(state.cxKpiDetalhe)root.appendChild(_cxRenderKpiModal(state.cxKpiDetalhe,dia,movs,aberturaTotal,totalEntradas,totalSaidas,totalDinheiroFisico,saldoFisicoEsperado));
+  if(state.cxCompostoAjusteModal)root.appendChild(_cxRenderCompostoAjusteModal(session));
   if(state.cxRelatorioModal)root.appendChild(_cxRenderRelatorioFiltroModal());
   if(state.cxRetroModal)root.appendChild(_cxRenderRetroModal());
   if(state.cxFidCadastroModal)root.appendChild(_cxRenderFidCadastroModal());
@@ -1024,6 +1039,11 @@ function _cxRenderMovDetalheModal(mov){
       body.appendChild(el('div',{style:{fontSize:'11px',color:'#60a5fa',marginTop:'10px',lineHeight:'1.5'}},
         '📥 Importado da planilha — pedido #'+mov.origemImportCodigo+(mov.origemImportAuto?' (lançado automaticamente pelo "Concluir")':'')));
     }
+    if(mov.compostoAjustadoPor){
+      var _dtAj=mov.compostoAjustadoEm?new Date(mov.compostoAjustadoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'';
+      body.appendChild(el('div',{style:{fontSize:'11px',color:'#fb923c',marginTop:'8px',lineHeight:'1.5'}},
+        '🔀 Pagamento composto ('+fmtMoney(mov.compostoValorOriginal||0)+') ajustado por '+mov.compostoAjustadoPor+(_dtAj?' em '+_dtAj:'')+'.'));
+    }
   } else {
     body.appendChild(linha(mov.subtipo==='sangria'?'Motivo':'Descrição',mov.motivo||mov.descricao||'—'));
     body.appendChild(linha('Valor',fmtMoney(mov.valor||0),cor));
@@ -1435,6 +1455,7 @@ function _cxNormFormaTxt(txt){
 // listar as vendas no histórico ao clicar em cada card.
 function _cxPagamentoCategoria(p,mov){
   var n=_cxNormFormaTxt(p.formaNome);
+  if(n.indexOf('composto')>=0)return 'composto';
   if(n.indexOf('notinha')>=0)return 'notinha';
   if(n.indexOf('debit')>=0)return 'debito';
   if(n.indexOf('credit')>=0)return 'credito';
@@ -1450,7 +1471,7 @@ function _cxPagamentoCategoria(p,mov){
   return null;
 }
 function _cxTotaisPorCategoria(movs){
-  var tot={credito:0,debito:0,pixIfood:0,pixYooga:0,pixManual:0,notinha:0};
+  var tot={credito:0,debito:0,pixIfood:0,pixYooga:0,pixManual:0,notinha:0,composto:0};
   (movs||[]).filter(function(m){return m.tipo==='entrada';}).forEach(function(m){
     (m.pagamentos||[]).forEach(function(p){
       var cat=_cxPagamentoCategoria(p,m);
@@ -2408,7 +2429,7 @@ function _cxRenderFormasModal(){
 // ── MODAL DE HISTÓRICO: detalhe por trás de cada KPI do dia ─────────────────
 function _cxRenderKpiModal(tipo,dia,movs,aberturaTotal,totalEntradas,totalSaidas,totalDinheiroFisico,saldoFisicoEsperado){
   var titulos={abertura:'🔓 Abertura do Caixa',vendas:'⬆ Vendas do Dia',saidas:'⬇ Saídas do Dia',dinheiro:'💰 Dinheiro Esperado no Caixa',
-    credito:'💳 Total Crédito',debito:'💵 Total Débito',pixIfood:'⚡ Pix iFood',pixYooga:'⚡ Pix Yooga',pixManual:'⚡ Pix Chave Manual',notinha:'📝 Notinha Funcionário'};
+    credito:'💳 Total Crédito',debito:'💵 Total Débito',pixIfood:'⚡ Pix iFood',pixYooga:'⚡ Pix Yooga',pixManual:'⚡ Pix Chave Manual',notinha:'📝 Notinha Funcionário',composto:'🔀 Pagamentos Compostos'};
 
   var ov=el('div',{style:{
     position:'absolute',inset:'0',background:'rgba(0,0,0,.85)',
@@ -2507,6 +2528,40 @@ function _cxRenderKpiModal(tipo,dia,movs,aberturaTotal,totalEntradas,totalSaidas
         ]));
       });
     }
+  } else if(tipo==='composto'){
+    var matchesComp=[];
+    movs.filter(function(m){return m.tipo==='entrada';}).forEach(function(m){
+      (m.pagamentos||[]).forEach(function(p){
+        if(_cxPagamentoCategoria(p,m)==='composto')matchesComp.push({m:m,p:p});
+      });
+    });
+    if(matchesComp.length===0){
+      body.appendChild(el('div',{style:{textAlign:'center',color:'#64748b',padding:'20px',fontSize:'13px'}},'✓ Nenhum pagamento composto pendente de ajuste.'));
+    } else {
+      body.appendChild(el('div',{style:{fontSize:'12px',color:'#fb923c',background:'rgba(251,146,60,.12)',border:'1px solid rgba(251,146,60,.3)',borderRadius:'8px',padding:'10px 12px',marginBottom:'14px',lineHeight:'1.6'}},
+        '⚠ Esses pedidos vieram como "Composto" da Yooga (pagamento misto). Abra a comanda no painel da Yooga, veja como o cliente realmente pagou, e clique em "Ajustar" pra lançar certinho aqui.'));
+      var totalComp=0;
+      matchesComp.forEach(function(x){
+        totalComp+=x.p.valor;
+        var canalLabel4=x.m.canal==='delivery'?'🛵 Delivery':'🏠 Salão';
+        var platLabel4=_cxPlataformaLabel(x.m);
+        var titulo4=canalLabel4+(platLabel4?' · '+platLabel4:'')+(x.m.identificacao?' · '+x.m.identificacao:'');
+        var linhaComp=el('div',{style:{padding:'10px 0',borderBottom:'1px solid #334155'}});
+        linhaComp.appendChild(el('div',{style:{display:'flex',justifyContent:'space-between',gap:'8px',alignItems:'center'}},[
+          el('div',{style:{flex:'1',minWidth:'0'}},[
+            el('div',{style:{fontSize:'13px',fontWeight:'700'}},titulo4),
+            el('div',{style:{fontSize:'11px',color:'#64748b',marginTop:'2px'}},(x.m.horario||'')+' · '+(x.m.funcNome||'')+' · '+fmtMoney(x.p.valor)),
+          ]),
+          (function(mov){
+            var ajustarBtn=el('button',{type:'button',style:{background:'#fb923c',color:'#1e293b',border:'none',borderRadius:'8px',padding:'8px 12px',cursor:'pointer',fontSize:'12px',fontWeight:'800',flexShrink:'0'}},'Ajustar');
+            ajustarBtn.onclick=function(){setState({cxKpiDetalhe:null,cxCompostoAjusteModal:{movId:mov.id,linhas:[{formaId:'',valor:''}]}});};
+            return ajustarBtn;
+          })(x.m),
+        ]));
+        body.appendChild(linhaComp);
+      });
+      body.appendChild(totalRow('Total pendente',totalComp,'#fb923c'));
+    }
   } else if(['credito','debito','pixIfood','pixYooga','pixManual','notinha'].indexOf(tipo)>=0){
     var matches=[];
     movs.filter(function(m){return m.tipo==='entrada';}).forEach(function(m){
@@ -2539,6 +2594,132 @@ function _cxRenderKpiModal(tipo,dia,movs,aberturaTotal,totalEntradas,totalSaidas
   var closeBtn=el('button',{style:{width:'100%',marginTop:'18px',background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'12px',cursor:'pointer',fontWeight:'700'}},'Fechar');
   closeBtn.onclick=function(){setState({cxKpiDetalhe:null});};
   box.appendChild(closeBtn);
+
+  ov.appendChild(box);
+  return ov;
+}
+
+// ── AJUSTE DE PAGAMENTO COMPOSTO ─────────────────────────────────────────────
+// Quando um pedido chega como "Composto" (pagamento misto da Yooga), o dev
+// abre a comanda no painel da Yooga, vê a composição real e distribui aqui
+// entre as formas de pagamento de verdade — some pro total de cada uma e
+// sai da lista de pendentes.
+function _cxRenderCompostoAjusteModal(session){
+  var m=state.cxCompostoAjusteModal;
+  if(!m)return null;
+  var mov=(state.caixaDiarioMovs||[]).find(function(x){return x.id===m.movId;});
+  if(!mov){setState({cxCompostoAjusteModal:null});return null;}
+  var compostoPag=(mov.pagamentos||[]).find(function(p){return _cxPagamentoCategoria(p,mov)==='composto';});
+  if(!compostoPag){setState({cxCompostoAjusteModal:null});return null;}
+  var valorAlvo=compostoPag.valor;
+  var formasDisp=(state.formasPagamento||[]).filter(function(f){return _cxNormFormaTxt(f.nome).indexOf('composto')<0;});
+
+  var ov=el('div',{style:{
+    position:'absolute',inset:'0',background:'rgba(0,0,0,.9)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:'330',padding:'20px',overflowY:'auto',
+  }});
+  var box=el('div',{style:{
+    background:'#1e293b',borderRadius:'20px',padding:'24px',
+    width:'420px',maxWidth:'94vw',maxHeight:'90vh',overflowY:'auto',border:'2px solid #fb923c',
+  }});
+  box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px',textAlign:'center',color:'#fb923c'}},'🔀 Ajustar Pagamento Composto'));
+  box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'4px'}},mov.identificacao||'—'));
+  box.appendChild(el('div',{style:{fontSize:'13px',color:'#f1f5f9',fontWeight:'800',textAlign:'center',marginBottom:'18px'}},'Distribuir: '+fmtMoney(valorAlvo)));
+
+  function calcSomaLinhas(){
+    return m.linhas.reduce(function(s,l){return s+(parseFloat(l.valor)||0);},0);
+  }
+  var bannerEl=el('div',{style:{fontSize:'13px',fontWeight:'800',textAlign:'center',padding:'10px',borderRadius:'8px',marginBottom:'16px'}});
+  function atualizaBanner(){
+    var somaAtual=calcSomaLinhas();
+    var dif=Math.round((somaAtual-valorAlvo)*100)/100;
+    if(Math.abs(dif)<0.005){
+      bannerEl.style.background='rgba(74,222,128,.12)';bannerEl.style.color='#4ade80';bannerEl.style.border='1px solid rgba(74,222,128,.3)';
+      bannerEl.textContent='✓ Soma confere: '+fmtMoney(somaAtual);
+    } else {
+      bannerEl.style.background='rgba(248,113,113,.12)';bannerEl.style.color='#f87171';bannerEl.style.border='1px solid rgba(248,113,113,.3)';
+      bannerEl.textContent=(dif>0?'Sobrou ':'Falta ')+fmtMoney(Math.abs(dif))+' pra bater '+fmtMoney(valorAlvo);
+    }
+  }
+
+  function rerenderModal(){setState({cxCompostoAjusteModal:m});}
+
+  var linhasWrap=el('div',{style:{marginBottom:'8px'}});
+  m.linhas.forEach(function(l,i){
+    var sel=el('select',{style:{flex:'1',padding:'10px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px'}});
+    var optVazio=el('option',{},'Selecione a forma');optVazio.value='';if(!l.formaId)optVazio.selected=true;sel.appendChild(optVazio);
+    formasDisp.forEach(function(f){
+      var opt=el('option',{},f.nome);opt.value=f.id;if(f.id===l.formaId)opt.selected=true;sel.appendChild(opt);
+    });
+    sel.onchange=function(){l.formaId=sel.value;};
+
+    var valInp=el('input',{placeholder:'0,00',value:l.valor||'',
+      style:{width:'110px',padding:'10px',borderRadius:'8px',border:'1px solid #334155',background:'#0f172a',color:'#f1f5f9',fontSize:'13px',fontWeight:'700',textAlign:'right'}});
+    _cxAplicarMascaraMoeda(valInp,function(v){l.valor=v;atualizaBanner();});
+
+    var linha=el('div',{style:{display:'flex',gap:'8px',marginBottom:'8px',alignItems:'center'}},[sel,valInp]);
+    if(m.linhas.length>1){
+      var rmBtn=el('button',{type:'button',style:{background:'none',border:'none',color:'#f87171',fontSize:'18px',cursor:'pointer',padding:'0 4px'}},'×');
+      rmBtn.onclick=function(){m.linhas.splice(i,1);rerenderModal();};
+      linha.appendChild(rmBtn);
+    }
+    linhasWrap.appendChild(linha);
+  });
+  box.appendChild(linhasWrap);
+
+  var addBtn=el('button',{type:'button',style:{
+    background:'transparent',border:'1px dashed #475569',color:'#94a3b8',borderRadius:'8px',
+    padding:'8px',width:'100%',cursor:'pointer',fontSize:'12px',fontWeight:'700',marginBottom:'14px',
+  }},'+ Adicionar forma');
+  addBtn.onclick=function(){m.linhas.push({formaId:'',valor:''});rerenderModal();};
+  box.appendChild(addBtn);
+
+  atualizaBanner();
+  box.appendChild(bannerEl);
+
+  var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
+  var cancelBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
+  cancelBtn.onclick=function(){setState({cxCompostoAjusteModal:null});};
+  var confirmBtn=el('button',{style:{background:'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'✓ Confirmar Ajuste');
+  confirmBtn.onclick=function(){
+    var somaFinal=calcSomaLinhas();
+    if(Math.abs(Math.round((somaFinal-valorAlvo)*100)/100)>=0.005){
+      showToast('A soma das formas precisa bater exatamente com '+fmtMoney(valorAlvo),'error');
+      return;
+    }
+    var linhasValidas=[];
+    var erro=false;
+    m.linhas.forEach(function(l){
+      var val=parseFloat(l.valor)||0;
+      if(val<=0){erro=true;return;}
+      var f=(state.formasPagamento||[]).find(function(x){return x.id===l.formaId;});
+      if(!f){erro=true;return;}
+      var liq=_cxCalcLiquido(val,f);
+      linhasValidas.push({formaId:f.id,formaNome:f.nome,valor:val,taxaValor:f.taxaValor||0,taxaTipo:f.taxaTipo||'pct',valorLiquido:liq,ehDinheiroFisico:!!f.ehDinheiroFisico});
+    });
+    if(erro||linhasValidas.length===0){showToast('Selecione a forma e o valor de cada linha','error');return;}
+
+    var novosPagamentos=(mov.pagamentos||[]).filter(function(p){return _cxPagamentoCategoria(p,mov)!=='composto';}).concat(linhasValidas);
+    var totalPago=novosPagamentos.reduce(function(s,p){return s+p.valor;},0);
+    var dif2=Math.round((totalPago-mov.valor)*100)/100;
+    var troco=dif2>0?dif2:0;
+    var falta=dif2<0?-dif2:0;
+    var totalDinheiro=novosPagamentos.filter(function(p){return p.ehDinheiroFisico;}).reduce(function(s,p){return s+p.valor;},0);
+    totalDinheiro=Math.max(0,Math.round((totalDinheiro-troco)*100)/100);
+
+    var agora=new Date();
+    var movAtualizado=Object.assign({},mov,{
+      pagamentos:novosPagamentos,totalPago:totalPago,troco:troco,falta:falta,valorDinheiroFisico:totalDinheiro,
+      compostoAjustadoPor:session.funcNome,compostoAjustadoEm:agora.toISOString(),compostoValorOriginal:valorAlvo,
+    });
+    var lista=(state.caixaDiarioMovs||[]).map(function(x){return x.id===mov.id?movAtualizado:x;});
+    lsSet('caixaDiarioMovs',lista);
+    setState({caixaDiarioMovs:lista,cxCompostoAjusteModal:null});
+    scheduleSave();
+    showToast('Pagamento composto ajustado!','success');
+  };
+  actsRow.appendChild(cancelBtn);actsRow.appendChild(confirmBtn);
+  box.appendChild(actsRow);
 
   ov.appendChild(box);
   return ov;

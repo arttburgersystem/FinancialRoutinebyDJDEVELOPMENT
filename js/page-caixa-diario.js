@@ -309,6 +309,12 @@ function renderCaixaDiario(){
       }},'🕓');
       retroBtn.onclick=function(){setState({cxPickerOpen:false,cxRetroModal:{data:state.cxDataTrabalho||today()}});};
       hdr.appendChild(retroBtn);
+      var caixasBtn=el('button',{title:'Ver todos os caixas (abertos e fechados)',style:{
+        background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'10px',
+        padding:'10px 14px',cursor:'pointer',fontSize:'16px',flexShrink:'0',
+      }},'📋');
+      caixasBtn.onclick=function(){setState({cxPickerOpen:false,cxCaixasModal:true});};
+      hdr.appendChild(caixasBtn);
       var relBtn=el('button',{title:'Relatório de vendas (PDF)',style:{
         background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'10px',
         padding:'10px 14px',cursor:'pointer',fontSize:'16px',flexShrink:'0',
@@ -329,11 +335,11 @@ function renderCaixaDiario(){
   }},session?'⬅ Sair':'✕ Fechar');
   exitBtn.onclick=function(){
     if(session){
-      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null,cxMovDetalheId:null,cxCompostoAjusteModal:null});
+      setState({cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null,cxMovDetalheId:null,cxCompostoAjusteModal:null,cxCaixasModal:false});
     } else if(window.DJF_KIOSK_BOOT && typeof lockApp==='function'){
       lockApp();
     } else {
-      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null,cxMovDetalheId:null,cxCompostoAjusteModal:null});
+      setState({caixaDiarioMode:false,cxSession:null,cxPin:null,cxContagemModal:null,cxMovModal:null,cxFormasModal:false,cxPickerOpen:false,cxKpiDetalhe:null,cxRelatorioModal:null,cxRetroModal:null,cxDataTrabalho:null,cxTab:null,cxFidBusca:'',cxFidCliente:null,cxFidModal:null,cxImportModal:null,cxStoneModal:null,cxMovDetalheId:null,cxCompostoAjusteModal:null,cxCaixasModal:false});
     }
   };
   hdr.appendChild(exitBtn);
@@ -628,6 +634,7 @@ function renderCaixaDiario(){
   if(state.cxCompostoAjusteModal)root.appendChild(_cxRenderCompostoAjusteModal(session));
   if(state.cxRelatorioModal)root.appendChild(_cxRenderRelatorioFiltroModal());
   if(state.cxRetroModal)root.appendChild(_cxRenderRetroModal());
+  if(state.cxCaixasModal)root.appendChild(_cxRenderCaixasModal(session));
   if(state.cxFidCadastroModal)root.appendChild(_cxRenderFidCadastroModal());
   if(state.cxFidCarimboModal)root.appendChild(_cxRenderFidCarimboModal(session));
   if(state.cxMovDetalheId){
@@ -742,6 +749,87 @@ function _cxResumoFechado(dia,session){
   novaBtn.onclick=function(){setState({cxContagemModal:{tipo:'abertura',qtds:{}}});};
   card.appendChild(novaBtn);
   return card;
+}
+
+// ── LISTA DE TODOS OS CAIXAS (abertos e fechados) — somente desenvolvedor ───
+// Resolve o problema de só dar pra ver o caixa fechado do dia ativo: aqui
+// aparecem todos os dias já registrados, com acesso rápido pro relatório e
+// pra gerar a Conciliação Bancária de qualquer um deles, mesmo dias antigos.
+function _cxRenderCaixasModal(session){
+  if(!state.cxCaixasModal||!_cxIsDev(session))return null;
+  var pf=state.profile;
+  var todos=(state.caixaDiario||[]).filter(function(d){return d.profile===pf;})
+    .sort(function(a,b){
+      if(a.data!==b.data)return b.data.localeCompare(a.data);
+      return (b.aberturaHorario||'').localeCompare(a.aberturaHorario||'');
+    });
+
+  var ov=el('div',{style:{
+    position:'absolute',inset:'0',background:'rgba(0,0,0,.88)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:'320',padding:'20px',overflowY:'auto',
+  }});
+  var box=el('div',{style:{
+    background:'#1e293b',borderRadius:'20px',padding:'24px',
+    width:'560px',maxWidth:'96vw',maxHeight:'88vh',overflowY:'auto',border:'2px solid #334155',
+  }});
+  box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'18px',textAlign:'center'}},'📋 Todos os Caixas'));
+
+  if(!todos.length){
+    box.appendChild(el('div',{style:{textAlign:'center',color:'#64748b',padding:'30px',fontSize:'13px'}},'Nenhum caixa registrado ainda.'));
+  } else {
+    todos.forEach(function(dia){
+      var isFechado=dia.status==='fechado';
+      var jaGerado=(state.contas||[]).some(function(c){return c.origemCaixaDiarioDiaId===dia.id;});
+      var row=el('div',{style:{background:'#0f172a',border:'1px solid #334155',borderRadius:'12px',padding:'14px',marginBottom:'10px'}});
+      row.appendChild(el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}},[
+        el('div',{style:{fontSize:'14px',fontWeight:'800'}},(typeof fmtDate==='function'?fmtDate(dia.data):dia.data)),
+        el('span',{style:{fontSize:'11px',fontWeight:'700',padding:'3px 10px',borderRadius:'20px',
+          background:isFechado?'rgba(74,222,128,.15)':'rgba(96,165,250,.15)',
+          color:isFechado?'#4ade80':'#60a5fa'}},isFechado?'Fechado':'Aberto'),
+      ]));
+      var infoLinhas=['Abertura: '+fmtMoney(dia.aberturaTotal||0)+' às '+(dia.aberturaHorario||'—')+' por '+(dia.aberturaFuncNome||'—')];
+      if(isFechado)infoLinhas.push('Fechamento: '+fmtMoney(dia.fechamentoTotal||0)+' às '+(dia.fechamentoHorario||'—')+' por '+(dia.fechamentoFuncNome||'—'));
+      row.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',marginBottom:'10px',lineHeight:'1.6'}},
+        infoLinhas.map(function(t){return el('div',{},t);})));
+
+      var actsRow=el('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}});
+      var verBtn=el('button',{type:'button',style:{background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'8px',padding:'8px 12px',cursor:'pointer',fontSize:'12px',fontWeight:'700'}},'🕓 Ver esse dia');
+      verBtn.onclick=(function(dt){return function(){setState({cxCaixasModal:false,cxDataTrabalho:dt===today()?null:dt});};})(dia.data);
+      actsRow.appendChild(verBtn);
+
+      var relBtn2=el('button',{type:'button',style:{background:'#334155',color:'#f1f5f9',border:'none',borderRadius:'8px',padding:'8px 12px',cursor:'pointer',fontSize:'12px',fontWeight:'700'}},'📄 Relatório');
+      relBtn2.onclick=(function(dt){return function(){_cxExportarRelatorio(dt);};})(dia.data);
+      actsRow.appendChild(relBtn2);
+
+      if(isFechado){
+        var conciliarBtn2=el('button',{type:'button',style:{
+          background:jaGerado?'#334155':'#0f766e',color:'#fff',border:'none',borderRadius:'8px',
+          padding:'8px 12px',cursor:jaGerado?'default':'pointer',fontSize:'12px',fontWeight:'700',
+        }},jaGerado?'✓ Conciliação gerada':'🏦 Gerar Conciliação');
+        if(!jaGerado){
+          conciliarBtn2.onclick=(function(diaRef){return function(){
+            var novasContas=_cxGerarConciliacaoFechamento(diaRef);
+            if(!novasContas.length){showToast('Nada pra gerar nesse dia.','info');return;}
+            var contasAtualizadas=(state.contas||[]).concat(novasContas);
+            lsSet('contas',contasAtualizadas);
+            setState({contas:contasAtualizadas,cxCaixasModal:true});
+            scheduleSave();
+            showToast(novasContas.length+' conta(s) geradas na Conciliação Bancária!','success');
+          };})(dia);
+        }
+        actsRow.appendChild(conciliarBtn2);
+      }
+      row.appendChild(actsRow);
+      box.appendChild(row);
+    });
+  }
+
+  var closeBtn=el('button',{style:{width:'100%',marginTop:'8px',background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'12px',cursor:'pointer',fontWeight:'700'}},'Fechar');
+  closeBtn.onclick=function(){setState({cxCaixasModal:false});};
+  box.appendChild(closeBtn);
+
+  ov.appendChild(box);
+  return ov;
 }
 
 // ── MODAL DE CONTAGEM DE CÉDULAS/MOEDAS (abertura ou fechamento) ─────────────

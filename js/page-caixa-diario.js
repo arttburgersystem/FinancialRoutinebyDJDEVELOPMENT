@@ -514,6 +514,14 @@ function renderCaixaDiario(){
           background:'#1e293b',border:'1px solid #334155',borderRadius:'12px',marginBottom:'8px',
         }});
         row.appendChild(el('div',{style:{fontSize:'20px'}},m.tipo==='entrada'?'⬆':m.subtipo==='sangria'?'🩸':'⬇'));
+        if(m.tipo==='entrada'&&m.plataforma){
+          var _dotCor=m.plataforma==='yooga'?'#3b82f6':m.plataforma==='ifood'?'#ef4444':null;
+          if(_dotCor){
+            row.appendChild(el('div',{title:m.plataforma==='yooga'?'Yooga':'iFood',style:{
+              width:'8px',height:'8px',borderRadius:'50%',background:_dotCor,flexShrink:'0',
+            }}));
+          }
+        }
         var titulo, sub;
         if(m.tipo==='entrada'&&m.pagamentos){
           var canalLabel=m.canal==='delivery'?'🛵 Delivery':'🏠 Salão';

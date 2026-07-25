@@ -1297,14 +1297,20 @@ function _cxRenderEntradaModal(m,session){
     var totalDevido=Math.max(0,Math.round((totalVenda-(m.cupomAtivo?cupomValorNum:0))*100)/100);
     var pags=[];
     var erro=false;
+    // Quando o lançamento vem de uma importação de XLS, a taxa real de
+    // marketplace (coluna "Taxas Marketplace") já é conhecida — nesse caso a
+    // taxa entra inteira via taxaPlataforma (abaixo) e a linha de pagamento
+    // não aplica também a taxa estimada da forma, pra não descontar em dobro.
+    var temTaxaRealImport=m._cxImportTaxaReal!==undefined;
     m.pagamentos.forEach(function(p){
       var val=parseFloat((p.valor+'').replace(',','.'))||0;
       if(val<=0){erro=true;return;}
       var f=formas.find(function(x){return x.id===p.formaId;});
       if(!f){erro=true;return;}
       var isYoogaLinha=f.id==='fp_yooga'||/yooga/i.test(f.nome||'');
-      var liq=isYoogaLinha?val:_cxCalcLiquido(val,f);
-      pags.push({formaId:f.id,formaNome:f.nome,valor:val,taxaValor:isYoogaLinha?0:(f.taxaValor||0),taxaTipo:f.taxaTipo||'pct',valorLiquido:liq,ehDinheiroFisico:!!f.ehDinheiroFisico});
+      var semTaxaNaLinha=isYoogaLinha||temTaxaRealImport;
+      var liq=semTaxaNaLinha?val:_cxCalcLiquido(val,f);
+      pags.push({formaId:f.id,formaNome:f.nome,valor:val,taxaValor:semTaxaNaLinha?0:(f.taxaValor||0),taxaTipo:f.taxaTipo||'pct',valorLiquido:liq,ehDinheiroFisico:!!f.ehDinheiroFisico});
     });
     if(erro||pags.length===0){showToast('Preencha a forma e o valor de cada pagamento','error');return;}
     var totalPago=pags.reduce(function(s,p){return s+p.valor;},0);
@@ -1316,11 +1322,15 @@ function _cxRenderEntradaModal(m,session){
     // Dinheiro físico que fica na gaveta: soma das formas em dinheiro menos o troco devolvido
     var totalDinheiro=pags.filter(function(p){return p.ehDinheiroFisico;}).reduce(function(s,p){return s+p.valor;},0);
     totalDinheiro=Math.max(0,Math.round((totalDinheiro-troco)*100)/100);
-    // Pedido automático Yooga: soma a taxa retida pela plataforma (já cadastrada
-    // na forma de pagamento "Yooga Online"), mesmo que o pagamento em si tenha
-    // sido feito por outra forma.
+    // Taxa de plataforma: se veio de uma importação de XLS, usa o valor REAL
+    // da coluna "Taxas Marketplace" daquele pedido (mais preciso que estimar).
+    // Senão, só estima automaticamente pro pedido automático Yooga (taxa fixa
+    // cadastrada na forma "Yooga Online") — iFood lançado manualmente não tem
+    // como saber a taxa exata sem a planilha, então fica sem estimativa.
     var taxaPlataforma=0;
-    if(m.plataforma==='yooga'&&m.tipoPedidoYooga==='automatico'){
+    if(temTaxaRealImport){
+      taxaPlataforma=m._cxImportTaxaReal||0;
+    } else if(m.plataforma==='yooga'&&m.tipoPedidoYooga==='automatico'){
       var yoogaFormaSave=(state.formasPagamento||[]).find(function(f){return f.id==='fp_yooga'||/yooga/i.test(f.nome||'');});
       if(yoogaFormaSave)taxaPlataforma=yoogaFormaSave.taxaValor||0;
     }
@@ -1438,7 +1448,7 @@ function _cxBuildMovModalFromImportRow(r,idx){
     cupomAtivo:cupomVal>0,cupomCodigo:cupomVal>0?'Importado':'',cupomValor:cupomVal>0?cupomVal:'',
     misto:false,
     pagamentos:[{formaId:r.guessFormaId,valor:r.valorRecebido}],
-    _cxImportIdx:idx,_cxImportCodigo:r.codigo||'',
+    _cxImportIdx:idx,_cxImportCodigo:r.codigo||'',_cxImportTaxaReal:r.taxa||0,
   };
 }
 
@@ -1518,9 +1528,11 @@ function _cxRegistrarEntradaAuto(r,session){
   var cupomValorNum=r.desconto>0?r.desconto:0;
   var totalDevido=Math.max(0,Math.round((totalVenda-cupomValorNum)*100)/100);
   var val=r.valorRecebido||0;
-  var isYoogaLinha=f.id==='fp_yooga'||/yooga/i.test(f.nome||'');
-  var liq=isYoogaLinha?val:_cxCalcLiquido(val,f);
-  var pags=[{formaId:f.id,formaNome:f.nome,valor:val,taxaValor:isYoogaLinha?0:(f.taxaValor||0),taxaTipo:f.taxaTipo||'pct',valorLiquido:liq,ehDinheiroFisico:!!f.ehDinheiroFisico}];
+  // Vem sempre de uma linha importada do XLS — a taxa real de marketplace
+  // (r.taxa) já é conhecida, então a linha de pagamento não aplica também a
+  // taxa estimada da forma (evita descontar em dobro).
+  var liq=val;
+  var pags=[{formaId:f.id,formaNome:f.nome,valor:val,taxaValor:0,taxaTipo:f.taxaTipo||'pct',valorLiquido:liq,ehDinheiroFisico:!!f.ehDinheiroFisico}];
   var totalPago=val;
   var dif=Math.round((totalPago-totalDevido)*100)/100;
   var troco=dif>0?dif:0;
@@ -1533,7 +1545,7 @@ function _cxRegistrarEntradaAuto(r,session){
     id:uid(),profile:state.profile,data:_cxDataAtiva(),diaId:diaAtual?diaAtual.id:null,tipo:'entrada',
     canal:r.guessCanal,
     identificacao:((r.codigo?'Pedido #'+r.codigo:'')+(r.cliente&&r.cliente!=='Não identificado'?' — '+r.cliente:'')).trim()||'Pedido importado',
-    plataforma:r.guessCanal==='delivery'?r.guessPlataforma:'',tipoPedidoYooga:r.guessPlataforma==='yooga'?'manual':'',taxaPlataforma:0,
+    plataforma:r.guessCanal==='delivery'?r.guessPlataforma:'',tipoPedidoYooga:r.guessPlataforma==='yooga'?'manual':'',taxaPlataforma:r.taxa||0,
     cupomCodigo:cupomValorNum>0?'Importado':'',cupomValor:cupomValorNum,
     pagamentos:pags,valorBruto:totalVenda,valor:totalDevido,totalPago:totalPago,troco:troco,falta:falta,
     valorDinheiroFisico:totalDinheiro,

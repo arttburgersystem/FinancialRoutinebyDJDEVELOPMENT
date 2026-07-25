@@ -502,20 +502,15 @@ function renderCaixaDiario(){
     mainArea.appendChild(kpis);
 
     // Totais por forma de pagamento (crédito/débito/pix/notinha funcionário)
+    // — reaproveita o kpiCard (clicável, abre o histórico filtrado) —
     var totCategorias=_cxTotaisPorCategoria(movs);
     var catRow=el('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:'10px',marginBottom:'20px'}});
-    function catCard(label,val,cor){
-      return el('div',{style:{background:'#1e293b',border:'1px solid #334155',borderRadius:'12px',padding:'12px 14px'}},[
-        el('div',{style:{fontSize:'10px',color:'#94a3b8',fontWeight:'700',textTransform:'uppercase',marginBottom:'4px'}},label),
-        el('div',{style:{fontSize:'16px',fontWeight:'800',color:cor||'#f1f5f9'}},fmtMoney(val)),
-      ]);
-    }
-    catRow.appendChild(catCard('💳 Total Crédito',totCategorias.credito,'#60a5fa'));
-    catRow.appendChild(catCard('💵 Total Débito',totCategorias.debito,'#4ade80'));
-    catRow.appendChild(catCard('⚡ Pix iFood',totCategorias.pixIfood,'#ef4444'));
-    catRow.appendChild(catCard('⚡ Pix Yooga',totCategorias.pixYooga,'#3b82f6'));
-    catRow.appendChild(catCard('⚡ Pix Chave Manual',totCategorias.pixManual,'#a78bfa'));
-    catRow.appendChild(catCard('📝 Notinha Funcionário',totCategorias.notinha,'#fbbf24'));
+    catRow.appendChild(kpiCard('💳 Total Crédito',totCategorias.credito,'#60a5fa','credito'));
+    catRow.appendChild(kpiCard('💵 Total Débito',totCategorias.debito,'#4ade80','debito'));
+    catRow.appendChild(kpiCard('⚡ Pix iFood',totCategorias.pixIfood,'#ef4444','pixIfood'));
+    catRow.appendChild(kpiCard('⚡ Pix Yooga',totCategorias.pixYooga,'#3b82f6','pixYooga'));
+    catRow.appendChild(kpiCard('⚡ Pix Chave Manual',totCategorias.pixManual,'#a78bfa','pixManual'));
+    catRow.appendChild(kpiCard('📝 Notinha Funcionário',totCategorias.notinha,'#fbbf24','notinha'));
     mainArea.appendChild(catRow);
 
     var actsRow=el('div',{style:{display:'flex',gap:'10px',marginBottom:'20px',flexWrap:'wrap'}});
@@ -1435,23 +1430,31 @@ function _cxNormFormaTxt(txt){
 // Soma o total recebido em cada movimentação de entrada (movs já filtrado
 // pela sessão/dia atual), separado por categoria de forma de pagamento —
 // usado no painel de totais do dashboard do Caixa Diário.
+// Categoria de uma linha de pagamento (credito/debito/pixIfood/pixYooga/
+// pixManual/notinha/null) — usada tanto pra somar os totais quanto pra
+// listar as vendas no histórico ao clicar em cada card.
+function _cxPagamentoCategoria(p,mov){
+  var n=_cxNormFormaTxt(p.formaNome);
+  if(n.indexOf('notinha')>=0)return 'notinha';
+  if(n.indexOf('debit')>=0)return 'debito';
+  if(n.indexOf('credit')>=0)return 'credito';
+  if(n.indexOf('pix')>=0){
+    // O nome da forma às vezes vira só "Pix" genérico (a Yooga/iFood mandam
+    // variações tipo "YOOGA ONLINE - PIX"), então pra separar certinho usa
+    // a plataforma já identificada na própria venda — mais confiável do
+    // que tentar adivinhar só pelo texto da forma.
+    if(mov.plataforma==='ifood')return 'pixIfood';
+    if(mov.plataforma==='yooga')return 'pixYooga';
+    return 'pixManual';
+  }
+  return null;
+}
 function _cxTotaisPorCategoria(movs){
   var tot={credito:0,debito:0,pixIfood:0,pixYooga:0,pixManual:0,notinha:0};
   (movs||[]).filter(function(m){return m.tipo==='entrada';}).forEach(function(m){
     (m.pagamentos||[]).forEach(function(p){
-      var n=_cxNormFormaTxt(p.formaNome);
-      if(n.indexOf('notinha')>=0){tot.notinha+=p.valor;return;}
-      if(n.indexOf('debit')>=0){tot.debito+=p.valor;return;}
-      if(n.indexOf('credit')>=0){tot.credito+=p.valor;return;}
-      if(n.indexOf('pix')>=0){
-        // O nome da forma às vezes vira só "Pix" genérico (a Yooga/iFood
-        // mandam variações tipo "YOOGA ONLINE - PIX"), então pra separar
-        // certinho usa a plataforma já identificada na própria venda —
-        // mais confiável do que tentar adivinhar pelo texto da forma.
-        if(m.plataforma==='ifood')tot.pixIfood+=p.valor;
-        else if(m.plataforma==='yooga')tot.pixYooga+=p.valor;
-        else tot.pixManual+=p.valor;
-      }
+      var cat=_cxPagamentoCategoria(p,m);
+      if(cat)tot[cat]+=p.valor;
     });
   });
   Object.keys(tot).forEach(function(k){tot[k]=Math.round(tot[k]*100)/100;});
@@ -2404,7 +2407,8 @@ function _cxRenderFormasModal(){
 
 // ── MODAL DE HISTÓRICO: detalhe por trás de cada KPI do dia ─────────────────
 function _cxRenderKpiModal(tipo,dia,movs,aberturaTotal,totalEntradas,totalSaidas,totalDinheiroFisico,saldoFisicoEsperado){
-  var titulos={abertura:'🔓 Abertura do Caixa',vendas:'⬆ Vendas do Dia',saidas:'⬇ Saídas do Dia',dinheiro:'💰 Dinheiro Esperado no Caixa'};
+  var titulos={abertura:'🔓 Abertura do Caixa',vendas:'⬆ Vendas do Dia',saidas:'⬇ Saídas do Dia',dinheiro:'💰 Dinheiro Esperado no Caixa',
+    credito:'💳 Total Crédito',debito:'💵 Total Débito',pixIfood:'⚡ Pix iFood',pixYooga:'⚡ Pix Yooga',pixManual:'⚡ Pix Chave Manual',notinha:'📝 Notinha Funcionário'};
 
   var ov=el('div',{style:{
     position:'absolute',inset:'0',background:'rgba(0,0,0,.85)',
@@ -2502,6 +2506,32 @@ function _cxRenderKpiModal(tipo,dia,movs,aberturaTotal,totalEntradas,totalSaidas
           el('span',{},fmtMoney(x.p.valor)),
         ]));
       });
+    }
+  } else if(['credito','debito','pixIfood','pixYooga','pixManual','notinha'].indexOf(tipo)>=0){
+    var matches=[];
+    movs.filter(function(m){return m.tipo==='entrada';}).forEach(function(m){
+      (m.pagamentos||[]).forEach(function(p){
+        if(_cxPagamentoCategoria(p,m)===tipo)matches.push({m:m,p:p});
+      });
+    });
+    if(matches.length===0){
+      body.appendChild(el('div',{style:{textAlign:'center',color:'#64748b',padding:'20px',fontSize:'13px'}},'Nenhuma venda com essa forma de pagamento ainda.'));
+    } else {
+      var totalCat=0;
+      matches.forEach(function(x){
+        totalCat+=x.p.valor;
+        var canalLabel3=x.m.canal==='delivery'?'🛵 Delivery':'🏠 Salão';
+        var platLabel3=_cxPlataformaLabel(x.m);
+        var titulo3=canalLabel3+(platLabel3?' · '+platLabel3:'')+(x.m.identificacao?' · '+x.m.identificacao:'');
+        body.appendChild(el('div',{style:{padding:'10px 0',borderBottom:'1px solid #334155'}},[
+          el('div',{style:{display:'flex',justifyContent:'space-between',gap:'8px'}},[
+            el('div',{style:{fontSize:'13px',fontWeight:'700'}},titulo3),
+            el('div',{style:{fontSize:'14px',fontWeight:'800',color:'#4ade80',whiteSpace:'nowrap'}},'+'+fmtMoney(x.p.valor)),
+          ]),
+          el('div',{style:{fontSize:'11px',color:'#64748b',marginTop:'2px'}},(x.m.horario||'')+' · '+(x.m.funcNome||'')+' · '+x.p.formaNome),
+        ]));
+      });
+      body.appendChild(totalRow('Total',totalCat,'#4ade80'));
     }
   }
 

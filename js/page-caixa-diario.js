@@ -592,13 +592,14 @@ function renderCaixaDiario(){
         }},'▶');
         verBtn.onclick=(function(id){return function(){setState({cxMovDetalheId:id});};})(m.id);
         row.appendChild(verBtn);
-        var delBtn=el('button',{style:{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'20px',padding:'0 4px',lineHeight:'1'}},'×');
-        delBtn.onclick=(function(id){return function(){
+        var delBtn=el('button',{title:'Excluir lançamento',style:{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'20px',padding:'0 4px',lineHeight:'1'}},'×');
+        delBtn.onclick=(function(id,valorMov,tituloMov){return function(){
+          if(!confirm('Excluir "'+tituloMov+'" — '+fmtMoney(valorMov)+'?\n\nEssa ação não pode ser desfeita.'))return;
           var novos=(state.caixaDiarioMovs||[]).filter(function(x){return x.id!==id;});
           lsSet('caixaDiarioMovs',novos);
           setState({caixaDiarioMovs:novos});
           scheduleSave();
-        };})(m.id);
+        };})(m.id,m.valor,titulo);
         row.appendChild(delBtn);
         mainArea.appendChild(row);
       });
@@ -1170,6 +1171,10 @@ function _cxRenderMovDetalheModal(mov){
       body.appendChild(el('div',{style:{fontSize:'11px',color:'#60a5fa',marginTop:'10px',lineHeight:'1.5'}},
         '📥 Importado da planilha — pedido #'+mov.origemImportCodigo+(mov.origemImportAuto?' (lançado automaticamente pelo "Concluir")':'')));
     }
+    if(mov.taxaEstimada){
+      body.appendChild(el('div',{style:{fontSize:'11px',color:'#94a3b8',marginTop:'8px',fontStyle:'italic',lineHeight:'1.5'}},
+        '≈ Taxa de plataforma estimada pela taxa cadastrada (lançamento manual, sem o valor exato de uma planilha importada).'));
+    }
     if(mov.compostoAjustadoPor){
       var _dtAj=mov.compostoAjustadoEm?new Date(mov.compostoAjustadoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'';
       body.appendChild(el('div',{style:{fontSize:'11px',color:'#fb923c',marginTop:'8px',lineHeight:'1.5'}},
@@ -1513,12 +1518,18 @@ function _cxRenderEntradaModal(m,session){
       var yoogaFormaSave=(state.formasPagamento||[]).find(function(f){return f.id==='fp_yooga'||/yooga/i.test(f.nome||'');});
       if(yoogaFormaSave)taxaPlataforma=yoogaFormaSave.taxaValor||0;
     }
+    // Marca quando a taxa de plataforma (iFood/Yooga) foi só estimada pela
+    // taxa cadastrada na forma, em vez do valor real de uma planilha
+    // importada — ajuda a saber quais lançamentos merecem conferência depois.
+    var taxaEstimada=!temTaxaRealImport&&m.canal==='delivery'&&(m.plataforma==='yooga'||m.plataforma==='ifood')&&
+      pags.some(function(p){var f=formas.find(function(x){return x.id===p.formaId;});return f&&f.taxaValor>0;});
     var diaAtual=_cxDiaAtual();
     var agora=new Date();
     var novo={
       id:uid(),profile:state.profile,data:_cxDataAtiva(),diaId:diaAtual?diaAtual.id:null,tipo:'entrada',
       canal:m.canal,identificacao:(m.identificacao||'').trim(),
       plataforma:m.canal==='delivery'?m.plataforma:'',tipoPedidoYooga:m.tipoPedidoYooga||'',taxaPlataforma:taxaPlataforma,
+      taxaEstimada:taxaEstimada,
       cupomCodigo:m.cupomAtivo?(m.cupomCodigo||'').trim():'',cupomValor:m.cupomAtivo?cupomValorNum:0,
       pagamentos:pags,valorBruto:totalVenda,valor:totalDevido,totalPago:totalPago,troco:troco,falta:falta,
       valorDinheiroFisico:totalDinheiro,

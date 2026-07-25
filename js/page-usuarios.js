@@ -5,7 +5,7 @@ var PERMISSOES_MODULOS=[
   {id:'bancos',       label:'Bancos e Contas',       icone:'🏦', acoes:['ver','criar','editar','excluir']},
   {id:'receitas',     label:'Receitas',              icone:'💵', acoes:['ver','criar','editar','excluir']},
   {id:'pagar',        label:'Despesas',              icone:'💸', acoes:['ver','criar','editar','excluir']},
-  {id:'receber',      label:'Contas a Receber',      icone:'📥', acoes:['ver','criar','editar','excluir']},
+  {id:'receber',      label:'Conciliação Bancária',  icone:'🏦', acoes:['ver','criar','editar','excluir']},
   {id:'dre',          label:'DRE / Resultado',       icone:'📈', acoes:['ver']},
   {id:'vendas',       label:'Vendas',                icone:'🛒', acoes:['ver','criar','editar','excluir']},
   {id:'fluxo',        label:'Fluxo de Caixa',        icone:'🔄', acoes:['ver']},

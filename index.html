@@ -1298,7 +1298,7 @@ function _navDef(ae){
     // ── apostas (só A>E) ──
     {id:'apostas',label:'Minhas Apostas',icon:'🎯',section:'apostas',onlyAE:true},
     {id:'bancos',label:ae?'Bancas':'Bancos',icon:'🏦',section:ae?'apostas':'financeiro'},
-    {id:'receber',label:ae?'Saques Previstos':'Contas a receber',icon:ae?'💸':'💰',section:ae?'apostas':'financeiro'},
+    {id:'receber',label:ae?'Saques Previstos':'Conciliação Bancária',icon:ae?'💸':'🏦',section:ae?'apostas':'financeiro'},
     {id:'pagar',label:ae?'Depósitos / Saídas':'Despesas',icon:'💸',section:ae?'apostas':'financeiro'},
     {id:'planejamento',label:ae?'Metas de ROI':'Metas',icon:'🎯',section:ae?'apostas':'planejamento'},
     {id:'recorrencias',label:'Recorrências',icon:'🔄',section:ae?'apostas':'planejamento'},
@@ -1721,7 +1721,7 @@ function renderSidebar(){
 // ── TOPBAR ────────────────────────────────────────────────────────────────────
 function renderTopbar(){
   var pf=PROFILES.find(function(p){return p.id===state.profile;});
-  var titles={dashboard:'Visão geral',bancos:'Bancos e Contas',receitas:'Receitas',dre:'DRE — Resultado',vendas:'Vendas do Dia',pagar:'Despesas',receber:'Contas a receber',fluxo:'Fluxo de caixa',orcamento:'Orçamento vs Realizado',planejamento:'Metas e Objetivos',alertas:'Alertas',exportar:'Relatórios e Exportação',cartoes:'Cartões de Crédito',tarefas:'Tarefas & Agenda',emprestimos:'Empréstimos',compras:'Compras','lista-compras':'Lista de Compras','estoque-insumos':'Estoque',fornecedores:'Fornecedores',funcionarios:'Funcionários',freelancers:'Freelancers',usuarios:'Usuários & Permissões',recorrencias:'Recorrências',auditoria:'Auditoria do Sistema',ajuda:'Central de Ajuda',estoque:'Estoque & CMV',cardapio:'Cardápio',impressoes:'Setores de Impressão',kds:'KDS — Kitchen Display',empresa:'Dados da Empresa',notas:'Bloco de Notas',mapa:'Mapa'};
+  var titles={dashboard:'Visão geral',bancos:'Bancos e Contas',receitas:'Receitas',dre:'DRE — Resultado',vendas:'Vendas do Dia',pagar:'Despesas',receber:'Conciliação Bancária',fluxo:'Fluxo de caixa',orcamento:'Orçamento vs Realizado',planejamento:'Metas e Objetivos',alertas:'Alertas',exportar:'Relatórios e Exportação',cartoes:'Cartões de Crédito',tarefas:'Tarefas & Agenda',emprestimos:'Empréstimos',compras:'Compras','lista-compras':'Lista de Compras','estoque-insumos':'Estoque',fornecedores:'Fornecedores',funcionarios:'Funcionários',freelancers:'Freelancers',usuarios:'Usuários & Permissões',recorrencias:'Recorrências',auditoria:'Auditoria do Sistema',ajuda:'Central de Ajuda',estoque:'Estoque & CMV',cardapio:'Cardápio',impressoes:'Setores de Impressão',kds:'KDS — Kitchen Display',empresa:'Dados da Empresa',notas:'Bloco de Notas',mapa:'Mapa'};
 
   var hamburger=el('button',{class:'mobile-topbar-btn',onclick:function(){setState({sidebarOpen:!state.sidebarOpen,calcOpen:false,calOpen:false});}},state.sidebarOpen?'✕':'☰');
 
@@ -2571,6 +2571,28 @@ function renderReceber(){
     scheduleSave();showToast('Marcado como recebido!');
   }
 
+  // Vindo da Conciliação Bancária (gerado no fechamento do Caixa Diário) e
+  // ainda sem banco definido: pede pra escolher o banco de destino antes de
+  // marcar como recebido, em vez de receber "no vazio".
+  function receberClick(c){
+    if(c.origemCaixaDiario&&!c.banco){
+      setState({receberBancoModal:{contaId:c.id,bancoId:''}});
+      return;
+    }
+    marcarRecebido(c);
+  }
+  function marcarRecebidoComBanco(contaId,bancoId){
+    var conta=state.contas.find(function(x){return x.id===contaId;});
+    if(!conta)return;
+    var novasConta=state.contas.map(function(x){return x.id===contaId?Object.assign({},x,{status:'recebido',banco:bancoId}):x;});
+    var novosBancos=(state.bancos||[]).map(function(b){
+      return b.id===bancoId?Object.assign({},b,{saldo:Math.round(((b.saldo||0)+(conta.valor||0))*100)/100}):b;
+    });
+    lsSet('contas',novasConta);lsSet('bancos',novosBancos);
+    setState({contas:novasConta,bancos:novosBancos,receberBancoModal:null});
+    scheduleSave();showToast('Recebido e direcionado pro banco!');
+  }
+
   var q=busca.toLowerCase();
   var filtrados=items.filter(function(c){
     var mb=!busca||
@@ -2641,7 +2663,7 @@ function renderReceber(){
         el('td',{style:{padding:'10px 12px'}},[el('span',{class:'badge '+st},c.status==='previsto'?'Previsto':c.status==='recebido'?'Recebido':'Atrasado')]),
         el('td',{style:{padding:'8px 10px',textAlign:'right'}},[
           el('div',{style:{display:'flex',gap:'4px',justifyContent:'flex-end'}},[
-            c.status!=='recebido'?el('button',{class:'btn-icon edit',title:'Marcar como recebido',onclick:function(){marcarRecebido(c);}},
+            c.status!=='recebido'?el('button',{class:'btn-icon edit',title:'Marcar como recebido',onclick:function(){receberClick(c);}},
               el('span',{style:{fontSize:'14px',color:'var(--green)'}},'✓')):null,
             el('button',{class:'btn-icon edit',title:'Editar',onclick:function(){setState({modal:{tipo:'receber',editItem:c}});}}, '✏️'),
             el('button',{class:'btn-icon',title:'Excluir',onclick:function(){deleteConta(c.id);}}, '🗑️'),
@@ -2654,8 +2676,8 @@ function renderReceber(){
     div('page-header',[
       el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},[
         el('div',{},[
-          el('h1',{},'💰 Contas a Receber'),
-          el('p',{},'Entradas previstas e realizadas — com controle de banco e forma de recebimento'),
+          el('h1',{},'🏦 Conciliação Bancária'),
+          el('p',{},'Entradas previstas e realizadas — direcione cada valor pro banco certo ao receber'),
         ]),
         el('div',{style:{display:'flex',gap:'8px'}},[
           el('button',{class:'btn-ghost',style:{fontSize:'13px'},onclick:function(){if(typeof _importarAbrir==='function')_importarAbrir();}},'📥 Importar Extrato'),
@@ -2678,6 +2700,53 @@ function renderReceber(){
       ]),
     ]),
   ]);
+}
+
+// ── MODAL: direcionar valor recebido pra um banco (Conciliação Bancária) ────
+function renderReceberBancoModal(){
+  var mb=state.receberBancoModal;
+  if(!mb)return null;
+  var conta=state.contas.find(function(x){return x.id===mb.contaId;});
+  if(!conta){setState({receberBancoModal:null});return null;}
+  var pf=state.profile;
+  var bancosDisp=(state.bancos||[]).filter(function(b){return b.profile===pf;});
+
+  var titleBar=div('modal-title',[
+    el('span',{style:{flex:'1'}},'🏦 Direcionar para o Banco'),
+    el('button',{class:'modal-close',onclick:function(){setState({receberBancoModal:null});}},'×'),
+  ]);
+
+  var body=el('div',{},[
+    el('div',{style:{fontSize:'13px',color:'var(--text3)',marginBottom:'4px'}},conta.descricao),
+    el('div',{style:{fontSize:'22px',fontWeight:'800',color:'var(--green)',marginBottom:'18px'}},fmtMoney(conta.valor||0)),
+    el('label',{class:'form-label'},'Qual banco vai receber esse valor?'),
+  ]);
+
+  if(bancosDisp.length===0){
+    body.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)',padding:'10px 0'}},'Nenhum banco cadastrado — vá em Bancos e crie um primeiro.'));
+  } else {
+    var sel=el('select',{class:'form-input'});
+    var optVazio=el('option',{},'Selecione...');optVazio.value='';sel.appendChild(optVazio);
+    bancosDisp.forEach(function(b){
+      var opt=el('option',{},b.nome);opt.value=b.id;if(b.id===mb.bancoId)opt.selected=true;sel.appendChild(opt);
+    });
+    sel.onchange=function(){setState({receberBancoModal:Object.assign({},mb,{bancoId:sel.value})});};
+    body.appendChild(sel);
+  }
+
+  var footer=div('modal-actions',[
+    btn('btn-ghost','Cancelar',function(){setState({receberBancoModal:null});}),
+    btn('btn-primary','✓ Confirmar Recebimento',function(){
+      if(!mb.bancoId){showToast('Selecione o banco de destino','error');return;}
+      marcarRecebidoComBanco(mb.contaId,mb.bancoId);
+    }),
+  ]);
+
+  var modal=div('modal',[titleBar,body,footer]);
+  modal.style.maxWidth='380px';
+  var ov=div('modal-overlay',[modal]);
+  ov.onclick=function(e){if(e.target===ov)setState({receberBancoModal:null});};
+  return ov;
 }
 
 // ── FLUXO DE CAIXA ────────────────────────────────────────────────────────────
@@ -3502,6 +3571,7 @@ function render(){
   if(typeof renderPatrimonioModal==='function'){var patM=renderPatrimonioModal();if(patM)app.appendChild(patM);}
   if(typeof renderPatrimonioDelModal==='function'){var patDM=renderPatrimonioDelModal();if(patDM)app.appendChild(patDM);}
   if(state.downloadModal){app.appendChild(renderDownloadModal());}
+  if(state.receberBancoModal){app.appendChild(renderReceberBancoModal());}
   if(typeof _doCheckBanner==='function')_doCheckBanner();
   var notifBanner=typeof _renderNotifPermissaoBanner==='function'?_renderNotifPermissaoBanner():null;
   if(notifBanner)app.appendChild(notifBanner);

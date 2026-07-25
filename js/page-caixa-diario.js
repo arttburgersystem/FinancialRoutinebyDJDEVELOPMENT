@@ -722,10 +722,56 @@ function _cxResumoFechado(dia){
 
 // ── MODAL DE CONTAGEM DE CÉDULAS/MOEDAS (abertura ou fechamento) ─────────────
 // Grava a abertura/fechamento já validados (chamado direto, ou após autorização do dev)
+// Rótulos das categorias de forma de pagamento usadas na Conciliação Bancária
+var _CX_CATEGORIA_LABELS={credito:'Crédito',debito:'Débito',pixIfood:'Pix iFood',pixYooga:'Pix Yooga',pixManual:'Pix Chave Manual',notinha:'Notinha Funcionário'};
+
+// Gera, no fechamento do caixa, uma conta "a receber" por modalidade de
+// pagamento (unificada, não uma por venda) + uma "a pagar" por saída do
+// dia — tudo pendente, esperando o dev direcionar pra qual banco vai cada
+// valor na Conciliação Bancária. Não gera de novo se já tiver gerado pra
+// esse mesmo dia (evita duplicar caso o fechamento seja processado 2x).
+function _cxGerarConciliacaoFechamento(diaFechado){
+  var pf=diaFechado.profile;
+  var jaGerou=(state.contas||[]).some(function(c){return c.origemCaixaDiarioDiaId===diaFechado.id;});
+  if(jaGerou)return [];
+
+  var movsDoDia=(state.caixaDiarioMovs||[]).filter(function(mv){return mv.diaId===diaFechado.id&&mv.profile===pf;});
+  var totCategorias=_cxTotaisPorCategoria(movsDoDia);
+  var dataFmt=diaFechado.data;
+  var dataDisp=typeof fmtDate==='function'?fmtDate(dataFmt):dataFmt;
+  var novas=[];
+
+  Object.keys(_CX_CATEGORIA_LABELS).forEach(function(k){
+    var val=totCategorias[k]||0;
+    if(val<=0)return;
+    novas.push({
+      id:uid(),tipo:'receber',
+      descricao:'Caixa Diário — '+_CX_CATEGORIA_LABELS[k]+' — '+dataDisp,
+      valor:val,categoria:'Conciliação Bancária',status:'previsto',
+      vencimento:dataFmt,banco:'',profile:pf,
+      origemCaixaDiario:true,origemCaixaDiarioDiaId:diaFechado.id,origemCaixaDiarioCategoria:k,
+      notas:'Gerado automaticamente no fechamento do caixa de '+dataDisp+'.',
+    });
+  });
+
+  movsDoDia.filter(function(mv){return mv.tipo==='saida';}).forEach(function(s){
+    novas.push({
+      id:uid(),tipo:'pagar',
+      descricao:'Caixa Diário — '+(s.descricao||'Saída'),
+      valor:s.valor||0,categoria:'Despesas de Caixa',status:'previsto',
+      vencimento:dataFmt,banco:'',profile:pf,
+      origemCaixaDiario:true,origemCaixaDiarioDiaId:diaFechado.id,origemCaixaDiarioMovId:s.id,
+    });
+  });
+
+  return novas;
+}
+
 function _cxSalvarContagem(m,session,total,qtds,isFechamento,foraDoPadrao,diferencaPadrao,autorizadoPorNome){
   var pf=state.profile, dt=_cxDataAtiva(), agora=new Date();
   var horario=agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   var dias=(state.caixaDiario||[]).slice();
+  var contasGeradas=null;
   if(isFechamento){
     var idx=-1;
     for(var i=0;i<dias.length;i++){if(dias[i].data===dt&&dias[i].profile===pf&&dias[i].status==='aberto'){idx=i;break;}}
@@ -735,6 +781,7 @@ function _cxSalvarContagem(m,session,total,qtds,isFechamento,foraDoPadrao,difere
       fechamentoFuncId:session.funcId,fechamentoFuncNome:session.funcNome,
       fechamentoHorario:horario,status:'fechado',
     });
+    contasGeradas=_cxGerarConciliacaoFechamento(dias[idx]);
   } else {
     // Sempre cria uma nova sessão (permite mais de uma abertura no mesmo dia)
     var novo={
@@ -749,8 +796,14 @@ function _cxSalvarContagem(m,session,total,qtds,isFechamento,foraDoPadrao,difere
   }
   lsSet('caixaDiario',dias);
   if(isFechamento){
+    var patchFechamento={caixaDiario:dias,cxContagemModal:Object.assign({},m,{etapa:'pos-fechamento'})};
+    if(contasGeradas&&contasGeradas.length){
+      var contasAtualizadas=(state.contas||[]).concat(contasGeradas);
+      lsSet('contas',contasAtualizadas);
+      patchFechamento.contas=contasAtualizadas;
+    }
     // Não fecha o modal ainda — mostra a tela de "salvar ou imprimir" antes.
-    setState({caixaDiario:dias,cxContagemModal:Object.assign({},m,{etapa:'pos-fechamento'})});
+    setState(patchFechamento);
   } else {
     setState({caixaDiario:dias,cxContagemModal:null});
   }

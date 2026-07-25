@@ -122,7 +122,22 @@ var _CX_FORMAS_DEFAULT=[
   {id:'fp_delivery_pix',      nome:'Delivery - Pix',      taxaValor:0,    taxaTipo:'pct', ehDinheiroFisico:false},
   {id:'fp_ifood',              nome:'iFood Online',         taxaValor:12,   taxaTipo:'pct', ehDinheiroFisico:false},
   {id:'fp_yooga',              nome:'Yooga Online',         taxaValor:0.99, taxaTipo:'fixo', ehDinheiroFisico:false},
+  {id:'fp_notinha_func',      nome:'Notinha Funcionário', taxaValor:0,    taxaTipo:'pct', ehDinheiroFisico:false},
 ];
+// Garante que a forma "Notinha Funcionário" (fiado — funcionário consome e
+// desconta do salário depois, não é dinheiro físico) exista mesmo em
+// aparelhos que já tinham o catálogo de formas de pagamento configurado
+// antes dessa forma existir. Roda uma vez só.
+function _cxGarantirFormaNotinhaFuncionario(){
+  var formas=state.formasPagamento||[];
+  if(formas.length===0)return; // será criada pelo seed normal
+  var jaExiste=formas.some(function(f){return f.id==='fp_notinha_func'||/notinha/i.test(f.nome||'');});
+  if(jaExiste)return;
+  var novasFormas=formas.concat([{id:'fp_notinha_func',nome:'Notinha Funcionário',taxaValor:0,taxaTipo:'pct',ehDinheiroFisico:false}]);
+  lsSet('formasPagamento',novasFormas);
+  state.formasPagamento=novasFormas;
+  scheduleSave();
+}
 function _cxSeedFormasPagamento(){
   if(state.formasPagamento&&state.formasPagamento.length>0)return;
   var def=_CX_FORMAS_DEFAULT.map(function(f){return Object.assign({},f);});
@@ -225,6 +240,7 @@ function _cxLiberarRedefinicaoPinDev(){
 
 function renderCaixaDiario(){
   _cxSeedFormasPagamento();
+  _cxGarantirFormaNotinhaFuncionario();
   var pf=state.profile;
   var funcs=_cxListaLogin();
 
@@ -484,6 +500,21 @@ function renderCaixaDiario(){
     kpis.appendChild(kpiCard('Saídas',totalSaidas,'#f87171','saidas'));
     kpis.appendChild(kpiCard('Dinheiro esperado no caixa',saldoFisicoEsperado,'#fbbf24','dinheiro'));
     mainArea.appendChild(kpis);
+
+    // Totais por forma de pagamento (crédito/débito/pix/notinha funcionário)
+    var totCategorias=_cxTotaisPorCategoria(movs);
+    var catRow=el('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:'10px',marginBottom:'20px'}});
+    function catCard(label,val,cor){
+      return el('div',{style:{background:'#1e293b',border:'1px solid #334155',borderRadius:'12px',padding:'12px 14px'}},[
+        el('div',{style:{fontSize:'10px',color:'#94a3b8',fontWeight:'700',textTransform:'uppercase',marginBottom:'4px'}},label),
+        el('div',{style:{fontSize:'16px',fontWeight:'800',color:cor||'#f1f5f9'}},fmtMoney(val)),
+      ]);
+    }
+    catRow.appendChild(catCard('💳 Total Crédito',totCategorias.credito,'#60a5fa'));
+    catRow.appendChild(catCard('💵 Total Débito',totCategorias.debito,'#4ade80'));
+    catRow.appendChild(catCard('⚡ Total Pix',totCategorias.pix,'#a78bfa'));
+    catRow.appendChild(catCard('📝 Notinha Funcionário',totCategorias.notinha,'#fbbf24'));
+    mainArea.appendChild(catRow);
 
     var actsRow=el('div',{style:{display:'flex',gap:'10px',marginBottom:'20px',flexWrap:'wrap'}});
     var addEntBtn=el('button',{style:{
@@ -1398,6 +1429,23 @@ function _cxNormFormaTxt(txt){
   return (txt||'').toString().trim().toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g,'')
     .replace(/\s+/g,' ');
+}
+// Soma o total recebido em cada movimentação de entrada (movs já filtrado
+// pela sessão/dia atual), separado por categoria de forma de pagamento —
+// usado no painel de totais do dashboard do Caixa Diário.
+function _cxTotaisPorCategoria(movs){
+  var tot={credito:0,debito:0,pix:0,notinha:0};
+  (movs||[]).filter(function(m){return m.tipo==='entrada';}).forEach(function(m){
+    (m.pagamentos||[]).forEach(function(p){
+      var n=_cxNormFormaTxt(p.formaNome);
+      if(n.indexOf('notinha')>=0)tot.notinha+=p.valor;
+      else if(n.indexOf('debit')>=0)tot.debito+=p.valor;
+      else if(n.indexOf('credit')>=0)tot.credito+=p.valor;
+      else if(n.indexOf('pix')>=0)tot.pix+=p.valor;
+    });
+  });
+  Object.keys(tot).forEach(function(k){tot[k]=Math.round(tot[k]*100)/100;});
+  return tot;
 }
 // Só retorna uma forma se o texto do XLS bater (exato ou por contenção) com
 // o nome de uma forma já cadastrada — usado para sugerir o mapeamento de

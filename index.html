@@ -4041,6 +4041,10 @@ function oferecerBiometria() {
   if(location.hash==='#requisicao'){
     window.DJF_KIOSK_BOOT=true;
     state.reqMode=true;
+    // Os kiosks são sempre da Artt Burger — força o perfil "artt" mesmo que
+    // este aparelho nunca tenha aberto o sistema antes (perfil padrão de
+    // fábrica é "pessoal", o que deixava a lista de login vazia num PC novo).
+    state.profile='artt';lsSet('pf','artt');
     document.getElementById('pin-overlay').style.display='none';
     initApp();
     return;
@@ -4050,6 +4054,7 @@ function oferecerBiometria() {
   if(location.hash==='#caixa-diario'){
     window.DJF_KIOSK_BOOT=true;
     state.caixaDiarioMode=true;
+    state.profile='artt';lsSet('pf','artt');
     document.getElementById('pin-overlay').style.display='none';
     initApp();
     return;

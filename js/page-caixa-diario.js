@@ -614,7 +614,7 @@ function renderCaixaDiario(){
 
   root.appendChild(mainArea);
 
-  if(contModal)root.appendChild(_cxRenderContagemModal(contModal,dia,session,totalDinheiroFisico,totalSaidas));
+  if(contModal)root.appendChild(_cxRenderContagemModal(contModal,dia,session,totalDinheiroFisico,totalSaidas,movs,aberturaTotal,totalEntradas));
   if(state.cxImportModal&&_cxIsDev(session))root.appendChild(_cxRenderImportVendasModal(session));
   if(state.cxStoneModal&&_cxIsDev(session))root.appendChild(_cxRenderStoneModal(session));
   if(movModal)root.appendChild(
@@ -747,12 +747,17 @@ function _cxSalvarContagem(m,session,total,qtds,isFechamento,foraDoPadrao,difere
     dias.push(novo);
   }
   lsSet('caixaDiario',dias);
-  setState({caixaDiario:dias,cxContagemModal:null});
+  if(isFechamento){
+    // Não fecha o modal ainda — mostra a tela de "salvar ou imprimir" antes.
+    setState({caixaDiario:dias,cxContagemModal:Object.assign({},m,{etapa:'pos-fechamento'})});
+  } else {
+    setState({caixaDiario:dias,cxContagemModal:null});
+  }
   scheduleSave();
   showToast(isFechamento?'Caixa fechado!':(foraDoPadrao?'Caixa aberto fora do padrão (autorizado)!':'Caixa aberto!'),isFechamento||!foraDoPadrao?'success':'info');
 }
 
-function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
+function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas,movs,aberturaTotal,totalEntradas){
   var isFechamento=m.tipo==='fechamento';
   var qtds=m.qtds||{};
 
@@ -800,6 +805,74 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
     actsAut.appendChild(voltarBtn);actsAut.appendChild(autorizarBtn);
     box.appendChild(actsAut);
 
+    ov.appendChild(box);
+    return ov;
+  }
+
+  // ── Etapa: resumo antes de confirmar o fechamento ───────────────────────
+  if(isFechamento&&m.etapa==='resumo'){
+    var totalContadoR=m._totalContado||0;
+    var saldoEspR=(dia?dia.aberturaTotal||0:0)+totalDinheiroFisico-totalSaidas;
+    var diferencaR=Math.round((totalContadoR-saldoEspR)*100)/100;
+    var totCategoriasR=_cxTotaisPorCategoria(movs);
+
+    box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'18px',textAlign:'center',color:'#fbbf24'}},'📋 Resumo do Fechamento'));
+
+    function linhaResumo(label,val,cor){
+      return el('div',{style:{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid #334155',fontSize:'14px'}},[
+        el('span',{style:{color:'#94a3b8'}},label),
+        el('span',{style:{fontWeight:'700',color:cor||'#f1f5f9'}},fmtMoney(val)),
+      ]);
+    }
+    box.appendChild(linhaResumo('Abertura',aberturaTotal,'#60a5fa'));
+    box.appendChild(linhaResumo('Vendas do dia',totalEntradas,'#4ade80'));
+    box.appendChild(linhaResumo('Saídas',totalSaidas,'#f87171'));
+    box.appendChild(linhaResumo('Dinheiro esperado (sistema)',saldoEspR,'#fbbf24'));
+    box.appendChild(linhaResumo('Total contado (cédulas)',totalContadoR));
+    box.appendChild(el('div',{style:{display:'flex',justifyContent:'space-between',padding:'12px 0 0',marginTop:'8px',borderTop:'2px solid #334155',fontSize:'15px',fontWeight:'800'}},[
+      el('span',{},'Diferença'),
+      el('span',{style:{color:Math.abs(diferencaR)<0.01?'#4ade80':(diferencaR>0?'#60a5fa':'#f87171')}},(diferencaR>0?'+':'')+fmtMoney(diferencaR)),
+    ]));
+
+    var linhasCat=[['Crédito',totCategoriasR.credito],['Débito',totCategoriasR.debito],['Pix iFood',totCategoriasR.pixIfood],['Pix Yooga',totCategoriasR.pixYooga],['Pix Chave Manual',totCategoriasR.pixManual],['Notinha Funcionário',totCategoriasR.notinha]].filter(function(x){return x[1]>0;});
+    if(linhasCat.length){
+      box.appendChild(el('div',{style:{fontSize:'11px',fontWeight:'700',color:'#64748b',margin:'18px 0 8px',textTransform:'uppercase',letterSpacing:'.05em'}},'Por forma de pagamento'));
+      linhasCat.forEach(function(pair){box.appendChild(linhaResumo(pair[0],pair[1]));});
+    }
+    if(totCategoriasR.composto>0){
+      box.appendChild(el('div',{style:{fontSize:'12px',color:'#fb923c',background:'rgba(251,146,60,.12)',border:'1px solid rgba(251,146,60,.3)',borderRadius:'8px',padding:'10px 12px',marginTop:'14px',lineHeight:'1.6'}},
+        '⚠ Ainda tem '+fmtMoney(totCategoriasR.composto)+' em pagamento composto pendente de ajuste — o card 🔀 continua disponível no dashboard depois de fechar.'));
+    }
+
+    var actsResumo=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginTop:'22px'}});
+    var voltarResumoBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'← Voltar');
+    voltarResumoBtn.onclick=function(){m.etapa='contagem';setState({cxContagemModal:m});};
+    var confirmResumoBtn=el('button',{style:{background:'#dc2626',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'🔒 Confirmar Fechamento');
+    confirmResumoBtn.onclick=function(){
+      _cxSalvarContagem(m,session,totalContadoR,m.qtds||{},true,false,0,'');
+    };
+    actsResumo.appendChild(voltarResumoBtn);actsResumo.appendChild(confirmResumoBtn);
+    box.appendChild(actsResumo);
+
+    ov.appendChild(box);
+    return ov;
+  }
+
+  // ── Etapa: pós-fechamento — salvar ou imprimir ──────────────────────────
+  if(isFechamento&&m.etapa==='pos-fechamento'){
+    box.appendChild(el('div',{style:{fontSize:'44px',textAlign:'center',marginBottom:'10px'}},'✅'));
+    box.appendChild(el('div',{style:{fontSize:'18px',fontWeight:'800',textAlign:'center',marginBottom:'6px',color:'#4ade80'}},'Caixa Fechado!'));
+    box.appendChild(el('div',{style:{fontSize:'12px',color:'#94a3b8',textAlign:'center',marginBottom:'22px'}},'Deseja salvar ou imprimir o resumo do fechamento?'));
+    var actsPos=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
+    var salvarBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'💾 Só Salvar');
+    salvarBtn.onclick=function(){setState({cxContagemModal:null});};
+    var imprimirBtn=el('button',{style:{background:'#1d4ed8',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},'🖨 Imprimir Resumo');
+    imprimirBtn.onclick=function(){
+      _cxImprimirResumoFechamento(dia,aberturaTotal,totalEntradas,totalSaidas,totalDinheiroFisico,movs,session);
+      setState({cxContagemModal:null});
+    };
+    actsPos.appendChild(salvarBtn);actsPos.appendChild(imprimirBtn);
+    box.appendChild(actsPos);
     ov.appendChild(box);
     return ov;
   }
@@ -859,20 +932,25 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
   var actsRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginTop:'18px'}});
   var cancelBtn=el('button',{style:{background:'#374151',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'700'}},'Cancelar');
   cancelBtn.onclick=function(){setState({cxContagemModal:null});};
-  var confirmBtn=el('button',{style:{background:isFechamento?'#dc2626':'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},
-    isFechamento?'🔒 Confirmar Fechamento':'🔓 Confirmar Abertura');
+  var confirmBtn=el('button',{style:{background:isFechamento?'#1d4ed8':'#16a34a',color:'#fff',border:'none',borderRadius:'10px',padding:'14px',cursor:'pointer',fontWeight:'800'}},
+    isFechamento?'Ver Resumo →':'🔓 Confirmar Abertura');
   confirmBtn.onclick=function(){
     var total=calcTotal();
-    if(!isFechamento){
-      var diffPadrao=Math.round((total-_CX_ABERTURA_PADRAO)*100)/100;
-      if(Math.abs(diffPadrao)>0.005){
-        m.autorizando=true;
-        m._totalPendente=total;
-        m._qtdsPendente=Object.assign({},qtds);
-        m._erroAutorizacao=false;
-        setState({cxContagemModal:m});
-        return;
-      }
+    if(isFechamento){
+      m.etapa='resumo';
+      m._totalContado=total;
+      m.qtds=qtds;
+      setState({cxContagemModal:m});
+      return;
+    }
+    var diffPadrao=Math.round((total-_CX_ABERTURA_PADRAO)*100)/100;
+    if(Math.abs(diffPadrao)>0.005){
+      m.autorizando=true;
+      m._totalPendente=total;
+      m._qtdsPendente=Object.assign({},qtds);
+      m._erroAutorizacao=false;
+      setState({cxContagemModal:m});
+      return;
     }
     _cxSalvarContagem(m,session,total,qtds,isFechamento,false,0,'');
   };
@@ -881,6 +959,59 @@ function _cxRenderContagemModal(m,dia,session,totalDinheiroFisico,totalSaidas){
 
   ov.appendChild(box);
   return ov;
+}
+
+// ── IMPRESSÃO DO RESUMO DE FECHAMENTO ────────────────────────────────────────
+// Abre uma aba com o resumo do fechamento pra imprimir/salvar em PDF. Fica
+// disponível pra quem fechou o caixa (não é restrito ao desenvolvedor, ao
+// contrário do relatório detalhado de vendas).
+function _cxImprimirResumoFechamento(dia,aberturaTotal,totalEntradas,totalSaidas,totalDinheiroFisico,movs,session){
+  var pf=state.profile;
+  var saldoEsp=aberturaTotal+totalDinheiroFisico-totalSaidas;
+  var totalContado=dia?(dia.fechamentoTotal||0):0;
+  var diferenca=Math.round((totalContado-saldoEsp)*100)/100;
+  var totCategorias=_cxTotaisPorCategoria(movs);
+  var emp=((state.empresaData||{})[pf])||{};
+  var nomeEmp=emp.nomeFantasia||emp.razaoSocial||'Financial Routine';
+  var M=function(v){return'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});};
+  var dataAlvo=_cxDataAtiva();
+
+  var linhasCategorias=[['Crédito',totCategorias.credito],['Débito',totCategorias.debito],['Pix iFood',totCategorias.pixIfood],['Pix Yooga',totCategorias.pixYooga],['Pix Chave Manual',totCategorias.pixManual],['Notinha Funcionário',totCategorias.notinha],['Composto (pendente de ajuste)',totCategorias.composto]]
+    .filter(function(x){return x[1]>0;})
+    .map(function(x){return '<tr><td>'+x[0]+'</td><td class="num">'+M(x[1])+'</td></tr>';}).join('');
+
+  var w=window.open('','_blank','width=480,height=800');
+  if(!w){showToast('O navegador bloqueou a janela de impressão — permita pop-ups pra esse site.','error');return;}
+  w.document.write(
+    '<html><head><meta charset="UTF-8"><title>Resumo do Fechamento — '+fmtDate(dataAlvo)+'</title><style>'+
+    'body{font-family:system-ui,sans-serif;padding:24px;color:#111;max-width:420px;margin:0 auto}'+
+    'h1{font-size:18px;font-weight:900;margin:0 0 2px}'+
+    '.sub{font-size:11px;color:#666;margin-bottom:14px}'+
+    'table{width:100%;border-collapse:collapse;margin-bottom:14px}'+
+    'td{padding:7px 4px;border-bottom:1px solid #eee;font-size:13px}'+
+    '.num{text-align:right;font-weight:700}'+
+    '.total-row td{font-size:15px;font-weight:900;border-top:2px solid #333;border-bottom:none;padding-top:10px}'+
+    'h3{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#666;margin:18px 0 6px}'+
+    '.rodape{margin-top:18px;font-size:10px;color:#999;text-align:center;border-top:1px dashed #ccc;padding-top:10px}'+
+    '@media print{button{display:none}}'+
+    '</style></head><body>'+
+    '<h1>'+nomeEmp+'</h1>'+
+    '<div class="sub">Resumo do Fechamento de Caixa — '+fmtDate(dataAlvo)+'</div>'+
+    '<table>'+
+      '<tr><td>Abertura</td><td class="num">'+M(aberturaTotal)+'</td></tr>'+
+      '<tr><td>Vendas do dia</td><td class="num">'+M(totalEntradas)+'</td></tr>'+
+      '<tr><td>Saídas</td><td class="num">'+M(totalSaidas)+'</td></tr>'+
+      '<tr><td>Dinheiro esperado</td><td class="num">'+M(saldoEsp)+'</td></tr>'+
+      '<tr><td>Total contado</td><td class="num">'+M(totalContado)+'</td></tr>'+
+      '<tr class="total-row"><td>Diferença</td><td class="num">'+(diferenca>0?'+':'')+M(diferenca)+'</td></tr>'+
+    '</table>'+
+    (linhasCategorias?'<h3>Por forma de pagamento</h3><table>'+linhasCategorias+'</table>':'')+
+    '<div class="sub">Fechado por '+(dia?dia.fechamentoFuncNome:(session?session.funcNome:''))+' às '+(dia?dia.fechamentoHorario:'')+'</div>'+
+    '<div class="rodape">Emitido em '+new Date().toLocaleString('pt-BR')+' · Financial Routine</div>'+
+    '<br><button onclick="window.print()" style="padding:10px 24px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px">🖨 Imprimir / Salvar PDF</button>'+
+    '</body></html>'
+  );
+  w.document.close();
 }
 
 // ── MODAL DE NOVA SAÍDA (sangria, troco, compra à vista...) ─────────────────

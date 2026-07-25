@@ -512,7 +512,9 @@ function renderCaixaDiario(){
     }
     catRow.appendChild(catCard('💳 Total Crédito',totCategorias.credito,'#60a5fa'));
     catRow.appendChild(catCard('💵 Total Débito',totCategorias.debito,'#4ade80'));
-    catRow.appendChild(catCard('⚡ Total Pix',totCategorias.pix,'#a78bfa'));
+    catRow.appendChild(catCard('⚡ Pix iFood',totCategorias.pixIfood,'#ef4444'));
+    catRow.appendChild(catCard('⚡ Pix Yooga',totCategorias.pixYooga,'#3b82f6'));
+    catRow.appendChild(catCard('⚡ Pix Chave Manual',totCategorias.pixManual,'#a78bfa'));
     catRow.appendChild(catCard('📝 Notinha Funcionário',totCategorias.notinha,'#fbbf24'));
     mainArea.appendChild(catRow);
 
@@ -1434,14 +1436,22 @@ function _cxNormFormaTxt(txt){
 // pela sessão/dia atual), separado por categoria de forma de pagamento —
 // usado no painel de totais do dashboard do Caixa Diário.
 function _cxTotaisPorCategoria(movs){
-  var tot={credito:0,debito:0,pix:0,notinha:0};
+  var tot={credito:0,debito:0,pixIfood:0,pixYooga:0,pixManual:0,notinha:0};
   (movs||[]).filter(function(m){return m.tipo==='entrada';}).forEach(function(m){
     (m.pagamentos||[]).forEach(function(p){
       var n=_cxNormFormaTxt(p.formaNome);
-      if(n.indexOf('notinha')>=0)tot.notinha+=p.valor;
-      else if(n.indexOf('debit')>=0)tot.debito+=p.valor;
-      else if(n.indexOf('credit')>=0)tot.credito+=p.valor;
-      else if(n.indexOf('pix')>=0)tot.pix+=p.valor;
+      if(n.indexOf('notinha')>=0){tot.notinha+=p.valor;return;}
+      if(n.indexOf('debit')>=0){tot.debito+=p.valor;return;}
+      if(n.indexOf('credit')>=0){tot.credito+=p.valor;return;}
+      if(n.indexOf('pix')>=0){
+        // O nome da forma às vezes vira só "Pix" genérico (a Yooga/iFood
+        // mandam variações tipo "YOOGA ONLINE - PIX"), então pra separar
+        // certinho usa a plataforma já identificada na própria venda —
+        // mais confiável do que tentar adivinhar pelo texto da forma.
+        if(m.plataforma==='ifood')tot.pixIfood+=p.valor;
+        else if(m.plataforma==='yooga')tot.pixYooga+=p.valor;
+        else tot.pixManual+=p.valor;
+      }
     });
   });
   Object.keys(tot).forEach(function(k){tot[k]=Math.round(tot[k]*100)/100;});

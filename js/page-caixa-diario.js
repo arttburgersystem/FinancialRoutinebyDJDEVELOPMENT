@@ -842,6 +842,35 @@ var _CX_CATEGORIA_LABELS={credito:'Crédito',debito:'Débito',pixIfood:'Pix iFoo
 // dia — tudo pendente, esperando o dev direcionar pra qual banco vai cada
 // valor na Conciliação Bancária. Não gera de novo se já tiver gerado pra
 // esse mesmo dia (evita duplicar caso o fechamento seja processado 2x).
+// Soma dias corridos a uma data ISO (YYYY-MM-DD) sem cair em problema de
+// fuso horário (usa meio-dia como referência ao somar).
+function _cxAddDias(dataISO,dias){
+  var d=new Date(dataISO+'T12:00:00');
+  d.setDate(d.getDate()+dias);
+  var yyyy=d.getFullYear(),mm=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');
+  return yyyy+'-'+mm+'-'+dd;
+}
+// Próximo dia útil depois de uma data (pula sábado e domingo) — usado pra
+// prever a data de recebimento de vendas no crédito/débito (D+1 útil).
+function _cxProximoDiaUtil(dataISO){
+  var d=_cxAddDias(dataISO,1);
+  var dow=new Date(d+'T12:00:00').getDay(); // 0=domingo, 6=sábado
+  while(dow===0||dow===6){
+    d=_cxAddDias(d,1);
+    dow=new Date(d+'T12:00:00').getDay();
+  }
+  return d;
+}
+// Previsão de quando o valor de cada modalidade realmente cai na conta,
+// conforme o prazo real de repasse de cada uma:
+// iFood: 30 dias corridos · Crédito/Débito: D+1 útil (sem cair fim de semana)
+// Pix e Dinheiro: na hora (mesmo dia do fechamento).
+function _cxVencimentoPorCategoria(dataFechamento,categoria){
+  if(categoria==='pixIfood')return _cxAddDias(dataFechamento,30);
+  if(categoria==='credito'||categoria==='debito')return _cxProximoDiaUtil(dataFechamento);
+  return dataFechamento; // pixYooga, pixManual, notinha — sem prazo de repasse conhecido, mantém o dia do fechamento
+}
+
 function _cxGerarConciliacaoFechamento(diaFechado){
   var pf=diaFechado.profile;
   var jaGerou=(state.contas||[]).some(function(c){return c.origemCaixaDiarioDiaId===diaFechado.id;});
@@ -856,13 +885,15 @@ function _cxGerarConciliacaoFechamento(diaFechado){
   Object.keys(_CX_CATEGORIA_LABELS).forEach(function(k){
     var val=totCategorias[k]||0;
     if(val<=0)return;
+    var venc=_cxVencimentoPorCategoria(dataFmt,k);
+    var vencDisp=typeof fmtDate==='function'?fmtDate(venc):venc;
     novas.push({
       id:uid(),tipo:'receber',
       descricao:'Caixa Diário — '+_CX_CATEGORIA_LABELS[k]+' — '+dataDisp,
       valor:val,categoria:'Conciliação Bancária',status:'previsto',
-      vencimento:dataFmt,banco:'',profile:pf,
+      vencimento:venc,banco:'',profile:pf,
       origemCaixaDiario:true,origemCaixaDiarioDiaId:diaFechado.id,origemCaixaDiarioCategoria:k,
-      notas:'Gerado automaticamente no fechamento do caixa de '+dataDisp+'.',
+      notas:'Gerado automaticamente no fechamento do caixa de '+dataDisp+'. Previsão de recebimento: '+vencDisp+'.',
     });
   });
 

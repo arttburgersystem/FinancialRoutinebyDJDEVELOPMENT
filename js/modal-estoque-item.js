@@ -87,6 +87,7 @@ function renderEstoqueItemModal() {
       categoria:     g('categoria') === '— Categoria —' ? '' : g('categoria'),
       unidade:       g('unidade') || 'un',
       estoqueAtual:  isEdit ? (edit.estoqueAtual || 0) : estoqueIni,
+      estoqueRotativoQtd: isEdit ? (edit.estoqueRotativoQtd || 0) : 0,
       estoqueMinimo: estoqueMin,
       estoqueMaximo: estoqueMax || null,
       custoMedio:    isEdit ? (edit.custoMedio || custoAtual) : custoAtual,

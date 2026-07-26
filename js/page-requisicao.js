@@ -370,7 +370,7 @@ function renderRequisicao() {
     var confirmarBtn=el('button',{style:{
       background:'#16a34a',color:'#fff',border:'none',borderRadius:'10px',
       padding:'13px 32px',cursor:'pointer',fontSize:'16px',fontWeight:'900',
-    }},'✅ Registrar Retirada');
+    }},'✅ Enviar para o Rotativo');
     confirmarBtn.onclick=function(){_reqConfirmar();};
     cartActs.appendChild(confirmarBtn);
     cartBar.appendChild(cartActs);
@@ -508,52 +508,25 @@ function renderRequisicao() {
   return root;
 }
 
-// ── REGISTRA A RETIRADA ───────────────────────────────────────────────────────
+// ── REGISTRA A TRANSFERÊNCIA (Estacionado → Rotativo) ───────────────────────
+// A retirada no tablet abastece o Estoque Rotativo — usa a mesma função
+// compartilhada de transferência do módulo Estoque Rotativo, pra ter uma
+// única lógica (sem duplicar cálculo em dois arquivos diferentes).
 function _reqConfirmar() {
   var session  = state.reqSession;
   var carrinho = state.reqCarrinho||[];
   if(!session||carrinho.length===0)return;
 
-  var pf  = state.profile;
-  var now = new Date().toISOString();
-  var dataHj = now.slice(0,10);
+  if(typeof _erTransferirLote!=='function'){
+    if(typeof showToast==='function')showToast('Erro interno: módulo de transferência não carregado.','error');
+    return;
+  }
 
-  var itensNovos = (state.estoqueItens||[]).slice();
-  var movsNovos  = (state.estoqueMovs ||[]).slice();
-  var erros = [];
+  var linhas=carrinho.map(function(c){return {itemId:c.insumoId,qtd:c.qtd,nome:c.nome};});
+  var res=_erTransferirLote(linhas,session.funcId,session.funcNome,'Requisição tablet — '+session.funcNome);
 
-  carrinho.forEach(function(c){
-    var idx=-1;
-    for(var i=0;i<itensNovos.length;i++){if(itensNovos[i].id===c.insumoId){idx=i;break;}}
-    if(idx<0){erros.push(c.nome+': produto não encontrado');return;}
-    var item = itensNovos[idx];
-    var qtdAtual = item.estoqueAtual||0;
-    var qtdNova  = Math.round((qtdAtual-c.qtd)*1000)/1000;
-    itensNovos[idx] = Object.assign({},item,{estoqueAtual:qtdNova,atualizadoEm:now});
-    movsNovos.push({
-      id:uid(),profile:pf,
-      insumoId:c.insumoId,insumoNome:c.nome,
-      tipo:'saida',quantidade:c.qtd,
-      custoUnit:c.custoMedio||null,
-      valorTotal:c.qtd*(c.custoMedio||0)||null,
-      qtdAntes:qtdAtual,qtdDepois:qtdNova,
-      custoMedioAntes:item.custoMedio||0,custoMedioDepois:item.custoMedio||0,
-      motivo:'Consumo Produção',
-      funcId:session.funcId,funcNome:session.funcNome,
-      data:dataHj,
-      obs:'Requisição tablet — '+session.funcNome,
-      criadoEm:now,
-    });
-  });
+  if(res.erros.length>0){alert('Erros ao registrar:\n'+res.erros.join('\n'));return;}
 
-  if(erros.length>0){alert('Erros ao registrar:\n'+erros.join('\n'));return;}
-
-  lsSet('estoqueItens',itensNovos);
-  lsSet('estoqueMovs',movsNovos);
-  setState({
-    estoqueItens:itensNovos,estoqueMovs:movsNovos,
-    reqSession:null,reqCarrinho:[],reqQtdModal:null,reqBusca:'',
-  });
-  scheduleSave();
-  if(typeof showToast==='function')showToast('Retirada registrada com sucesso!');
+  setState({reqSession:null,reqCarrinho:[],reqQtdModal:null,reqBusca:''});
+  if(typeof showToast==='function')showToast(res.count+' item(ns) enviados para o Estoque Rotativo!');
 }

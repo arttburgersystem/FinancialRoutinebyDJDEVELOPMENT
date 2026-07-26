@@ -150,8 +150,8 @@ function renderEstoqueInsumos() {
 
   var wrap = div('', []);
   wrap.appendChild(div('page-header', [
-    el('h1', {}, 'Estoque'),
-    el('p', {}, 'Insumos, custo médio, fichas técnicas — ' + pf),
+    el('h1', {}, '📦 Estoque Estacionado'),
+    el('p', {}, 'Armazenamento geral dos insumos (mercado interno) — custo médio, fichas técnicas. Abasteça o Estoque Rotativo a partir daqui — ' + pf),
   ]));
   wrap.appendChild(actionRow);
   wrap.appendChild(kpiGrid);
@@ -271,9 +271,10 @@ function _renderEiMovs(movs, itens) {
   }).slice(0, 300);
 
   var tipoCores = {
-    entrada: { cor: '#00a86b', bg: '#00a86b22', label: '⬆ Entrada' },
-    saida:   { cor: '#e05252', bg: '#e0525222', label: '⬇ Saída'   },
-    ajuste:  { cor: 'var(--primary)', bg: 'var(--bg3)', label: '⚙ Ajuste' },
+    entrada:       { cor: '#00a86b', bg: '#00a86b22', label: '⬆ Entrada' },
+    saida:         { cor: '#e05252', bg: '#e0525222', label: '⬇ Saída'   },
+    ajuste:        { cor: 'var(--primary)', bg: 'var(--bg3)', label: '⚙ Ajuste' },
+    transferencia: { cor: '#38bdf8', bg: '#38bdf822', label: '🔄 → Rotativo' },
   };
 
   var wrap = el('div', { class: 'card', style: { padding: '0', overflow: 'hidden' } });
@@ -292,7 +293,7 @@ function _renderEiMovs(movs, itens) {
   sorted.forEach(function(mov) {
     var insumo = (itens || []).filter(function(x) { return x.id === mov.insumoId; })[0];
     var tc = tipoCores[mov.tipo] || tipoCores.ajuste;
-    var sinal = mov.tipo === 'saida' ? '−' : mov.tipo === 'entrada' ? '+' : '=';
+    var sinal = (mov.tipo === 'saida' || mov.tipo === 'transferencia') ? '−' : mov.tipo === 'entrada' ? '+' : '=';
 
     var row = el('div', { style: {
       display: 'grid', gridTemplateColumns: cols,

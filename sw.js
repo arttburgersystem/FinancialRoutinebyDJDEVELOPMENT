@@ -8,7 +8,7 @@
 // como "/sw.js" ou "/index.html" quebram no GitHub Pages, pois resolvem pra
 // raiz do domínio (github.io), não da subpasta do projeto.
 
-var CACHE_NAME = 'djf-cache-v141';
+var CACHE_NAME = 'djf-cache-v142';
 var ASSETS = [
   '.',
   'index.html',
@@ -57,6 +57,7 @@ var ASSETS = [
   'js/page-empresa.js',
   'js/page-emprestimos.js',
   'js/page-estoque-insumos.js',
+  'js/page-estoque-rotativo.js',
   'js/page-estoque.js',
   'js/page-fidelidade.js',
   'js/page-fiscal.js',

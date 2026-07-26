@@ -1311,7 +1311,8 @@ function _navDef(ae){
     {id:'emprestimos',label:'Empréstimos',icon:'🏧',section:'financeiro',hideAE:true},
     {id:'compras',label:'Compras',icon:'🛒',section:'financeiro',hideAE:true},
     {id:'lista-compras',label:'Lista de Compras',icon:'🛍️',section:'financeiro',hideAE:true},
-    {id:'estoque-insumos',label:'Estoque',icon:'📦',section:'financeiro',hideAE:true},
+    {id:'estoque-insumos',label:'Estoque Estacionado',icon:'📦',section:'financeiro',hideAE:true},
+    {id:'estoque-rotativo',label:'Estoque Rotativo',icon:'🔄',section:'financeiro',hideAE:true},
     {id:'cartoes',label:'Cartões de Crédito',icon:'💳',section:'financeiro',hideAE:true},
     {id:'fornecedores',label:'Fornecedores',icon:'🏪',section:'financeiro',hideAE:true},
     {id:'funcionarios',label:'Funcionários',icon:'👥',section:'financeiro',hideAE:true},
@@ -1721,7 +1722,7 @@ function renderSidebar(){
 // ── TOPBAR ────────────────────────────────────────────────────────────────────
 function renderTopbar(){
   var pf=PROFILES.find(function(p){return p.id===state.profile;});
-  var titles={dashboard:'Visão geral',bancos:'Bancos e Contas',receitas:'Receitas',dre:'DRE — Resultado',vendas:'Vendas do Dia',pagar:'Despesas',receber:'Conciliação Bancária',fluxo:'Fluxo de caixa',orcamento:'Orçamento vs Realizado',planejamento:'Metas e Objetivos',alertas:'Alertas',exportar:'Relatórios e Exportação',cartoes:'Cartões de Crédito',tarefas:'Tarefas & Agenda',emprestimos:'Empréstimos',compras:'Compras','lista-compras':'Lista de Compras','estoque-insumos':'Estoque',fornecedores:'Fornecedores',funcionarios:'Funcionários',freelancers:'Freelancers',usuarios:'Usuários & Permissões',recorrencias:'Recorrências',auditoria:'Auditoria do Sistema',ajuda:'Central de Ajuda',estoque:'Estoque & CMV',cardapio:'Cardápio',impressoes:'Setores de Impressão',kds:'KDS — Kitchen Display',empresa:'Dados da Empresa',notas:'Bloco de Notas',mapa:'Mapa'};
+  var titles={dashboard:'Visão geral',bancos:'Bancos e Contas',receitas:'Receitas',dre:'DRE — Resultado',vendas:'Vendas do Dia',pagar:'Despesas',receber:'Conciliação Bancária',fluxo:'Fluxo de caixa',orcamento:'Orçamento vs Realizado',planejamento:'Metas e Objetivos',alertas:'Alertas',exportar:'Relatórios e Exportação',cartoes:'Cartões de Crédito',tarefas:'Tarefas & Agenda',emprestimos:'Empréstimos',compras:'Compras','lista-compras':'Lista de Compras','estoque-insumos':'Estoque Estacionado','estoque-rotativo':'Estoque Rotativo',fornecedores:'Fornecedores',funcionarios:'Funcionários',freelancers:'Freelancers',usuarios:'Usuários & Permissões',recorrencias:'Recorrências',auditoria:'Auditoria do Sistema',ajuda:'Central de Ajuda',estoque:'Estoque & CMV',cardapio:'Cardápio',impressoes:'Setores de Impressão',kds:'KDS — Kitchen Display',empresa:'Dados da Empresa',notas:'Bloco de Notas',mapa:'Mapa'};
 
   var hamburger=el('button',{class:'mobile-topbar-btn',onclick:function(){setState({sidebarOpen:!state.sidebarOpen,calcOpen:false,calOpen:false});}},state.sidebarOpen?'✕':'☰');
 
@@ -3505,7 +3506,7 @@ function render(){
   var _hiddenPages=['estoque','impressoes','mapa'];
   if(_hiddenPages.indexOf(state.page)!==-1){setState({page:'dashboard'});return;}
 
-  var pages={clientes:renderClientes,fidelidade:renderFidelidade,dp:renderDp,manual:renderManual,dashboard:isAEProfile()&&typeof renderDashboardAE==='function'?renderDashboardAE:renderDashboard,apostas:typeof renderApostas==='function'?renderApostas:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,compras:renderCompras,'lista-compras':renderListaCompras,'estoque-insumos':renderEstoqueInsumos,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,freelancers:renderFreelancers,administrador:renderAdministrador,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas,usuarios:renderUsuarios,recorrencias:renderRecorrencias,auditoria:renderAuditoria,ajuda:renderAjuda,estoque:renderEstoque,empresa:renderEmpresa,cardapio:renderCardapio,impressoes:renderImpressoes,kds:renderKDS,notas:renderNotas,mapa:renderMapa,pdv:renderPDV,daily:renderDailyOperation,caixa:renderCaixa,patrimonio:renderPatrimonio,fiscal:renderFiscal};
+  var pages={clientes:renderClientes,fidelidade:renderFidelidade,dp:renderDp,manual:renderManual,dashboard:isAEProfile()&&typeof renderDashboardAE==='function'?renderDashboardAE:renderDashboard,apostas:typeof renderApostas==='function'?renderApostas:renderDashboard,bancos:renderBancos,receitas:renderReceitas,dre:renderDRE,vendas:renderVendas,pagar:renderPagar,receber:renderReceber,emprestimos:renderEmprestimos,compras:renderCompras,'lista-compras':renderListaCompras,'estoque-insumos':renderEstoqueInsumos,'estoque-rotativo':renderEstoqueRotativo,cartoes:renderCartoes,fornecedores:renderFornecedores,funcionarios:renderFuncionarios,freelancers:renderFreelancers,administrador:renderAdministrador,fluxo:renderFluxo,orcamento:renderOrcamento,planejamento:renderPlanejamento,alertas:renderAlertas,exportar:renderExportar,tarefas:renderTarefas,usuarios:renderUsuarios,recorrencias:renderRecorrencias,auditoria:renderAuditoria,ajuda:renderAjuda,estoque:renderEstoque,empresa:renderEmpresa,cardapio:renderCardapio,impressoes:renderImpressoes,kds:renderKDS,notas:renderNotas,mapa:renderMapa,pdv:renderPDV,daily:renderDailyOperation,caixa:renderCaixa,patrimonio:renderPatrimonio,fiscal:renderFiscal};
   var pageContent=(pages[state.page]||renderDashboard)();
   var content=div('content',[pageContent]);
   var mainCls='main'+(state.sidebarCollapsed?' sb-collapsed':'');
@@ -3676,6 +3677,7 @@ function _djfAnunciarHora(cfgOverride){
 <script src="js/modal-lembrete-compra.js"></script>
 <script src="js/page-lista-compras.js"></script>
 <script src="js/page-estoque-insumos.js"></script>
+<script src="js/page-estoque-rotativo.js"></script>
 <script src="js/page-requisicao.js"></script>
 <script src="js/import-yooga.js"></script>
 <script src="js/modal-estoque-item.js"></script>

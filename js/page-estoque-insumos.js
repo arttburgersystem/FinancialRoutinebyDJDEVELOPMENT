@@ -14,6 +14,21 @@ function _eiStatus(item) {
   return 'ok';
 }
 
+// Célula de custo (Médio/Atual): pisca em vermelho enquanto estiver R$0,00,
+// pra chamar atenção até alguém cadastrar o valor de verdade.
+function _eiCustoCel(valor, fontSize, fontWeight) {
+  var zerado = !valor;
+  return el('div', { style: {
+    fontSize: fontSize, fontWeight: zerado ? '700' : fontWeight, textAlign: 'right',
+    color: zerado ? '#fff' : 'var(--text)',
+    background: zerado ? '#e05252' : 'transparent',
+    borderRadius: zerado ? '6px' : '0',
+    padding: zerado ? '2px 6px' : '0',
+    display: 'inline-block',
+    animation: zerado ? '_fldblink 1.2s ease-in-out infinite' : 'none',
+  } }, zerado ? 'R$ 0,00' : fmtMoney(valor));
+}
+
 function _eiMargem(item) {
   if (!item.precoVenda || !item.custoMedio) return null;
   return (item.precoVenda - item.custoMedio) / item.precoVenda * 100;
@@ -37,6 +52,7 @@ function renderEstoqueInsumos() {
   var margemMedia = comMargem.length
     ? comMargem.reduce(function(a, x) { return a + _eiMargem(x); }, 0) / comMargem.length
     : null;
+  var custoZerado = itens.filter(function(x) { return !x.custoMedio; }).length;
 
   var kpiGrid = el('div', { class: 'kpi-grid', style: { marginBottom: '14px' } });
   kpiGrid.appendChild(el('div', { class: 'kpi-card' }, [
@@ -59,6 +75,11 @@ function renderEstoqueInsumos() {
     el('div', { class: 'kpi-value', style: { color: margemMedia !== null && margemMedia >= 30 ? '#00a86b' : 'var(--text)' } },
       margemMedia !== null ? margemMedia.toFixed(1) + '%' : '—'),
     el('div', { class: 'kpi-sub' }, 'sobre produtos c/ preço'),
+  ]));
+  kpiGrid.appendChild(el('div', { class: 'kpi-card', style: custoZerado > 0 ? { border: '1px solid #e05252', animation: '_fldblink 1.2s ease-in-out infinite' } : {} }, [
+    el('div', { class: 'kpi-label' }, '⚠ Custo Zerado'),
+    el('div', { class: 'kpi-value', style: { color: custoZerado > 0 ? '#e05252' : 'var(--text)' } }, String(custoZerado)),
+    el('div', { class: 'kpi-sub' }, custoZerado > 0 ? 'precisam do custo cadastrado' : 'tudo certo'),
   ]));
 
   // Tabs
@@ -234,10 +255,8 @@ function _renderEiItens(itens, busca, filtro, catFilt) {
       Number.isInteger(qtd) ? String(qtd) : qtd.toFixed(2)));
     row.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text3)', textAlign: 'right' } },
       item.estoqueMinimo != null ? String(item.estoqueMinimo) : '—'));
-    row.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text)', textAlign: 'right' } },
-      item.custoMedio ? fmtMoney(item.custoMedio) : '—'));
-    row.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text3)', textAlign: 'right' } },
-      item.custoAtual ? fmtMoney(item.custoAtual) : '—'));
+    row.appendChild(_eiCustoCel(item.custoMedio, '12px', '600'));
+    row.appendChild(_eiCustoCel(item.custoAtual, '12px', '500'));
     row.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700', color: mgCor, textAlign: 'right' } },
       mg !== null ? mg.toFixed(1) + '%' : '—'));
 

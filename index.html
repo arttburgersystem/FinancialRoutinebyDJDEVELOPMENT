@@ -551,6 +551,9 @@ var state={
   _devCallback: null,
   downloadModal: false,
   driveConfigModal: false,
+  despesasFixas: lsGet('despesasFixas',[]),
+  despesaFixaModal: null,
+  saidaRapidaModal: null,
   caixaDiario: lsGet('caixaDiario',[]),
   caixaDiarioMovs: lsGet('caixaDiarioMovs',[]),
   caixaDiarioMode: false,
@@ -934,6 +937,7 @@ function exportarBackup(){
       fichaTecnicas:state.fichaTecnicas||[],produtos:state.produtos||[],
       orcamentos:state.orcamentos||[],patrimonios:state.patrimonios||[],
       fechamentosCaixa:state.fechamentosCaixa||[],caixaDiario:state.caixaDiario||[],
+      despesasFixas:state.despesasFixas||[],
     };
     var json=JSON.stringify(data,null,2);
     var blob=new Blob([json],{type:'application/json'});
@@ -1482,7 +1486,7 @@ function _navDef(ae){
     {id:'notas',label:'Bloco de Notas',icon:'📝',section:ae?'apostas':'planejamento'},
     // ── financeiro genérico (oculto em A>E) ──
     {id:'dre',label:'DRE',icon:'📋',section:'financeiro',hideAE:true},
-    {id:'vendas',label:'Vendas do Dia',icon:'🛒',section:'financeiro',onlyProfile:'artt'},
+    {id:'vendas',label:'Vendas do Dia',icon:'🛒',section:'sistema',hidden:true},
     {id:'receitas',label:'Receitas',icon:'💵',section:'financeiro',hideAE:true},
     {id:'emprestimos',label:'Empréstimos',icon:'🏧',section:'financeiro',hideAE:true},
     {id:'compras',label:'Compras',icon:'🛒',section:'financeiro',hideAE:true},
@@ -1495,10 +1499,10 @@ function _navDef(ae){
     {id:'freelancers',label:'Freelancers',icon:'🎨',section:'financeiro',hideAE:true},
     {id:'administrador',label:'Administrador',icon:'👤',section:'financeiro',hideAE:true},
     {id:'fluxo',label:'Fluxo de caixa',icon:'📈',section:'financeiro',hideAE:true},
-    {id:'caixa',label:'Fechamento de Caixa',icon:'🏧',section:'financeiro',hideAE:true},
+    {id:'caixa',label:'Fechamento de Caixa',icon:'🏧',section:'sistema'},
     // ── planejamento genérico (oculto em A>E) ──
     {id:'tarefas',label:'Tarefas & Agenda',icon:'✅',section:'planejamento',hideAE:true},
-    {id:'orcamento',label:'Orçamento',icon:'💰',section:'planejamento',hideAE:true},
+    {id:'orcamento',label:'Orçamento',icon:'💰',section:'sistema',hidden:true},
     {id:'alertas',label:'Alertas',icon:'🔔',section:'planejamento'},
     {id:'cardapio',label:'Cardápio',icon:'🍽️',section:'financeiro',hideAE:true},
     // ── ocultos globalmente ──

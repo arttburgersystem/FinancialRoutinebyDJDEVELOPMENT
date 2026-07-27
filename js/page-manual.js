@@ -137,7 +137,7 @@ function _manualDeptTab() {
     setTimeout(function(){
       var c2=Object.assign({},state.manualChecklists||{});
       c2[dept.id]={setores:[{id:gId,nome:'Geral',abertura:clDept.abertura||[],fechamento:clDept.fechamento||[]}]};
-      lsSet('manualChecklists',c2); setState({manualChecklists:c2}); scheduleSave();
+      lsSet('manualChecklists',c2); setState({manualChecklists:c2});
       _clSelSetor=gId;
     },0);
   }

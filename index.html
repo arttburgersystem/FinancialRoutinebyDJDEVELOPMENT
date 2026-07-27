@@ -2438,6 +2438,7 @@ function _renderPainelFixas(mesAtual){
 
 // ── CONTAS A PAGAR ────────────────────────────────────────────────────────────
 function renderPagar(){
+  var pagarMes=state.pagarMes||today().slice(0,7);
   // Gera contas do mês atual — nunca retroativo
   _gerarContasFixas();
 

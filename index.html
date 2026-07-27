@@ -869,12 +869,7 @@ function loadFromFirebase(){
 // ── PROTEÇÃO: bloqueia save antes do Firebase carregar ────────────────────────
 var _firebaseLoaded=false;
 var syncTimer=null;
-function scheduleSave(){
-  // GUARD: nunca gravar no Firebase antes do carregamento inicial completar.
-  // Evita sobrescrever dados reais com arrays vazios do estado inicial.
-  if(!_firebaseLoaded){console.warn('[djf] scheduleSave bloqueado — Firebase não carregou ainda');return;}
-  clearTimeout(syncTimer);
-  syncTimer=setTimeout(function(){
+function _doSave(){
     // Atualiza badge diretamente — sem setState para não destruir inputs ativos
     _updateSyncDOM('syncing');
     // ── Shadow backup local (recuperação de emergência) ──────────────────────
@@ -937,7 +932,16 @@ function scheduleSave(){
       fbPut('/despesasFixas',arrToObj(state.despesasFixas||[])),
     ]).then(function(){_updateSyncDOM('ok');})
       .catch(function(e){console.error(e);_updateSyncDOM('error');showToast('Erro ao salvar no Firebase','error');});
-  },1500);
+}
+function saveNow(){
+  if(!_firebaseLoaded){console.warn('[djf] saveNow bloqueado — Firebase não carregou ainda');return;}
+  clearTimeout(syncTimer);
+  _doSave();
+}
+function scheduleSave(){
+  if(!_firebaseLoaded){console.warn('[djf] scheduleSave bloqueado — Firebase não carregou ainda');return;}
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(_doSave,1500);
 }
 
 // ── BACKUP / EXPORTAÇÃO ───────────────────────────────────────────────────────

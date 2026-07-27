@@ -55,7 +55,7 @@ function renderReceitaModal(){
     lsSet('receitas',rs);
     lsSet('bancos',bPatch);
     setState({receitas:rs,bancos:bPatch,receitaModal:null});
-    scheduleSave();
+    saveNow();
     showToast(isEdit?'Receita atualizada!':'Receita registrada!');
   }
 

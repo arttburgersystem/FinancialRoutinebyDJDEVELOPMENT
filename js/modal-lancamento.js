@@ -101,7 +101,7 @@ function renderModal(){
       var _ntc=(state.transacoesCartao||[]).concat(_novasTR);
       lsSet('contas',_nc); lsSet('transacoesCartao',_ntc);
       setState({contas:_nc, transacoesCartao:_ntc, modal:null});
-      scheduleSave();
+      saveNow();
       showToast(_numParc>1 ? _numParc+'x de '+fmtMoney(_valParcela)+' em '+(_cardSel?_cardSel.nome:'cartão') : fmtMoney(d.valor)+' à vista em '+(_cardSel?_cardSel.nome:'cartão'));
       return;
     }
@@ -135,7 +135,7 @@ function renderModal(){
     lsSet('contas',novasContas);
     lsSet('bancos',novosBancos);
     setState({contas:novasContas,bancos:novosBancos,modal:null});
-    scheduleSave();
+    saveNow();
     showToast(edit.id?'Atualizado!':'Lançamento adicionado!');
   }
 

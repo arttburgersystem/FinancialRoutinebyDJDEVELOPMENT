@@ -2157,7 +2157,8 @@ function _gerarContasFixas(mes){
   var contas=state.contas||[];
   var novas=[];
   fixas.forEach(function(f){
-    // Só gera para o mês atual — nunca para meses futuros
+    // Respeita o mês de início da despesa fixa
+    if(f.mesInicio&&mesAtual<f.mesInicio)return;
     var jaExiste=contas.some(function(c){
       return c.despesaFixaId===f.id&&(c.vencimento||'').slice(0,7)===mesAtual;
     });
@@ -2190,16 +2191,19 @@ function renderDespesaFixaModal(){
   var edit=m.editItem||{};var isEdit=!!edit.id;
   var pf=state.profile;
   var bancos=(state.bancos||[]).filter(function(b){return b.profile===pf;});
-  var nomeInp,valorInp,diaInp,catSel,bancoSel,obsInp;
+  var nomeInp,valorInp,diaInp,catSel,bancoSel,obsInp,mesInicioInp;
 
   function salvar(){
     var nome=(nomeInp&&nomeInp.value||'').trim();
     if(!nome){showToast('Informe o nome','error');return;}
-    var valor=parseFloat((valorInp&&valorInp.value||'0').replace(',','.'))||0;
+    var valor=_parseMoney(valorInp&&valorInp.value||'0');
     var diaMes=parseInt(diaInp&&diaInp.value)||1;
+    var mesInicio=mesInicioInp?mesInicioInp.value:today().slice(0,7);
+    if(!mesInicio){showToast('Informe o mês de início','error');return;}
     var fixa={
       id:edit.id||uid(),profile:pf,
       nome:nome,valor:valor,diaMes:diaMes,
+      mesInicio:mesInicio,
       categoria:catSel?catSel.value:'Outros',
       banco:bancoSel?bancoSel.value:'',
       obs:obsInp?obsInp.value:'',
@@ -2219,9 +2223,11 @@ function renderDespesaFixaModal(){
   nomeInp=el('input',{class:'form-input',placeholder:'Ex: Aluguel, Energia Elétrica...'});
   nomeInp.value=edit.nome||'';
   valorInp=el('input',{class:'form-input',type:'text',placeholder:'0,00'});
-  valorInp.value=edit.valor?String(edit.valor.toFixed(2)).replace('.',','):'';
+  _maskMoney(valorInp,edit.valor||'');
   diaInp=el('input',{class:'form-input',type:'number',min:'1',max:'31',placeholder:'1'});
   diaInp.value=edit.diaMes||1;
+  mesInicioInp=el('input',{class:'form-input',type:'month'});
+  mesInicioInp.value=edit.mesInicio||today().slice(0,7);
   obsInp=el('input',{class:'form-input',placeholder:'Opcional'});
   obsInp.value=edit.obs||'';
   catSel=(function(){
@@ -2247,7 +2253,10 @@ function renderDespesaFixaModal(){
         div('form-group',[el('label',{class:'form-label'},'Valor (R$) *'),valorInp]),
         div('form-group',[el('label',{class:'form-label'},'Vence todo dia'),diaInp]),
       ]),
-      div('form-group',[el('label',{class:'form-label'},'Categoria'),catSel]),
+      el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}},[
+        div('form-group',[el('label',{class:'form-label'},'A partir de *'),mesInicioInp]),
+        div('form-group',[el('label',{class:'form-label'},'Categoria'),catSel]),
+      ]),
       div('form-group',[el('label',{class:'form-label'},'Pagar com'),bancoSel]),
       div('form-group',[el('label',{class:'form-label'},'Observação'),obsInp]),
       el('div',{class:'modal-actions'},[
@@ -2364,7 +2373,7 @@ function _renderPainelFixas(mesAtual){
       el('div',{style:{flex:'1',minWidth:0}},[
         el('div',{style:{fontWeight:'600',fontSize:'13px',color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},f.nome),
         el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}},
-          'Todo dia '+f.diaMes+' · '+(f.categoria||'')+(banco?' · '+banco.nome:'')),
+          'Todo dia '+f.diaMes+' · '+(f.categoria||'')+(banco?' · '+banco.nome:'')+(f.mesInicio?' · desde '+f.mesInicio.slice(0,7).replace('-','/')':'')),
       ]),
       el('div',{style:{fontWeight:'700',fontSize:'13px',color:isPago?'var(--green)':'var(--text)',whiteSpace:'nowrap'}},fmtMoney(f.valor)),
       el('div',{style:{

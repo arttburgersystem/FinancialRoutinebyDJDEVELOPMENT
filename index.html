@@ -833,21 +833,36 @@ function loadFromFirebase(){
       }
       lsSet('contas',contas);lsSet('metas',metas);lsSet('receitas',receitas);lsSet('bancos',bancos);lsSet('transferencias',transferencias);lsSet('vendas',vendas);lsSet('emprestimos',emprestimos);lsSet('fornecedores',fornecedores);lsSet('funcionarios',funcionarios);lsSet('tarefas',tarefas);lsSet('cartoes',cartoes);lsSet('transacoesCartao',transacoesCartao);lsSet('usuarios',usuarios);lsSet('auditLog',auditLog);lsSet('produtos',produtos);lsSet('movEstoque',movEstoque);lsSet('empresaData',empresaData);lsSet('setoresImpressao',setoresImpressao);lsSet('complementos',complementos);lsSet('kdsConfigs',kdsConfigs);lsSet('pedidos',pedidos);lsSet('notas',notas);lsSet('impressorasCadastradas',impressorasCadastradas);lsSet('configImpressao',configImpressao);lsSet('administradores',administradores);lsSet('estCategorias',estCategorias);lsSet('apostas',apostas);lsSet('orcamentos',orcamentos);lsSet('dailyTaskDefs',dailyTaskDefs);lsSet('dailyOps',dailyOps);lsSet('compras',compras);lsSet('estoqueItens',estoqueItens);lsSet('estoqueMovs',estoqueMovs);lsSet('fichaTecnicas',fichaTecnicas);lsSet('feriasFuncionarios',feriasFuncionarios);lsSet('examesFuncionarios',examesFuncionarios);lsSet('freelancers',freelancers);lsSet('servicosFreelancer',servicosFreelancer);lsSet('flEspecialidades',flEspecialidades);
       setState({contas:contas,metas:metas,receitas:receitas,bancos:bancos,transferencias:transferencias,vendas:vendas,emprestimos:emprestimos,fornecedores:fornecedores,funcionarios:funcionarios,tarefas:tarefas,cartoes:cartoes,transacoesCartao:transacoesCartao,usuarios:usuarios,auditLog:auditLog,produtos:produtos,movEstoque:movEstoque,empresaData:empresaData,setoresImpressao:setoresImpressao,complementos:complementos,kdsConfigs:kdsConfigs,pedidos:pedidos,notas:notas,impressorasCadastradas:impressorasCadastradas,configImpressao:configImpressao,administradores:administradores,estCategorias:estCategorias,apostas:apostas,orcamentos:orcamentos,dailyTaskDefs:dailyTaskDefs,dailyOps:dailyOps,compras:compras,estoqueItens:estoqueItens,estoqueMovs:estoqueMovs,fichaTecnicas:fichaTecnicas,feriasFuncionarios:feriasFuncionarios,examesFuncionarios:examesFuncionarios,freelancers:freelancers,servicosFreelancer:servicosFreelancer,flEspecialidades:flEspecialidades,syncStatus:'ok'});
+      _firebaseLoaded=true;
     })
     .catch(function(e){
       console.error(e);
       setState({syncStatus:'error'});
       showToast('Erro ao conectar ao Firebase. Usando dados locais.','error');
       setState({contas:lsGet('contas',[]),metas:lsGet('metas',[]),receitas:lsGet('receitas',[]),vendas:lsGet('vendas',[]),emprestimos:lsGet('emprestimos',[]),fornecedores:lsGet('fornecedores',[]),funcionarios:lsGet('funcionarios',[]),tarefas:lsGet('tarefas',[])});
+      _firebaseLoaded=true; // erro de rede: libera save usando dados locais
     });
 }
 
+// ── PROTEÇÃO: bloqueia save antes do Firebase carregar ────────────────────────
+var _firebaseLoaded=false;
 var syncTimer=null;
 function scheduleSave(){
+  // GUARD: nunca gravar no Firebase antes do carregamento inicial completar.
+  // Evita sobrescrever dados reais com arrays vazios do estado inicial.
+  if(!_firebaseLoaded){console.warn('[djf] scheduleSave bloqueado — Firebase não carregou ainda');return;}
   clearTimeout(syncTimer);
   syncTimer=setTimeout(function(){
     // Atualiza badge diretamente — sem setState para não destruir inputs ativos
     _updateSyncDOM('syncing');
+    // ── Shadow backup local (recuperação de emergência) ──────────────────────
+    // Só salva cópia se os arrays tiverem dados, preservando backups anteriores
+    if((state.contas||[]).length>0){lsSet('bkp_contas',state.contas);lsSet('bkp_at',new Date().toISOString());}
+    if((state.receitas||[]).length>0)lsSet('bkp_receitas',state.receitas);
+    if((state.transferencias||[]).length>0)lsSet('bkp_transferencias',state.transferencias);
+    if((state.bancos||[]).length>0)lsSet('bkp_bancos',state.bancos);
+    if((state.vendas||[]).length>0)lsSet('bkp_vendas',state.vendas);
+    // ─────────────────────────────────────────────────────────────────────────
     lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);lsSet('notas',state.notas||[]);lsSet('impressorasCadastradas',state.impressorasCadastradas||[]);lsSet('auditLog',state.auditLog||[]);lsSet('administradores',state.administradores||[]);lsSet('estCategorias',state.estCategorias||[]);lsSet('pdvPedidos',state.pdvPedidos||[]);lsSet('pdvSessoes',state.pdvSessoes||[]);lsSet('pdvCaixaSes',state.pdvCaixaSes);lsSet('orcamentos',state.orcamentos||[]);lsSet('dailyTaskDefs',state.dailyTaskDefs||[]);lsSet('dailyOps',state.dailyOps||[]);lsSet('compras',state.compras||[]);lsSet('estoqueItens',state.estoqueItens||[]);lsSet('estoqueMovs',state.estoqueMovs||[]);lsSet('fichaTecnicas',state.fichaTecnicas||[]);lsSet('feriasFuncionarios',state.feriasFuncionarios||[]);lsSet('examesFuncionarios',state.examesFuncionarios||[]);lsSet('freelancers',state.freelancers||[]);lsSet('servicosFreelancer',state.servicosFreelancer||[]);lsSet('flEspecialidades',state.flEspecialidades||[]);lsSet('fechamentosCaixa',state.fechamentosCaixa||[]);lsSet('caixaVals',state.caixaVals||{});lsSet('patrimonios',state.patrimonios||[]);
     Promise.all([
       fbPut('/contas',arrToObj(state.contas)),
@@ -900,6 +915,34 @@ function scheduleSave(){
     ]).then(function(){_updateSyncDOM('ok');})
       .catch(function(e){console.error(e);_updateSyncDOM('error');showToast('Erro ao salvar no Firebase','error');});
   },1500);
+}
+
+// ── BACKUP / EXPORTAÇÃO ───────────────────────────────────────────────────────
+function exportarBackup(){
+  try{
+    var ed=state.empresaData||{};
+    var data={
+      app:'DJFinance',exportadoEm:new Date().toISOString(),empresa:ed.nome||'',
+      contas:state.contas||[],receitas:state.receitas||[],metas:state.metas||[],
+      bancos:state.bancos||[],transferencias:state.transferencias||[],
+      vendas:state.vendas||[],emprestimos:state.emprestimos||[],
+      fornecedores:state.fornecedores||[],funcionarios:state.funcionarios||[],
+      tarefas:state.tarefas||[],cartoes:state.cartoes||[],
+      transacoesCartao:state.transacoesCartao||[],compras:state.compras||[],
+      estoqueItens:state.estoqueItens||[],estoqueMovs:state.estoqueMovs||[],
+      fichaTecnicas:state.fichaTecnicas||[],produtos:state.produtos||[],
+      orcamentos:state.orcamentos||[],patrimonios:state.patrimonios||[],
+      fechamentosCaixa:state.fechamentosCaixa||[],caixaDiario:state.caixaDiario||[],
+    };
+    var json=JSON.stringify(data,null,2);
+    var blob=new Blob([json],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url; a.download='djfinance-backup-'+today()+'.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},5000);
+    showToast('✅ Backup exportado com sucesso!','success');
+  }catch(e){showToast('Erro ao exportar: '+e.message,'error');}
 }
 
 // ── AÇÕES ────────────────────────────────────────────────────────────────────
@@ -1607,6 +1650,9 @@ function renderSidebar(){
   var downloadBtn=el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',color:'var(--text3)',marginTop:'4px'},
     onclick:function(){setState({downloadModal:true});}
   },'⬇️ Download');
+  var backupBtn=el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',color:'var(--primary)',marginTop:'4px',fontWeight:'600'},
+    onclick:function(){exportarBackup();}
+  },'💾 Exportar Backup');
   // Usuário logado + logout
   var sessionEl=null;
   var PAPEIS_COR2={desenvolvedor:'#ff6b35',administrador:'#c9a84c',gerente:'#4caf7d',operador:'#4c7dc9',visualizador:'#9e9e9e'};
@@ -1670,7 +1716,7 @@ function renderSidebar(){
     window._djfVoicesHooked=true;
     window.speechSynthesis.onvoiceschanged=function(){if(typeof render==='function')render();};
   }
-  var footer=div('sidebar-footer',[collapseBtn,sessionEl,importRow,intensWrap,beepWrap,vozWrap,themeBtn,lockBtn,downloadBtn,renderSyncBadge()].filter(Boolean));
+  var footer=div('sidebar-footer',[collapseBtn,sessionEl,importRow,intensWrap,beepWrap,vozWrap,themeBtn,lockBtn,downloadBtn,backupBtn,renderSyncBadge()].filter(Boolean));
   var sbCls='sidebar'+(state.sidebarCollapsed?' collapsed':'')+(state.sidebarOpen?' mobile-open':'');
 
   // Busca ativa: mostra lista filtrada flat em vez das seções

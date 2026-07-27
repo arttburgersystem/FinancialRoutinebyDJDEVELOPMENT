@@ -11,6 +11,18 @@
 var _doTimerRef=null;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+function _doProximoDiaMes(diaMes){
+  var d=new Date(),ano=d.getFullYear(),mes=d.getMonth(),diaHoje=d.getDate();
+  var alvo;
+  if(diaHoje<=diaMes){
+    alvo=new Date(ano,mes,diaMes);
+    if(alvo.getMonth()!==mes)alvo=new Date(ano,mes+1,0);// dia não existe neste mês, usa último dia
+  } else {
+    alvo=new Date(ano,mes+1,diaMes);
+    if(alvo.getMonth()!==(mes+1)%12)alvo=new Date(ano,mes+2,0);
+  }
+  return alvo.toISOString().substring(0,10);
+}
 function _doHora(){
   var d=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));
   return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -77,7 +89,7 @@ function _doInit(){
   defs.forEach(function(def){
     var temAtiva=ops.some(function(op){
       return op.defId===def.id&&op.profile===pf&&
-        (op.status==='programacao'||op.status==='hoje'||op.status==='pendente'||op.status==='adiada');
+        (op.status==='programacao'||op.status==='hoje'||op.status==='pendente'||op.status==='adiada'||op.status==='futura');
     });
     var temCanceladaHoje=ops.some(function(op){
       return op.defId===def.id&&op.profile===pf&&op.status==='cancelada'&&op.data===hj;
@@ -87,15 +99,18 @@ function _doInit(){
     });
     if(!temAtiva&&!temCanceladaHoje&&!temConcluidaHoje){
       if(def.tipoRepeticao==='mensal'){
-        // Rotina mensal: só cria instância no dia do mês configurado
-        var diaHoje=new Date().getDate();
-        if(diaHoje!==(def.diaMes||1)) return;
+        // Rotina mensal: cria instância com a data da próxima ocorrência
+        var proximaData=_doProximoDiaMes(def.diaMes||1);
+        var statusMensal;
+        if(proximaData===hj&&hora06)statusMensal='hoje';
+        else if(proximaData===hj)statusMensal='programacao';
+        else statusMensal='futura';
         ops.push({
           id:uid(),defId:def.id,profile:pf,
           nome:def.nome,descricao:def.descricao||'',horario:def.horario||'',
           cor:def.cor||'gold',prioridade:def.prioridade||'media',
           alertaMinutos:def.alertaMinutos!=null?def.alertaMinutos:15,
-          data:hj,status:hora06?'hoje':'programacao',criadaEm:new Date().toISOString(),
+          data:proximaData,status:statusMensal,criadaEm:new Date().toISOString(),
           concluidaEm:null,canceladaEm:null,adiada:null,motivoCancelamento:'',
         });
         changed=true;
@@ -502,8 +517,10 @@ function _doDefCard(def){
   var diasTxt,ehHojeDow;
   if(ehMensal){
     var dm=def.diaMes||1;
-    diasTxt='Todo dia '+dm+' do mês';
-    ehHojeDow=(new Date().getDate()===dm);
+    var proxData=_doProximoDiaMes(dm);
+    var ehHojeM=(proxData===hj);
+    diasTxt='🗓 Todo dia '+dm+' do mês'+(ehHojeM?' · Hoje!':' · Próximo: '+_doFmtData(proxData));
+    ehHojeDow=ehHojeM;
   } else {
     var dias=def.dias||[];
     diasTxt=dias.length?dias.map(function(i){return diasN[i];}).join(', '):'Todos os dias';
@@ -519,6 +536,7 @@ function _doDefCard(def){
     'pendente': {l:'⚠️ Atrasada',          c:'var(--red)',   b:'rgba(224,82,82,.1)'},
     'concluida':{l:'✅ Concluída hoje',    c:'var(--green)', b:'rgba(39,174,96,.1)'},
     'programacao':{l:'⏸ Aguardando',      c:'var(--text3)', b:'rgba(255,255,255,.05)'},
+    'futura':   {l:'📅 Tarefa Futura',     c:'var(--blue)',  b:'rgba(52,152,219,.1)'},
     'adiada':   {l:'↻ Adiada',             c:'var(--blue)',  b:'rgba(52,152,219,.1)'},
     'cancelada':{l:'✕ Cancelada',          c:'var(--text3)', b:'rgba(255,255,255,.05)'},
     'none':     {l:'📅 Agendada',          c:'var(--text3)', b:'rgba(255,255,255,.05)'},
@@ -588,9 +606,10 @@ function _doCard(op){
     var ehHojeProg,progTxt;
     if(def2&&def2.tipoRepeticao==='mensal'){
       var dm2=def2.diaMes||1;
-      ehHojeProg=(new Date().getDate()===dm2);
+      var prox2=_doProximoDiaMes(dm2);
+      ehHojeProg=(prox2===hj);
       if(ehHojeProg){progTxt=anteDas6?'⏰ Ativa hoje às 06:00':'▶ Ativa hoje';}
-      else{progTxt='📅 Todo dia '+dm2+' do mês';}
+      else{progTxt='🗓 Todo dia '+dm2+' do mês · Próximo: '+_doFmtData(prox2);}
     } else {
       var diasN2=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
       var dias2=def2?(def2.dias||[]):[];
@@ -606,6 +625,11 @@ function _doCard(op){
       fontWeight:ehHojeProg?'700':'400',
     }},progTxt);
   }
+
+  var futuraInfo=op.status==='futura'?el('div',{style:{
+    fontSize:'11px',marginBottom:'8px',padding:'4px 8px',borderRadius:'4px',
+    background:'rgba(52,152,219,.1)',color:'var(--blue)',fontWeight:'600',
+  }},'📅 Agendada para: '+_doFmtData(op.data)):null;
 
   var adiInfo=(op.status==='adiada'&&op.adiada)?el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'6px'}},
     '↻ Para: '+_doFmtData(op.adiada.para)+(op.adiada.motivo?' — "'+op.adiada.motivo+'"':'')):null;
@@ -642,7 +666,7 @@ function _doCard(op){
   }
 
   var actions=btns.length?el('div',{style:{display:'flex',gap:'5px',marginTop:'8px',flexWrap:'wrap'}},btns):null;
-  return el('div',{style:cardStyle},[hdr,desc,alertTag,pendInfo,progInfo,adiInfo,doneInfo,cancInfo,actions].filter(Boolean));
+  return el('div',{style:cardStyle},[hdr,desc,alertTag,pendInfo,progInfo,futuraInfo,adiInfo,doneInfo,cancInfo,actions].filter(Boolean));
 }
 
 // ── coluna kanban ─────────────────────────────────────────────────────────────

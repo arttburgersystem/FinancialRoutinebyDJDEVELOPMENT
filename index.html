@@ -550,6 +550,7 @@ var state={
   usuDevModal: false,
   _devCallback: null,
   downloadModal: false,
+  driveConfigModal: false,
   caixaDiario: lsGet('caixaDiario',[]),
   caixaDiarioMovs: lsGet('caixaDiarioMovs',[]),
   caixaDiarioMode: false,
@@ -943,6 +944,138 @@ function exportarBackup(){
     setTimeout(function(){URL.revokeObjectURL(url);},5000);
     showToast('✅ Backup exportado com sucesso!','success');
   }catch(e){showToast('Erro ao exportar: '+e.message,'error');}
+}
+
+// ── GOOGLE DRIVE BACKUP ──────────────────────────────────────────────────────
+var _driveClientId = lsGet('driveClientId','');
+var _driveAccessToken = null;
+var _driveTokenExpiry = 0;
+
+function _buildBackupData(){
+  var ed=state.empresaData||{};
+  return {
+    app:'DJFinance',exportadoEm:new Date().toISOString(),empresa:ed.nome||'',
+    contas:state.contas||[],receitas:state.receitas||[],metas:state.metas||[],
+    bancos:state.bancos||[],transferencias:state.transferencias||[],
+    vendas:state.vendas||[],emprestimos:state.emprestimos||[],
+    fornecedores:state.fornecedores||[],funcionarios:state.funcionarios||[],
+    tarefas:state.tarefas||[],cartoes:state.cartoes||[],
+    transacoesCartao:state.transacoesCartao||[],compras:state.compras||[],
+    estoqueItens:state.estoqueItens||[],estoqueMovs:state.estoqueMovs||[],
+    fichaTecnicas:state.fichaTecnicas||[],produtos:state.produtos||[],
+    orcamentos:state.orcamentos||[],patrimonios:state.patrimonios||[],
+    fechamentosCaixa:state.fechamentosCaixa||[],caixaDiario:state.caixaDiario||[],
+  };
+}
+
+function _getDriveFolder(token, folderName, cb){
+  var q=encodeURIComponent("mimeType='application/vnd.google-apps.folder' and name='"+folderName+"' and trashed=false");
+  fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id,name)',{
+    headers:{Authorization:'Bearer '+token}
+  }).then(function(r){return r.json();}).then(function(res){
+    if(res.files && res.files.length>0){cb(null,res.files[0].id);return;}
+    fetch('https://www.googleapis.com/drive/v3/files',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({name:folderName,mimeType:'application/vnd.google-apps.folder'})
+    }).then(function(r){return r.json();}).then(function(f){cb(null,f.id);}).catch(cb);
+  }).catch(cb);
+}
+
+function _uploadToDrive(token){
+  var data=_buildBackupData();
+  var json=JSON.stringify(data,null,2);
+  var fileName='djfinance-backup-'+today()+'.json';
+  _getDriveFolder(token,'DJFinance Backups',function(err,folderId){
+    if(err){showToast('Erro ao acessar Google Drive','error');return;}
+    var boundary='djf_boundary_'+Date.now();
+    var meta=JSON.stringify({name:fileName,parents:[folderId]});
+    var body='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+json+'\r\n--'+boundary+'--';
+    fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+token,'Content-Type':'multipart/related; boundary='+boundary},
+      body:body
+    }).then(function(r){
+      if(r.ok){showToast('✅ Backup salvo no Google Drive!','success');}
+      else{r.json().then(function(e){showToast('Erro Drive: '+(e.error&&e.error.message||r.status),'error');});}
+    }).catch(function(e){showToast('Erro ao enviar: '+e.message,'error');});
+  });
+}
+
+function exportarParaDrive(){
+  var cid=lsGet('driveClientId','');
+  if(!cid){setState({driveConfigModal:true});return;}
+  // Se tem token válido, usa direto
+  if(_driveAccessToken && Date.now()<_driveTokenExpiry-30000){
+    _uploadToDrive(_driveAccessToken);return;
+  }
+  // Solicita novo token via OAuth popup
+  var scope='https://www.googleapis.com/auth/drive.file';
+  var redirectUri=window.location.origin+window.location.pathname;
+  var oauthUrl='https://accounts.google.com/o/oauth2/v2/auth?client_id='+encodeURIComponent(cid)+'&redirect_uri='+encodeURIComponent(redirectUri)+'&response_type=token&scope='+encodeURIComponent(scope)+'&prompt=select_account';
+  var popup=window.open(oauthUrl,'djf_drive_oauth','width=500,height=600,left=200,top=100');
+  var interval=setInterval(function(){
+    try{
+      if(!popup||popup.closed){clearInterval(interval);return;}
+      var hash=popup.location.hash||'';
+      if(hash.indexOf('access_token=')>=0){
+        clearInterval(interval);
+        popup.close();
+        var params={};
+        hash.replace(/^#/,'').split('&').forEach(function(p){var kv=p.split('=');params[kv[0]]=decodeURIComponent(kv[1]||'');});
+        _driveAccessToken=params.access_token;
+        _driveTokenExpiry=Date.now()+(parseInt(params.expires_in||'3600',10)*1000);
+        _uploadToDrive(_driveAccessToken);
+      }
+    }catch(e){/* cross-origin, aguardando redirect */}
+  },500);
+}
+
+function renderDriveConfigModal(){
+  var cid=lsGet('driveClientId','');
+  var inp;
+  function salvar(){
+    var v=(inp&&inp.value||'').trim();
+    if(!v){showToast('Informe o Client ID','error');return;}
+    lsSet('driveClientId',v);
+    _driveClientId=v;
+    showToast('Client ID salvo!','success');
+    setState({driveConfigModal:false});
+    setTimeout(exportarParaDrive,300);
+  }
+  return el('div',{class:'modal-overlay',onclick:function(e){if(e.target===this)setState({driveConfigModal:false});}},
+    el('div',{class:'modal',style:{maxWidth:'520px',padding:'28px'}}, [
+      el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px'}},[
+        el('h3',{style:{margin:0,fontSize:'16px'}},'☁️ Configurar Google Drive'),
+        el('button',{class:'modal-close',onclick:function(){setState({driveConfigModal:false});}},'✕'),
+      ]),
+      el('div',{style:{background:'var(--bg3)',borderRadius:'10px',padding:'16px',marginBottom:'16px',fontSize:'13px',lineHeight:'1.7',color:'var(--text2)'}},[
+        el('b',{},'Como configurar (1 vez só):'),
+        el('ol',{style:{margin:'10px 0 0 18px',padding:0}},[
+          el('li',{},'Acesse console.cloud.google.com'),
+          el('li',{},'Crie um projeto (ou selecione um existente)'),
+          el('li',{},'Ative a API "Google Drive API"'),
+          el('li',{},'Em "Credenciais" → "Criar credencial" → "ID do cliente OAuth 2.0"'),
+          el('li',{},'Tipo: Aplicativo da Web'),
+          el('li',{},el('span',{},[
+            'Origens JS autorizadas: ',
+            el('code',{style:{background:'var(--bg)',padding:'1px 5px',borderRadius:'4px',fontSize:'11px'}},window.location.origin),
+          ])),
+          el('li',{},'Copie o "ID do cliente" e cole abaixo'),
+        ]),
+      ]),
+      el('label',{style:{display:'block',marginBottom:'6px',fontSize:'12px',fontWeight:'600',color:'var(--text3)'}},'ID do Cliente OAuth 2.0'),
+      inp=el('input',{type:'text',placeholder:'000000000000-xxxxxxxx.apps.googleusercontent.com',value:cid,
+        style:{width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:'8px',border:'1.5px solid var(--border)',background:'var(--bg2)',color:'var(--text)',fontSize:'13px',marginBottom:'16px'},
+        oninput:function(){},
+        onkeydown:function(e){if(e.key==='Enter')salvar();}
+      }),
+      el('div',{style:{display:'flex',gap:'10px'}},[
+        el('button',{class:'btn btn-primary',style:{flex:'1'},onclick:salvar},'Salvar e conectar'),
+        el('button',{class:'btn',style:{flex:'0 0 auto'},onclick:function(){setState({driveConfigModal:false});}},'Cancelar'),
+      ]),
+    ])
+  );
 }
 
 // ── AÇÕES ────────────────────────────────────────────────────────────────────
@@ -1653,6 +1786,9 @@ function renderSidebar(){
   var backupBtn=el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',color:'var(--primary)',marginTop:'4px',fontWeight:'600'},
     onclick:function(){exportarBackup();}
   },'💾 Exportar Backup');
+  var driveBtn=el('button',{class:'btn-ghost',style:{width:'100%',fontSize:'12px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',color:'#4285f4',marginTop:'2px',fontWeight:'600'},
+    onclick:function(){exportarParaDrive();}
+  },'☁️ Salvar no Google Drive');
   // Usuário logado + logout
   var sessionEl=null;
   var PAPEIS_COR2={desenvolvedor:'#ff6b35',administrador:'#c9a84c',gerente:'#4caf7d',operador:'#4c7dc9',visualizador:'#9e9e9e'};
@@ -1716,7 +1852,7 @@ function renderSidebar(){
     window._djfVoicesHooked=true;
     window.speechSynthesis.onvoiceschanged=function(){if(typeof render==='function')render();};
   }
-  var footer=div('sidebar-footer',[collapseBtn,sessionEl,importRow,intensWrap,beepWrap,vozWrap,themeBtn,lockBtn,downloadBtn,backupBtn,renderSyncBadge()].filter(Boolean));
+  var footer=div('sidebar-footer',[collapseBtn,sessionEl,importRow,intensWrap,beepWrap,vozWrap,themeBtn,lockBtn,downloadBtn,backupBtn,driveBtn,renderSyncBadge()].filter(Boolean));
   var sbCls='sidebar'+(state.sidebarCollapsed?' collapsed':'')+(state.sidebarOpen?' mobile-open':'');
 
   // Busca ativa: mostra lista filtrada flat em vez das seções
@@ -3618,6 +3754,7 @@ function render(){
   if(typeof renderPatrimonioModal==='function'){var patM=renderPatrimonioModal();if(patM)app.appendChild(patM);}
   if(typeof renderPatrimonioDelModal==='function'){var patDM=renderPatrimonioDelModal();if(patDM)app.appendChild(patDM);}
   if(state.downloadModal){app.appendChild(renderDownloadModal());}
+  if(state.driveConfigModal){app.appendChild(renderDriveConfigModal());}
   if(state.receberBancoModal){app.appendChild(renderReceberBancoModal());}
   if(typeof _doCheckBanner==='function')_doCheckBanner();
   var notifBanner=typeof _renderNotifPermissaoBanner==='function'?_renderNotifPermissaoBanner():null;

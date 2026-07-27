@@ -867,7 +867,7 @@ function scheduleSave(){
     if((state.bancos||[]).length>0)lsSet('bkp_bancos',state.bancos);
     if((state.vendas||[]).length>0)lsSet('bkp_vendas',state.vendas);
     // ─────────────────────────────────────────────────────────────────────────
-    lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);lsSet('notas',state.notas||[]);lsSet('impressorasCadastradas',state.impressorasCadastradas||[]);lsSet('auditLog',state.auditLog||[]);lsSet('administradores',state.administradores||[]);lsSet('estCategorias',state.estCategorias||[]);lsSet('pdvPedidos',state.pdvPedidos||[]);lsSet('pdvSessoes',state.pdvSessoes||[]);lsSet('pdvCaixaSes',state.pdvCaixaSes);lsSet('orcamentos',state.orcamentos||[]);lsSet('dailyTaskDefs',state.dailyTaskDefs||[]);lsSet('dailyOps',state.dailyOps||[]);lsSet('compras',state.compras||[]);lsSet('estoqueItens',state.estoqueItens||[]);lsSet('estoqueMovs',state.estoqueMovs||[]);lsSet('fichaTecnicas',state.fichaTecnicas||[]);lsSet('feriasFuncionarios',state.feriasFuncionarios||[]);lsSet('examesFuncionarios',state.examesFuncionarios||[]);lsSet('freelancers',state.freelancers||[]);lsSet('servicosFreelancer',state.servicosFreelancer||[]);lsSet('flEspecialidades',state.flEspecialidades||[]);lsSet('fechamentosCaixa',state.fechamentosCaixa||[]);lsSet('caixaVals',state.caixaVals||{});lsSet('patrimonios',state.patrimonios||[]);
+    lsSet('despesasFixas',state.despesasFixas||[]);lsSet('contas',state.contas);lsSet('metas',state.metas);lsSet('receitas',state.receitas);lsSet('bancos',state.bancos);lsSet('transferencias',state.transferencias);lsSet('vendas',state.vendas||[]);lsSet('emprestimos',state.emprestimos||[]);lsSet('fornecedores',state.fornecedores||[]);lsSet('funcionarios',state.funcionarios||[]);lsSet('tarefas',state.tarefas||[]);lsSet('cartoes',state.cartoes||[]);lsSet('transacoesCartao',state.transacoesCartao||[]);lsSet('usuarios',state.usuarios||[]);lsSet('produtos',state.produtos||[]);lsSet('movEstoque',state.movEstoque||[]);lsSet('metaCmvPct',state.metaCmvPct||32);lsSet('setoresImpressao',state.setoresImpressao||[]);lsSet('complementos',state.complementos||[]);lsSet('configImpressao',state.configImpressao||{});lsSet('kdsConfigs',state.kdsConfigs||[]);lsSet('pedidos',state.pedidos||[]);lsSet('notas',state.notas||[]);lsSet('impressorasCadastradas',state.impressorasCadastradas||[]);lsSet('auditLog',state.auditLog||[]);lsSet('administradores',state.administradores||[]);lsSet('estCategorias',state.estCategorias||[]);lsSet('pdvPedidos',state.pdvPedidos||[]);lsSet('pdvSessoes',state.pdvSessoes||[]);lsSet('pdvCaixaSes',state.pdvCaixaSes);lsSet('orcamentos',state.orcamentos||[]);lsSet('dailyTaskDefs',state.dailyTaskDefs||[]);lsSet('dailyOps',state.dailyOps||[]);lsSet('compras',state.compras||[]);lsSet('estoqueItens',state.estoqueItens||[]);lsSet('estoqueMovs',state.estoqueMovs||[]);lsSet('fichaTecnicas',state.fichaTecnicas||[]);lsSet('feriasFuncionarios',state.feriasFuncionarios||[]);lsSet('examesFuncionarios',state.examesFuncionarios||[]);lsSet('freelancers',state.freelancers||[]);lsSet('servicosFreelancer',state.servicosFreelancer||[]);lsSet('flEspecialidades',state.flEspecialidades||[]);lsSet('fechamentosCaixa',state.fechamentosCaixa||[]);lsSet('caixaVals',state.caixaVals||{});lsSet('patrimonios',state.patrimonios||[]);
     Promise.all([
       fbPut('/contas',arrToObj(state.contas)),
       fbPut('/metas',arrToObj(state.metas)),
@@ -916,6 +916,7 @@ function scheduleSave(){
       fbPut('/embConfig',state.embConfig||{}),
       fbPut('/comprasLembretes',arrToObj(state.comprasLembretes||[])),
       fbPut('/adiantamentos',arrToObj(state.adiantamentos||[])),
+      fbPut('/despesasFixas',arrToObj(state.despesasFixas||[])),
     ]).then(function(){_updateSyncDOM('ok');})
       .catch(function(e){console.error(e);_updateSyncDOM('error');showToast('Erro ao salvar no Firebase','error');});
   },1500);
@@ -2114,8 +2115,290 @@ function renderDashboard(){
   return div('',[kpis,inadCard,chartCard,catCard,alertsCard,metasCard].filter(Boolean));
 }
 
+// ── DESPESAS FIXAS ────────────────────────────────────────────────────────────
+var CATS_DESPESA=['Alimentação / Insumos','Aluguel','Energia Elétrica','Água','Internet / Telefone','Pessoal / RH','Manutenção','Marketing','Impostos / Taxas','Equipamentos','Fornecedor','Serviços','Outros'];
+
+function _gerarContasFixas(){
+  // Para cada despesa fixa ativa, garante que existe uma conta no mês atual
+  var pf=state.profile;
+  var hj=today();
+  var mesAtual=hj.slice(0,7);
+  var fixas=(state.despesasFixas||[]).filter(function(f){return f.profile===pf&&f.ativo!==false;});
+  if(!fixas.length)return;
+  var contas=state.contas||[];
+  var novas=[];
+  fixas.forEach(function(f){
+    var jaExiste=contas.some(function(c){return c.despesaFixaId===f.id&&(c.vencimento||'').slice(0,7)===mesAtual;});
+    if(!jaExiste){
+      var dm=String(f.diaMes||1).padStart(2,'0');
+      var venc=mesAtual+'-'+dm;
+      novas.push({
+        id:uid(),profile:pf,tipo:'pagar',
+        descricao:f.nome,valor:f.valor||0,
+        vencimento:venc,categoria:f.categoria||'Outros',
+        banco:f.banco||'',status:'pendente',
+        recorrente:true,despesaFixaId:f.id,
+        notas:'Gerado automaticamente — Despesa Fixa',
+        criadoEm:new Date().toISOString(),
+      });
+    }
+  });
+  if(novas.length){
+    var c2=contas.concat(novas);
+    lsSet('contas',c2);
+    state.contas=c2;
+    scheduleSave();
+  }
+}
+
+function renderDespesaFixaModal(){
+  var m=state.despesaFixaModal;if(!m)return null;
+  var edit=m.editItem||{};var isEdit=!!edit.id;
+  var pf=state.profile;
+  var bancos=(state.bancos||[]).filter(function(b){return b.profile===pf;});
+  var nomeInp,valorInp,diaInp,catSel,bancoSel,obsInp;
+
+  function salvar(){
+    var nome=(nomeInp&&nomeInp.value||'').trim();
+    if(!nome){showToast('Informe o nome','error');return;}
+    var valor=parseFloat((valorInp&&valorInp.value||'0').replace(',','.'))||0;
+    var diaMes=parseInt(diaInp&&diaInp.value)||1;
+    var fixa={
+      id:edit.id||uid(),profile:pf,
+      nome:nome,valor:valor,diaMes:diaMes,
+      categoria:catSel?catSel.value:'Outros',
+      banco:bancoSel?bancoSel.value:'',
+      obs:obsInp?obsInp.value:'',
+      ativo:true,
+    };
+    var fixas=isEdit
+      ?(state.despesasFixas||[]).map(function(f){return f.id===fixa.id?fixa:f;})
+      :(state.despesasFixas||[]).concat([fixa]);
+    lsSet('despesasFixas',fixas);
+    setState({despesasFixas:fixas,despesaFixaModal:null});
+    scheduleSave();
+    // Gera a conta do mês atual se ainda não existe
+    setTimeout(_gerarContasFixas,100);
+    showToast(isEdit?'Despesa fixa atualizada!':'Despesa fixa criada!','success');
+  }
+
+  nomeInp=el('input',{class:'form-input',placeholder:'Ex: Aluguel, Energia Elétrica...'});
+  nomeInp.value=edit.nome||'';
+  valorInp=el('input',{class:'form-input',type:'text',placeholder:'0,00'});
+  valorInp.value=edit.valor?String(edit.valor.toFixed(2)).replace('.',','):'';
+  diaInp=el('input',{class:'form-input',type:'number',min:'1',max:'31',placeholder:'1'});
+  diaInp.value=edit.diaMes||1;
+  obsInp=el('input',{class:'form-input',placeholder:'Opcional'});
+  obsInp.value=edit.obs||'';
+  catSel=(function(){
+    var s=el('select',{class:'form-input'});
+    CATS_DESPESA.forEach(function(c){var o=el('option',{value:c},c);if(c===(edit.categoria||'Outros'))o.selected=true;s.appendChild(o);});
+    return s;
+  })();
+  bancoSel=(function(){
+    var s=el('select',{class:'form-input'});
+    s.appendChild(el('option',{value:''},'— Nenhum —'));
+    bancos.forEach(function(b){var o=el('option',{value:b.id},b.nome);if(b.id===edit.banco)o.selected=true;s.appendChild(o);});
+    return s;
+  })();
+
+  return el('div',{class:'modal-overlay',onclick:function(e){if(e.target===this)setState({despesaFixaModal:null});}},
+    el('div',{class:'modal',style:{maxWidth:'440px'}},[
+      el('div',{class:'modal-title'},[
+        el('span',{},(isEdit?'✏️ Editar':'📌 Nova')+' Despesa Fixa'),
+        el('button',{class:'modal-close',onclick:function(){setState({despesaFixaModal:null});}},'✕'),
+      ]),
+      div('form-group',[el('label',{class:'form-label'},'Nome da despesa *'),nomeInp]),
+      el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}},[
+        div('form-group',[el('label',{class:'form-label'},'Valor (R$) *'),valorInp]),
+        div('form-group',[el('label',{class:'form-label'},'Vence todo dia'),diaInp]),
+      ]),
+      div('form-group',[el('label',{class:'form-label'},'Categoria'),catSel]),
+      div('form-group',[el('label',{class:'form-label'},'Pagar com'),bancoSel]),
+      div('form-group',[el('label',{class:'form-label'},'Observação'),obsInp]),
+      el('div',{class:'modal-actions'},[
+        btn('btn-secondary','Cancelar',function(){setState({despesaFixaModal:null});}),
+        btn('btn-primary',isEdit?'Salvar':'Criar',salvar),
+      ]),
+    ])
+  );
+}
+
+function renderSaidaRapidaModal(){
+  var m=state.saidaRapidaModal;if(!m)return null;
+  var pf=state.profile;
+  var bancos=(state.bancos||[]).filter(function(b){return b.profile===pf;});
+  var descInp,valorInp,bancoSel,dataInp,catSel,obsInp;
+
+  function salvar(){
+    var desc=(descInp&&descInp.value||'').trim();
+    if(!desc){showToast('Informe a descrição','error');return;}
+    var valor=parseFloat((valorInp&&valorInp.value||'0').replace(',','.'))||0;
+    if(!valor){showToast('Informe o valor','error');return;}
+    var data=dataInp?dataInp.value:today();
+    var conta={
+      id:uid(),profile:pf,tipo:'pagar',
+      descricao:desc,valor:valor,
+      vencimento:data,dataPagamento:data,
+      categoria:catSel?catSel.value:'Outros',
+      banco:bancoSel?bancoSel.value:'',
+      status:'pago',recorrente:false,
+      notas:obsInp?obsInp.value:'',
+      criadoEm:new Date().toISOString(),
+    };
+    var contas=(state.contas||[]).concat([conta]);
+    lsSet('contas',contas);
+    setState({contas:contas,saidaRapidaModal:null});
+    scheduleSave();
+    showToast('Saída registrada!','success');
+    if(typeof logAudit==='function')logAudit('saída rápida',desc+' '+fmtMoney(valor));
+  }
+
+  return el('div',{class:'modal-overlay',onclick:function(e){if(e.target===this)setState({saidaRapidaModal:null});}},
+    el('div',{class:'modal',style:{maxWidth:'400px'}},[
+      el('div',{class:'modal-title'},[
+        el('span',{},'⚡ Saída Rápida'),
+        el('button',{class:'modal-close',onclick:function(){setState({saidaRapidaModal:null});}},'✕'),
+      ]),
+      el('p',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'14px',marginTop:'-8px'}},'Registra um pagamento já realizado hoje.'),
+      div('form-group',[
+        el('label',{class:'form-label'},'O que foi pago? *'),
+        descInp=el('input',{class:'form-input',placeholder:'Ex: Compra de insumos, Fornecedor...'}),
+      ]),
+      el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}},[
+        div('form-group',[
+          el('label',{class:'form-label'},'Valor (R$) *'),
+          valorInp=el('input',{class:'form-input',type:'text',placeholder:'0,00'}),
+        ]),
+        div('form-group',[
+          el('label',{class:'form-label'},'Data'),
+          dataInp=(function(){var i=el('input',{class:'form-input',type:'date'});i.value=today();return i;})(),
+        ]),
+      ]),
+      div('form-group',[
+        el('label',{class:'form-label'},'Categoria'),
+        catSel=(function(){
+          var s=el('select',{class:'form-input'});
+          CATS_DESPESA.forEach(function(c){var o=el('option',{value:c},c);s.appendChild(o);});
+          return s;
+        })(),
+      ]),
+      div('form-group',[
+        el('label',{class:'form-label'},'Conta / Banco'),
+        bancoSel=(function(){
+          var s=el('select',{class:'form-input'});
+          s.appendChild(el('option',{value:''},'— Nenhum —'));
+          bancos.forEach(function(b){s.appendChild(el('option',{value:b.id},b.nome));});
+          return s;
+        })(),
+      ]),
+      div('form-group',[
+        el('label',{class:'form-label'},'Observação'),
+        obsInp=el('input',{class:'form-input',placeholder:'Opcional'}),
+      ]),
+      el('div',{class:'modal-actions'},[
+        btn('btn-secondary','Cancelar',function(){setState({saidaRapidaModal:null});}),
+        btn('btn-primary','✓ Registrar Saída',salvar),
+      ]),
+    ])
+  );
+}
+
+function _renderPainelFixas(mesAtual){
+  var pf=state.profile;
+  var fixas=(state.despesasFixas||[]).filter(function(f){return f.profile===pf&&f.ativo!==false;});
+  var contas=state.contas||[];
+  var bancos=state.bancos||[];
+
+  var totalMensal=fixas.reduce(function(s,f){return s+f.valor;},0);
+  var pago=0,pendente=0;
+
+  var linhas=fixas.map(function(f){
+    var contaMes=contas.find(function(c){return c.despesaFixaId===f.id&&(c.vencimento||'').slice(0,7)===mesAtual;});
+    var status=contaMes?contaMes.status:'pendente';
+    var isPago=status==='pago';
+    if(isPago)pago+=f.valor;else pendente+=f.valor;
+    var banco=bancos.find(function(b){return b.id===f.banco;});
+    var dm=String(f.diaMes||1).padStart(2,'0');
+
+    return el('div',{style:{
+      display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',
+      borderBottom:'1px solid var(--border)',
+      background:isPago?'rgba(39,174,96,.04)':'rgba(255,255,255,.02)',
+    }},[
+      el('div',{style:{flex:'1',minWidth:0}},[
+        el('div',{style:{fontWeight:'600',fontSize:'13px',color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},f.nome),
+        el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}},
+          'Todo dia '+f.diaMes+' · '+(f.categoria||'')+(banco?' · '+banco.nome:'')),
+      ]),
+      el('div',{style:{fontWeight:'700',fontSize:'13px',color:isPago?'var(--green)':'var(--text)',whiteSpace:'nowrap'}},fmtMoney(f.valor)),
+      el('div',{style:{
+        fontSize:'11px',fontWeight:'700',padding:'3px 10px',borderRadius:'12px',whiteSpace:'nowrap',
+        background:isPago?'rgba(39,174,96,.15)':'rgba(229,172,0,.12)',
+        color:isPago?'var(--green)':'var(--gold)',
+      }},isPago?'✅ Pago':'🕐 Pendente'),
+      !isPago&&contaMes?el('button',{style:{
+        padding:'4px 10px',borderRadius:'6px',border:'none',background:'var(--primary)',
+        color:'#fff',fontSize:'11px',fontWeight:'700',cursor:'pointer',whiteSpace:'nowrap',
+      },onclick:function(){setState({pagarAtrasadoModal:contaMes});}},'✓ Pagar'):null,
+      el('button',{style:{
+        padding:'4px 8px',borderRadius:'6px',border:'1px solid var(--border)',
+        background:'none',color:'var(--text3)',fontSize:'11px',cursor:'pointer',
+      },onclick:function(){setState({despesaFixaModal:{editItem:f}});}},'✏️'),
+      el('button',{style:{
+        padding:'4px 8px',borderRadius:'6px',border:'none',
+        background:'rgba(239,68,68,.10)',color:'var(--red)',fontSize:'11px',cursor:'pointer',
+      },onclick:function(){
+        if(!confirm('Excluir a despesa fixa "'+f.nome+'"?'))return;
+        var nf=(state.despesasFixas||[]).filter(function(x){return x.id!==f.id;});
+        lsSet('despesasFixas',nf);setState({despesasFixas:nf});scheduleSave();
+        showToast('Despesa fixa removida','error');
+      }},'🗑'),
+    ].filter(Boolean));
+  });
+
+  return el('div',{style:{
+    background:'var(--bg2)',border:'1.5px solid var(--border)',borderRadius:'var(--radius)',
+    overflow:'hidden',marginBottom:'16px',
+  }},[
+    // Header
+    el('div',{style:{
+      display:'flex',alignItems:'center',justifyContent:'space-between',
+      padding:'12px 16px',borderBottom:'1px solid var(--border)',
+      background:'linear-gradient(90deg,rgba(var(--primary-rgb,37,99,235),.06),transparent)',
+    }},[
+      el('div',{style:{display:'flex',alignItems:'center',gap:'10px'}},[
+        el('span',{style:{fontSize:'16px'}},'📌'),
+        el('div',{},[
+          el('div',{style:{fontWeight:'700',fontSize:'14px',color:'var(--text)'}},'Despesas Fixas Mensais'),
+          el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'1px'}},
+            fixas.length+' despesa'+(fixas.length!==1?'s':'')+' · Total: '+fmtMoney(totalMensal)+'/mês'),
+        ]),
+      ]),
+      btn('btn-primary','+ Nova Fixa',function(){setState({despesaFixaModal:{}});}),
+    ]),
+    // Linhas
+    fixas.length>0
+      ? el('div',{},linhas)
+      : el('div',{style:{padding:'20px',textAlign:'center',fontSize:'13px',color:'var(--text3)'}},
+          'Nenhuma despesa fixa cadastrada. Clique em "+ Nova Fixa" para começar.'),
+    // Rodapé com totais
+    fixas.length>0?el('div',{style:{
+      display:'flex',gap:'20px',padding:'10px 16px',
+      background:'var(--bg3)',borderTop:'1px solid var(--border)',flexWrap:'wrap',
+    }},[
+      el('div',{},[el('div',{style:{fontSize:'10px',color:'var(--text3)',fontWeight:'700',letterSpacing:'.5px'}},'COMPROMISSO MENSAL'),el('div',{style:{fontSize:'15px',fontWeight:'800',color:'var(--text)'}},fmtMoney(totalMensal))]),
+      el('div',{},[el('div',{style:{fontSize:'10px',color:'var(--green)',fontWeight:'700',letterSpacing:'.5px'}},'JÁ PAGO'),el('div',{style:{fontSize:'15px',fontWeight:'800',color:'var(--green)'}},fmtMoney(pago))]),
+      el('div',{},[el('div',{style:{fontSize:'10px',color:'var(--gold)',fontWeight:'700',letterSpacing:'.5px'}},'PENDENTE'),el('div',{style:{fontSize:'15px',fontWeight:'800',color:'var(--gold)'}},fmtMoney(pendente))]),
+    ]):null,
+  ].filter(Boolean));
+}
+
 // ── CONTAS A PAGAR ────────────────────────────────────────────────────────────
 function renderPagar(){
+  // Gera contas do mês a partir das despesas fixas cadastradas
+  _gerarContasFixas();
+
   var items=state.contas.filter(function(c){return c.tipo==='pagar'&&c.profile===state.profile;});
   var busca=state.busca.pagar||'';
   var filtro=state.filtro.pagar||'todos';
@@ -2514,11 +2797,13 @@ function renderPagar(){
     div('page-header',[el('h1',{},'Despesas'),el('p',{},'Gerencie seus compromissos e vencimentos')]),
     div('action-row',[
       el('div',{style:{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}},[sb,div('filter-row',chips),mesNav]),
-      el('div',{style:{display:'flex',gap:'8px'}},[
+      el('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}},[
         el('button',{class:'btn-ghost',style:{fontSize:'13px'},onclick:function(){if(typeof _importarAbrir==='function')_importarAbrir();}},'📥 Importar Extrato'),
+        el('button',{class:'btn-ghost',style:{fontSize:'13px',color:'var(--primary)',fontWeight:'700'},onclick:function(){setState({saidaRapidaModal:{}});}},'⚡ Saída Rápida'),
         el('button',{class:'btn-primary',onclick:function(){setState({modal:{tipo:'pagar',editItem:null}});}}, '+ Nova conta'),
       ]),
     ]),
+    _renderPainelFixas(pagarMes),
     kpiBar,
     _termCard,
     massBar,
@@ -3759,6 +4044,8 @@ function render(){
   if(typeof renderPatrimonioDelModal==='function'){var patDM=renderPatrimonioDelModal();if(patDM)app.appendChild(patDM);}
   if(state.downloadModal){app.appendChild(renderDownloadModal());}
   if(state.driveConfigModal){app.appendChild(renderDriveConfigModal());}
+  if(state.despesaFixaModal){var dfM=renderDespesaFixaModal();if(dfM)app.appendChild(dfM);}
+  if(state.saidaRapidaModal){var srM=renderSaidaRapidaModal();if(srM)app.appendChild(srM);}
   if(state.receberBancoModal){app.appendChild(renderReceberBancoModal());}
   if(typeof _doCheckBanner==='function')_doCheckBanner();
   var notifBanner=typeof _renderNotifPermissaoBanner==='function'?_renderNotifPermissaoBanner():null;

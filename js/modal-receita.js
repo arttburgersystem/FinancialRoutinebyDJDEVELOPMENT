@@ -20,7 +20,7 @@ function renderReceitaModal(){
     var d={
       id:        edit.id||uid(),
       descricao: g('descricao'),
-      valor:     parseFloat(g('valor'))||0,
+      valor:     _parseMoney(g('valor')),
       categoria: g('categoria'),
       data:      g('data'),
       banco:     g('banco'),
@@ -82,6 +82,9 @@ function renderReceitaModal(){
   var notas=el('textarea',{class:'form-input',id:'rc-notas',rows:'2',placeholder:'Observações...'});
   notas.value=vals.notas;
 
+  var valorInp=el('input',{class:'form-input',type:'text',id:'rc-valor',placeholder:'0,00'});
+  _maskMoney(valorInp,vals.valor);
+
   var modal=div('modal',[
     div('modal-title',[
       el('span',{},(isEdit?'Editar':'Nova')+' receita'),
@@ -89,7 +92,7 @@ function renderReceitaModal(){
     ]),
     div('form-group',[el('label',{class:'form-label'},'Descrição'),inp('descricao','text','Ex: Vendas do dia, Salário...',vals.descricao)]),
     div('form-row',[
-      div('form-group',[el('label',{class:'form-label'},'Valor (R$)'),inp('valor','number','0,00',vals.valor)]),
+      div('form-group',[el('label',{class:'form-label'},'Valor (R$)'),valorInp]),
       div('form-group',[el('label',{class:'form-label'},'Data'),inp('data','date','',vals.data)]),
     ]),
     div('form-row',[

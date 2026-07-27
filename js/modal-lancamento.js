@@ -28,7 +28,7 @@ function renderModal(){
     var rec=getCk();
     var d={
       id:edit.id||('conta_'+Date.now()),
-      descricao:g('descricao'),valor:parseFloat(g('valor'))||0,
+      descricao:g('descricao'),valor:_parseMoney(g('valor')),
       categoria:g('categoria'),vencimento:g('vencimento'),
       status:g('status'),recorrente:rec,notas:g('notas'),
       tipo:tipo,profile:state.profile,
@@ -212,7 +212,7 @@ function renderModal(){
 
   function atualizarSaldoPreview(){
     var bancoId=document.getElementById('mf-banco')?document.getElementById('mf-banco').value:'';
-    var valor=parseFloat(document.getElementById('mf-valor')?document.getElementById('mf-valor').value:0)||0;
+    var valor=_parseMoney(document.getElementById('mf-valor')?document.getElementById('mf-valor').value:'');
     var status=document.getElementById('mf-status')?document.getElementById('mf-status').value:'';
     var el2=document.getElementById('mf-saldo-preview');
     if(!el2)return;
@@ -257,7 +257,8 @@ function renderModal(){
   var statusSel=sel('status',tipo==='pagar'?['pendente','pago','vencido']:['previsto','recebido'],vals.status);
   statusSel.addEventListener('change',atualizarSaldoPreview);
 
-  var valorInp=inp('valor','number','0,00',vals.valor);
+  var valorInp=inp('valor','text','0,00','');
+  _maskMoney(valorInp,vals.valor);
   valorInp.addEventListener('input',atualizarSaldoPreview);
 
   // Seção de detalhes do cartão (só aparece quando forma = crédito + tipo = pagar)

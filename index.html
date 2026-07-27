@@ -751,6 +751,24 @@ function nowBR(){return new Date(new Date().toLocaleString('en-US',{timeZone:'Am
 function today(){return new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});}
 function fmtDate(d){if(!d)return'—';var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
 function fmtMoney(v){return'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function _parseMoney(s){if(!s&&s!==0)return 0;return parseFloat(String(s).replace(/\./g,'').replace(',','.'))||0;}
+function _formatCents(c){var s=String(Math.abs(c)).padStart(3,'0');var dec=s.slice(-2);var int=s.slice(0,-2).replace(/\B(?=(\d{3})+(?!\d))/g,'.');return(int||'0')+','+dec;}
+function _maskMoney(inp,val){
+  if(val!==undefined&&val!==''&&val!==null){
+    inp.value=_formatCents(Math.round(parseFloat(val)*100));
+  }
+  inp.type='text';
+  inp.addEventListener('keydown',function(e){
+    var allow=[8,9,13,27,46,37,38,39,40];
+    if(allow.indexOf(e.keyCode)>=0)return;
+    if(e.ctrlKey||e.metaKey)return;
+    if(e.keyCode<48||e.keyCode>57){if(e.keyCode<96||e.keyCode>105)e.preventDefault();}
+  });
+  inp.addEventListener('input',function(){
+    var raw=this.value.replace(/\D/g,'');
+    this.value=raw?_formatCents(parseInt(raw,10)):'';
+  });
+}
 function diasRestantes(venc){if(!venc)return null;return Math.ceil((new Date(venc+' 12:00:00')-new Date(today()+' 12:00:00'))/86400000);}
 function statusBadge(item){
   var d=diasRestantes(item.vencimento);
@@ -1482,8 +1500,8 @@ function _navDef(ae){
     {id:'receber',label:ae?'Saques Previstos':'Conciliação Bancária',icon:ae?'💸':'🏦',section:ae?'apostas':'financeiro'},
     {id:'receitas',label:'Receitas',icon:'💵',section:ae?'apostas':'financeiro',hideAE:true},
     {id:'pagar',label:ae?'Depósitos / Saídas':'Despesas',icon:'💸',section:ae?'apostas':'financeiro'},
+    {id:'recorrencias',label:'Recorrências',icon:'🔄',section:ae?'apostas':'financeiro'},
     {id:'planejamento',label:ae?'Metas de ROI':'Metas',icon:'🎯',section:ae?'apostas':'planejamento'},
-    {id:'recorrencias',label:'Recorrências',icon:'🔄',section:ae?'apostas':'planejamento'},
     {id:'exportar',label:'Relatórios',icon:'📊',section:ae?'apostas':'integração'},
     {id:'notas',label:'Bloco de Notas',icon:'📝',section:ae?'apostas':'planejamento'},
     // ── financeiro genérico (oculto em A>E) ──
@@ -1492,15 +1510,15 @@ function _navDef(ae){
     {id:'vendas',label:'Vendas do Dia',icon:'🛒',section:'sistema',hidden:true},
     {id:'cartoes',label:'Cartões de Crédito',icon:'💳',section:'financeiro',hideAE:true},
     {id:'emprestimos',label:'Empréstimos',icon:'🏧',section:'financeiro',hideAE:true},
-    {id:'compras',label:'Compras',icon:'🛒',section:'financeiro',hideAE:true},
-    {id:'lista-compras',label:'Lista de Compras',icon:'🛍️',section:'financeiro',hideAE:true},
+    {id:'compras',label:'Compras',icon:'🛒',section:'sistema',hidden:true},
+    {id:'lista-compras',label:'Lista de Compras',icon:'🛍️',section:'sistema',hidden:true},
     {id:'estoque-insumos',label:'Estoque Estacionado',icon:'📦',section:'financeiro',hideAE:true},
     {id:'estoque-rotativo',label:'Estoque Rotativo',icon:'🔄',section:'financeiro',hideAE:true},
     {id:'fornecedores',label:'Fornecedores',icon:'🏪',section:'financeiro',hideAE:true},
     {id:'funcionarios',label:'Funcionários',icon:'👥',section:'financeiro',hideAE:true},
     {id:'freelancers',label:'Freelancers',icon:'🎨',section:'financeiro',hideAE:true},
     {id:'administrador',label:'Administrador',icon:'👤',section:'financeiro',hideAE:true},
-    {id:'caixa',label:'Fechamento de Caixa',icon:'🏧',section:'sistema'},
+    {id:'caixa',label:'Fechamento de Caixa',icon:'🏧',section:'sistema',hidden:true},
     // ── planejamento genérico (oculto em A>E) ──
     {id:'tarefas',label:'Tarefas & Agenda',icon:'✅',section:'planejamento',hideAE:true},
     {id:'orcamento',label:'Orçamento',icon:'💰',section:'sistema',hidden:true},

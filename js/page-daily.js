@@ -86,17 +86,32 @@ function _doInit(){
       return op.defId===def.id&&op.profile===pf&&op.status==='concluida'&&op.data===hj;
     });
     if(!temAtiva&&!temCanceladaHoje&&!temConcluidaHoje){
-      var dias=def.dias||[];
-      var status=(hora06&&(!dias.length||dias.indexOf(dow)>=0))?'hoje':'programacao';
-      ops.push({
-        id:uid(),defId:def.id,profile:pf,
-        nome:def.nome,descricao:def.descricao||'',horario:def.horario||'',
-        cor:def.cor||'gold',prioridade:def.prioridade||'media',
-        alertaMinutos:def.alertaMinutos!=null?def.alertaMinutos:15,
-        data:hj,status:status,criadaEm:new Date().toISOString(),
-        concluidaEm:null,canceladaEm:null,adiada:null,motivoCancelamento:'',
-      });
-      changed=true;
+      if(def.tipoRepeticao==='mensal'){
+        // Rotina mensal: só cria instância no dia do mês configurado
+        var diaHoje=new Date().getDate();
+        if(diaHoje!==(def.diaMes||1)) return;
+        ops.push({
+          id:uid(),defId:def.id,profile:pf,
+          nome:def.nome,descricao:def.descricao||'',horario:def.horario||'',
+          cor:def.cor||'gold',prioridade:def.prioridade||'media',
+          alertaMinutos:def.alertaMinutos!=null?def.alertaMinutos:15,
+          data:hj,status:hora06?'hoje':'programacao',criadaEm:new Date().toISOString(),
+          concluidaEm:null,canceladaEm:null,adiada:null,motivoCancelamento:'',
+        });
+        changed=true;
+      } else {
+        var dias=def.dias||[];
+        var status=(hora06&&(!dias.length||dias.indexOf(dow)>=0))?'hoje':'programacao';
+        ops.push({
+          id:uid(),defId:def.id,profile:pf,
+          nome:def.nome,descricao:def.descricao||'',horario:def.horario||'',
+          cor:def.cor||'gold',prioridade:def.prioridade||'media',
+          alertaMinutos:def.alertaMinutos!=null?def.alertaMinutos:15,
+          data:hj,status:status,criadaEm:new Date().toISOString(),
+          concluidaEm:null,canceladaEm:null,adiada:null,motivoCancelamento:'',
+        });
+        changed=true;
+      }
     }
   });
 
@@ -105,9 +120,15 @@ function _doInit(){
     ops=ops.map(function(op){
       if(op.profile===pf&&op.status==='programacao'){
         var def=(state.dailyTaskDefs||[]).find(function(d){return d.id===op.defId;});
-        var dias=def?(def.dias||[]):[];
-        if(!dias.length||dias.indexOf(dow)>=0){
-          changed=true;return Object.assign({},op,{status:'hoje',data:hj});
+        if(def&&def.tipoRepeticao==='mensal'){
+          if(new Date().getDate()===(def.diaMes||1)){
+            changed=true;return Object.assign({},op,{status:'hoje',data:hj});
+          }
+        } else {
+          var dias=def?(def.dias||[]):[];
+          if(!dias.length||dias.indexOf(dow)>=0){
+            changed=true;return Object.assign({},op,{status:'hoje',data:hj});
+          }
         }
       }
       return op;
@@ -252,6 +273,8 @@ function renderDailyModal(){
   var diasLabels=['D','S','T','Q','Q','S','S'];
   var corSel=m._corSel||edit.cor||'gold';
   var corMap={gold:'var(--gold)',blue:'var(--blue)',green:'var(--green)',red:'var(--red)',purple:'#9c59b6'};
+  var tipoRep=m._tipoRep!==undefined?m._tipoRep:(edit.tipoRepeticao||'semanal');
+  var diaMesSel=m._diaMes!==undefined?m._diaMes:(edit.diaMes||1);
 
   var diasBtns=[0,1,2,3,4,5,6].map(function(i){
     var at=diasSel.indexOf(i)>=0;
@@ -312,7 +335,10 @@ function renderDailyModal(){
       var def={
         id:edit.id||uid(),profile:state.profile,
         nome:nome,descricao:g('descricao'),horario:g('horario'),
-        dias:diasSel.slice().sort(),alertaMinutos:(function(){var s=g('alerta');return s!==''?(parseInt(s)||0):15;})(),
+        tipoRepeticao:tipoRep||'semanal',
+        dias:tipoRep==='mensal'?[]:(diasSel.slice().sort()),
+        diaMes:tipoRep==='mensal'?(parseInt(g('diames')||String(diaMesSel))||1):null,
+        alertaMinutos:(function(){var s=g('alerta');return s!==''?(parseInt(s)||0):15;})(),
         cor:corSel,prioridade:g('prioridade')||'media',ativo:true,
       };
       var defs2=isEdit
@@ -348,8 +374,51 @@ function renderDailyModal(){
           selEl('prioridade',[{v:'alta',l:'🔴 Alta'},{v:'media',l:'🟡 Média'},{v:'baixa',l:'🟢 Baixa'}],edit.prioridade||'media')]),
       ]),
       !isOneOff?div('form-group',[
+        el('label',{class:'form-label'},'Tipo de repetição:'),
+        el('div',{style:{display:'flex',gap:'6px',marginTop:'6px'}},[
+          el('button',{type:'button',style:{
+            flex:'1',padding:'7px',borderRadius:'7px',fontSize:'12px',fontWeight:'700',cursor:'pointer',
+            background:tipoRep==='semanal'?'var(--gold)':'var(--bg3)',
+            color:tipoRep==='semanal'?'#000':'var(--text)',
+            border:'1px solid '+(tipoRep==='semanal'?'var(--gold)':'var(--border)'),
+            transition:'all .15s',
+          },onclick:function(){
+            tipoRep='semanal';
+            if(state.dailyModal){state.dailyModal._tipoRep='semanal';}
+            render();
+          }},'📅 Semanal'),
+          el('button',{type:'button',style:{
+            flex:'1',padding:'7px',borderRadius:'7px',fontSize:'12px',fontWeight:'700',cursor:'pointer',
+            background:tipoRep==='mensal'?'var(--primary)':'var(--bg3)',
+            color:tipoRep==='mensal'?'#fff':'var(--text)',
+            border:'1px solid '+(tipoRep==='mensal'?'var(--primary)':'var(--border)'),
+            transition:'all .15s',
+          },onclick:function(){
+            tipoRep='mensal';
+            if(state.dailyModal){state.dailyModal._tipoRep='mensal';}
+            render();
+          }},'🗓 Mensal'),
+        ]),
+      ]):null,
+      !isOneOff&&tipoRep==='semanal'?div('form-group',[
         el('label',{class:'form-label'},'Repetir nos dias:'),
         el('div',{style:{display:'flex',gap:'6px',marginTop:'6px'}},diasBtns),
+      ]):null,
+      !isOneOff&&tipoRep==='mensal'?div('form-group',[
+        el('label',{class:'form-label'},'Dia do mês (1–31):'),
+        (function(){
+          var sel=el('select',{class:'form-input',id:'do-diames',style:{width:'140px'}});
+          for(var d=1;d<=31;d++){
+            var op2=el('option',{value:String(d)},d===1?'1 (todo dia 1°)':String(d));
+            if(d===diaMesSel)op2.selected=true;
+            sel.appendChild(op2);
+          }
+          sel.onchange=function(){
+            diaMesSel=parseInt(this.value);
+            if(state.dailyModal)state.dailyModal._diaMes=diaMesSel;
+          };
+          return sel;
+        })(),
       ]):null,
       !isOneOff?div('form-group',[
         el('label',{class:'form-label'},'Alertar (min antes):'),
@@ -417,11 +486,19 @@ function renderDailyTemplatesModal(){
 function _doDefCard(def){
   var pf=state.profile,hj=today(),dow=new Date(hj+'T12:00:00').getDay();
   var diasN=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-  var dias=def.dias||[];
-  var diasTxt=dias.length?dias.map(function(i){return diasN[i];}).join(', '):'Todos os dias';
   var corMap={gold:'var(--gold)',blue:'var(--blue)',green:'var(--green)',red:'var(--red)',purple:'#9c59b6'};
   var cor=corMap[def.cor||'gold']||'var(--gold)';
-  var ehHojeDow=!dias.length||dias.indexOf(dow)>=0;
+  var ehMensal=def.tipoRepeticao==='mensal';
+  var diasTxt,ehHojeDow;
+  if(ehMensal){
+    var dm=def.diaMes||1;
+    diasTxt='Todo dia '+dm+' do mês';
+    ehHojeDow=(new Date().getDate()===dm);
+  } else {
+    var dias=def.dias||[];
+    diasTxt=dias.length?dias.map(function(i){return diasN[i];}).join(', '):'Todos os dias';
+    ehHojeDow=!dias.length||dias.indexOf(dow)>=0;
+  }
   // instância mais recente desta rotina
   var inst=(state.dailyOps||[]).filter(function(op){
     return op.defId===def.id&&op.profile===pf;
@@ -497,18 +574,27 @@ function _doCard(op){
   var progInfo=null;
   if(ehProg){
     var def2=(state.dailyTaskDefs||[]).find(function(d){return d.id===op.defId;});
-    var diasN2=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-    var dias2=def2?(def2.dias||[]):[];
-    var diasTxt=dias2.length?dias2.map(function(i){return diasN2[i];}).join(', '):'Todos os dias';
-    var dow2=new Date(hj+'T12:00:00').getDay();
-    var ehHojeDow=!dias2.length||dias2.indexOf(dow2)>=0;
     var anteDas6=_doHora()<'06:00';
+    var ehHojeProg,progTxt;
+    if(def2&&def2.tipoRepeticao==='mensal'){
+      var dm2=def2.diaMes||1;
+      ehHojeProg=(new Date().getDate()===dm2);
+      if(ehHojeProg){progTxt=anteDas6?'⏰ Ativa hoje às 06:00':'▶ Ativa hoje';}
+      else{progTxt='📅 Todo dia '+dm2+' do mês';}
+    } else {
+      var diasN2=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+      var dias2=def2?(def2.dias||[]):[];
+      var diasTxt2=dias2.length?dias2.map(function(i){return diasN2[i];}).join(', '):'Todos os dias';
+      var dow2=new Date(hj+'T12:00:00').getDay();
+      ehHojeProg=!dias2.length||dias2.indexOf(dow2)>=0;
+      progTxt=ehHojeProg&&anteDas6?'⏰ Ativa hoje às 06:00':ehHojeProg?'▶ Ativa hoje':'📅 '+diasTxt2;
+    }
     progInfo=el('div',{style:{
       fontSize:'11px',marginBottom:'8px',padding:'4px 8px',borderRadius:'4px',
-      background:ehHojeDow?'rgba(229,172,0,.1)':'rgba(255,255,255,.04)',
-      color:ehHojeDow?'var(--gold)':'var(--text3)',
-      fontWeight:ehHojeDow?'700':'400',
-    }},ehHojeDow&&anteDas6?'⏰ Ativa hoje às 06:00':ehHojeDow?'▶ Ativa hoje':'📅 '+diasTxt);
+      background:ehHojeProg?'rgba(229,172,0,.1)':'rgba(255,255,255,.04)',
+      color:ehHojeProg?'var(--gold)':'var(--text3)',
+      fontWeight:ehHojeProg?'700':'400',
+    }},progTxt);
   }
 
   var adiInfo=(op.status==='adiada'&&op.adiada)?el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'6px'}},

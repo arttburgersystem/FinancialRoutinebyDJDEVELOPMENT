@@ -1480,6 +1480,7 @@ function _navDef(ae){
     {id:'apostas',label:'Minhas Apostas',icon:'🎯',section:'apostas',onlyAE:true},
     {id:'bancos',label:ae?'Bancas':'Bancos',icon:'🏦',section:ae?'apostas':'financeiro'},
     {id:'receber',label:ae?'Saques Previstos':'Conciliação Bancária',icon:ae?'💸':'🏦',section:ae?'apostas':'financeiro'},
+    {id:'receitas',label:'Receitas',icon:'💵',section:ae?'apostas':'financeiro',hideAE:true},
     {id:'pagar',label:ae?'Depósitos / Saídas':'Despesas',icon:'💸',section:ae?'apostas':'financeiro'},
     {id:'planejamento',label:ae?'Metas de ROI':'Metas',icon:'🎯',section:ae?'apostas':'planejamento'},
     {id:'recorrencias',label:'Recorrências',icon:'🔄',section:ae?'apostas':'planejamento'},
@@ -1488,13 +1489,12 @@ function _navDef(ae){
     // ── financeiro genérico (oculto em A>E) ──
     {id:'dre',label:'DRE',icon:'📋',section:'financeiro',hideAE:true},
     {id:'vendas',label:'Vendas do Dia',icon:'🛒',section:'sistema',hidden:true},
-    {id:'receitas',label:'Receitas',icon:'💵',section:'financeiro',hideAE:true},
+    {id:'cartoes',label:'Cartões de Crédito',icon:'💳',section:'financeiro',hideAE:true},
     {id:'emprestimos',label:'Empréstimos',icon:'🏧',section:'financeiro',hideAE:true},
     {id:'compras',label:'Compras',icon:'🛒',section:'financeiro',hideAE:true},
     {id:'lista-compras',label:'Lista de Compras',icon:'🛍️',section:'financeiro',hideAE:true},
     {id:'estoque-insumos',label:'Estoque Estacionado',icon:'📦',section:'financeiro',hideAE:true},
     {id:'estoque-rotativo',label:'Estoque Rotativo',icon:'🔄',section:'financeiro',hideAE:true},
-    {id:'cartoes',label:'Cartões de Crédito',icon:'💳',section:'financeiro',hideAE:true},
     {id:'fornecedores',label:'Fornecedores',icon:'🏪',section:'financeiro',hideAE:true},
     {id:'funcionarios',label:'Funcionários',icon:'👥',section:'financeiro',hideAE:true},
     {id:'freelancers',label:'Freelancers',icon:'🎨',section:'financeiro',hideAE:true},
@@ -2118,24 +2118,31 @@ function renderDashboard(){
 // ── DESPESAS FIXAS ────────────────────────────────────────────────────────────
 var CATS_DESPESA=['Alimentação / Insumos','Aluguel','Energia Elétrica','Água','Internet / Telefone','Pessoal / RH','Manutenção','Marketing','Impostos / Taxas','Equipamentos','Fornecedor','Serviços','Outros'];
 
+var _fixasGeradasKey='';
 function _gerarContasFixas(){
-  // Para cada despesa fixa ativa, garante que existe uma conta no mês atual
+  // Guard: só executa uma vez por perfil/mês por sessão
   var pf=state.profile;
-  var hj=today();
-  var mesAtual=hj.slice(0,7);
+  var mesAtual=today().slice(0,7);
+  var key=pf+'_'+mesAtual;
+  if(_fixasGeradasKey===key)return;
+
   var fixas=(state.despesasFixas||[]).filter(function(f){return f.profile===pf&&f.ativo!==false;});
-  if(!fixas.length)return;
+  if(!fixas.length){_fixasGeradasKey=key;return;}
+
   var contas=state.contas||[];
   var novas=[];
   fixas.forEach(function(f){
-    var jaExiste=contas.some(function(c){return c.despesaFixaId===f.id&&(c.vencimento||'').slice(0,7)===mesAtual;});
+    // Só gera para o mês atual — nunca para meses futuros
+    var jaExiste=contas.some(function(c){
+      return c.despesaFixaId===f.id&&(c.vencimento||'').slice(0,7)===mesAtual;
+    });
     if(!jaExiste){
       var dm=String(f.diaMes||1).padStart(2,'0');
-      var venc=mesAtual+'-'+dm;
       novas.push({
         id:uid(),profile:pf,tipo:'pagar',
         descricao:f.nome,valor:f.valor||0,
-        vencimento:venc,categoria:f.categoria||'Outros',
+        vencimento:mesAtual+'-'+dm,
+        categoria:f.categoria||'Outros',
         banco:f.banco||'',status:'pendente',
         recorrente:true,despesaFixaId:f.id,
         notas:'Gerado automaticamente — Despesa Fixa',
@@ -2143,6 +2150,8 @@ function _gerarContasFixas(){
       });
     }
   });
+
+  _fixasGeradasKey=key; // marca como executado antes de salvar
   if(novas.length){
     var c2=contas.concat(novas);
     lsSet('contas',c2);

@@ -2141,13 +2141,15 @@ function renderDashboard(){
 // ── DESPESAS FIXAS ────────────────────────────────────────────────────────────
 var CATS_DESPESA=['Alimentação / Insumos','Aluguel','Energia Elétrica','Água','Internet / Telefone','Pessoal / RH','Manutenção','Marketing','Impostos / Taxas','Equipamentos','Fornecedor','Serviços','Outros'];
 
-var _fixasGeradasKey='';
-function _gerarContasFixas(){
-  // Guard: só executa uma vez por perfil/mês por sessão
+var _fixasGeradasKeys={};
+function _gerarContasFixas(mes){
   var pf=state.profile;
-  var mesAtual=today().slice(0,7);
+  var hoje=today().slice(0,7);
+  var mesAtual=mes||hoje;
+  // Nunca gerar para meses futuros
+  if(mesAtual>hoje)return;
   var key=pf+'_'+mesAtual;
-  if(_fixasGeradasKey===key)return;
+  if(_fixasGeradasKeys[key])return;
 
   var fixas=(state.despesasFixas||[]).filter(function(f){return f.profile===pf&&f.ativo!==false;});
   if(!fixas.length){_fixasGeradasKey=key;return;}
@@ -2174,7 +2176,7 @@ function _gerarContasFixas(){
     }
   });
 
-  _fixasGeradasKey=key; // marca como executado antes de salvar
+  _fixasGeradasKeys[key]=true; // marca como executado antes de salvar
   if(novas.length){
     var c2=contas.concat(novas);
     lsSet('contas',c2);
@@ -2347,9 +2349,10 @@ function _renderPainelFixas(mesAtual){
 
   var linhas=fixas.map(function(f){
     var contaMes=contas.find(function(c){return c.despesaFixaId===f.id&&(c.vencimento||'').slice(0,7)===mesAtual;});
-    var status=contaMes?contaMes.status:'pendente';
+    var isFuturo=!contaMes&&mesAtual>today().slice(0,7);
+    var status=contaMes?contaMes.status:(isFuturo?'futuro':'pendente');
     var isPago=status==='pago';
-    if(isPago)pago+=f.valor;else pendente+=f.valor;
+    if(isPago)pago+=f.valor;else if(!isFuturo)pendente+=f.valor;
     var banco=bancos.find(function(b){return b.id===f.banco;});
     var dm=String(f.diaMes||1).padStart(2,'0');
 
@@ -2366,9 +2369,9 @@ function _renderPainelFixas(mesAtual){
       el('div',{style:{fontWeight:'700',fontSize:'13px',color:isPago?'var(--green)':'var(--text)',whiteSpace:'nowrap'}},fmtMoney(f.valor)),
       el('div',{style:{
         fontSize:'11px',fontWeight:'700',padding:'3px 10px',borderRadius:'12px',whiteSpace:'nowrap',
-        background:isPago?'rgba(39,174,96,.15)':'rgba(229,172,0,.12)',
-        color:isPago?'var(--green)':'var(--gold)',
-      }},isPago?'✅ Pago':'🕐 Pendente'),
+        background:isPago?'rgba(39,174,96,.15)':isFuturo?'rgba(100,100,100,.12)':'rgba(229,172,0,.12)',
+        color:isPago?'var(--green)':isFuturo?'var(--text3)':'var(--gold)',
+      }},isPago?'✅ Pago':isFuturo?'📅 Futuro':'🕐 Pendente'),
       !isPago&&contaMes?el('button',{style:{
         padding:'4px 10px',borderRadius:'6px',border:'none',background:'var(--primary)',
         color:'#fff',fontSize:'11px',fontWeight:'700',cursor:'pointer',whiteSpace:'nowrap',
@@ -2428,13 +2431,14 @@ function _renderPainelFixas(mesAtual){
 
 // ── CONTAS A PAGAR ────────────────────────────────────────────────────────────
 function renderPagar(){
-  // Gera contas do mês a partir das despesas fixas cadastradas
-  _gerarContasFixas();
+  var pagarMes=state.pagarMes||today().slice(0,7);
+  // Gera contas do mês visualizado (e do mês atual) a partir das despesas fixas
+  _gerarContasFixas(pagarMes);
+  _gerarContasFixas(); // garante mês atual sempre gerado
 
   var items=state.contas.filter(function(c){return c.tipo==='pagar'&&c.profile===state.profile;});
   var busca=state.busca.pagar||'';
   var filtro=state.filtro.pagar||'todos';
-  var pagarMes=state.pagarMes||today().slice(0,7);
 
   // Navegar meses
   function _navMes(delta){

@@ -365,13 +365,13 @@ function renderDailyModal(){
           isOneOff?(m._dataFutura&&m._dataFutura>today()?'📅 Tarefa Futura — '+_doFmtData(m._dataFutura):'+ Tarefa Rápida (hoje)'):isEdit?'Editar Rotina':'+ Nova Rotina Diária'),
         el('button',{class:'btn-ghost',style:{padding:'4px 10px'},onclick:function(){setState({dailyModal:null});}},'✕'),
       ]),
-      div('form-group',[el('label',{class:'form-label'},'Nome da tarefa *'),inp('nome','text','Ex: Conferir caixa',edit.nome)]),
+      div('form-group',[el('label',{class:'form-label'},'Nome da tarefa *'),inp('nome','text','Ex: Conferir caixa',m._sNome!==undefined?m._sNome:edit.nome)]),
       div('form-group',[el('label',{class:'form-label'},'Descrição'),
-        (function(){var t=el('textarea',{class:'form-input',id:'do-descricao',rows:'2',placeholder:'Detalhes opcionais...',style:{resize:'vertical'}});t.value=edit.descricao||'';return t;})()]),
+        (function(){var t=el('textarea',{class:'form-input',id:'do-descricao',rows:'2',placeholder:'Detalhes opcionais...',style:{resize:'vertical'}});t.value=m._sDesc!==undefined?m._sDesc:(edit.descricao||'');return t;})()]),
       el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}},[
-        div('form-group',[el('label',{class:'form-label'},'Horário'),inp('horario','time','',edit.horario||'')]),
+        div('form-group',[el('label',{class:'form-label'},'Horário'),inp('horario','time','',m._sHora!==undefined?m._sHora:(edit.horario||''))]),
         div('form-group',[el('label',{class:'form-label'},'Prioridade'),
-          selEl('prioridade',[{v:'alta',l:'🔴 Alta'},{v:'media',l:'🟡 Média'},{v:'baixa',l:'🟢 Baixa'}],edit.prioridade||'media')]),
+          selEl('prioridade',[{v:'alta',l:'🔴 Alta'},{v:'media',l:'🟡 Média'},{v:'baixa',l:'🟢 Baixa'}],m._sPrio!==undefined?m._sPrio:(edit.prioridade||'media'))]),
       ]),
       !isOneOff?div('form-group',[
         el('label',{class:'form-label'},'Tipo de repetição:'),
@@ -383,8 +383,13 @@ function renderDailyModal(){
             border:'1px solid '+(tipoRep==='semanal'?'var(--gold)':'var(--border)'),
             transition:'all .15s',
           },onclick:function(){
-            tipoRep='semanal';
-            if(state.dailyModal){state.dailyModal._tipoRep='semanal';}
+            if(state.dailyModal){
+              var _n=document.getElementById('do-nome'),_d=document.getElementById('do-descricao'),_h=document.getElementById('do-horario'),_p=document.getElementById('do-prioridade'),_a=document.getElementById('do-alerta');
+              if(_n)state.dailyModal._sNome=_n.value;if(_d)state.dailyModal._sDesc=_d.value;
+              if(_h)state.dailyModal._sHora=_h.value;if(_p)state.dailyModal._sPrio=_p.value;
+              if(_a)state.dailyModal._sAlerta=_a.value;
+              state.dailyModal._tipoRep='semanal';
+            }
             render();
           }},'📅 Semanal'),
           el('button',{type:'button',style:{
@@ -394,8 +399,13 @@ function renderDailyModal(){
             border:'1px solid '+(tipoRep==='mensal'?'var(--primary)':'var(--border)'),
             transition:'all .15s',
           },onclick:function(){
-            tipoRep='mensal';
-            if(state.dailyModal){state.dailyModal._tipoRep='mensal';}
+            if(state.dailyModal){
+              var _n=document.getElementById('do-nome'),_d=document.getElementById('do-descricao'),_h=document.getElementById('do-horario'),_p=document.getElementById('do-prioridade'),_a=document.getElementById('do-alerta');
+              if(_n)state.dailyModal._sNome=_n.value;if(_d)state.dailyModal._sDesc=_d.value;
+              if(_h)state.dailyModal._sHora=_h.value;if(_p)state.dailyModal._sPrio=_p.value;
+              if(_a)state.dailyModal._sAlerta=_a.value;
+              state.dailyModal._tipoRep='mensal';
+            }
             render();
           }},'🗓 Mensal'),
         ]),
@@ -422,7 +432,7 @@ function renderDailyModal(){
       ]):null,
       !isOneOff?div('form-group',[
         el('label',{class:'form-label'},'Alertar (min antes):'),
-        inp('alerta','number','15',edit.alertaMinutos!=null?edit.alertaMinutos:15,{min:'0',max:'120',style:{width:'100px'}}),
+        inp('alerta','number','15',m._sAlerta!==undefined?m._sAlerta:(edit.alertaMinutos!=null?edit.alertaMinutos:15),{min:'0',max:'120',style:{width:'100px'}}),
       ]):null,
       div('form-group',[
         el('label',{class:'form-label'},'Cor:'),

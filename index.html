@@ -4302,6 +4302,7 @@ function migrarVendasStone(){
 }
 
 function initApp(){
+  _kioskApplyTheme(lsGet('kioskTheme','dark'));
   document.getElementById('app').style.display='';
   document.getElementById('pin-overlay').style.display='none';
   render();
@@ -4322,6 +4323,40 @@ function lockApp(){
   var ov=document.getElementById('pin-overlay');
   ov.style.display='flex';
   buildPinScreen('enter');
+}
+
+// ── TEMA DOS KIOSKS ───────────────────────────────────────────────────────────
+function _kioskApplyTheme(theme){
+  var dark=theme!=='light';
+  var id='djf-kiosk-theme';
+  var s=document.getElementById(id)||document.createElement('style');
+  s.id=id;
+  s.textContent=':root{'+(dark?[
+    '--k-bg:#0f172a','--k-bg2:#1e293b','--k-border:#334155',
+    '--k-btn-back:#374151','--k-text4:#475569','--k-text3:#64748b',
+    '--k-text2:#94a3b8','--k-text:#f1f5f9','--k-accent:#38bdf8',
+    '--k-accent2:#60a5fa','--k-overlay:rgba(0,0,0,.85)',
+  ]:[
+    '--k-bg:#f1f5f9','--k-bg2:#ffffff','--k-border:#e2e8f0',
+    '--k-btn-back:#e2e8f0','--k-text4:#94a3b8','--k-text3:#64748b',
+    '--k-text2:#475569','--k-text:#0f172a','--k-accent:#0284c7',
+    '--k-accent2:#2563eb','--k-overlay:rgba(0,0,0,.55)',
+  ]).join(';')+'}';
+  if(!s.parentNode)document.head.appendChild(s);
+  lsSet('kioskTheme',theme);
+}
+function _kioskThemeBtn(){
+  var cur=lsGet('kioskTheme','dark');
+  var btn=el('button',{title:cur==='dark'?'Tema claro':'Tema escuro',style:{
+    background:'none',border:'1px solid var(--k-border)',borderRadius:'8px',
+    color:'var(--k-text2)',cursor:'pointer',padding:'7px 10px',fontSize:'16px',
+    flexShrink:'0',lineHeight:'1',
+  }},cur==='dark'?'☀️':'🌙');
+  btn.onclick=function(){
+    _kioskApplyTheme(cur==='dark'?'light':'dark');
+    setState({});
+  };
+  return btn;
 }
 
 // ── MODAL DE DOWNLOAD: atalhos dedicados (Tablet de Requisição, Caixa Diário) ─

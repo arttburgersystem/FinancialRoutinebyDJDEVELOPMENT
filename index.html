@@ -2292,23 +2292,26 @@ function renderSaidaRapidaModal(){
   function salvar(){
     var desc=(descInp&&descInp.value||'').trim();
     if(!desc){showToast('Informe a descrição','error');return;}
-    var valor=parseFloat((valorInp&&valorInp.value||'0').replace(',','.'))||0;
+    var valor=_parseMoney(valorInp&&valorInp.value||'0');
     if(!valor){showToast('Informe o valor','error');return;}
     var data=dataInp?dataInp.value:today();
+    var bancoId=bancoSel?bancoSel.value:'';
     var conta={
       id:uid(),profile:pf,tipo:'pagar',
       descricao:desc,valor:valor,
       vencimento:data,dataPagamento:data,
       categoria:catSel?catSel.value:'Outros',
-      banco:bancoSel?bancoSel.value:'',
+      banco:bancoId,
       status:'pago',recorrente:false,
       notas:obsInp?obsInp.value:'',
       criadoEm:new Date().toISOString(),
     };
     var contas=(state.contas||[]).concat([conta]);
-    lsSet('contas',contas);
-    setState({contas:contas,saidaRapidaModal:null});
-    scheduleSave();
+    var bs=state.bancos||[];
+    if(bancoId){bs=bs.map(function(b){return b.id===bancoId?Object.assign({},b,{saldo:Math.round(((b.saldo||0)-valor)*100)/100}):b;});}
+    lsSet('contas',contas);lsSet('bancos',bs);
+    setState({contas:contas,bancos:bs,saidaRapidaModal:null});
+    saveNow();
     showToast('Saída registrada!','success');
     if(typeof logAudit==='function')logAudit('saída rápida',desc+' '+fmtMoney(valor));
   }
@@ -2707,8 +2710,11 @@ function renderPagar(){
             else{
               var upd=Object.assign({},cc,{status:'pago',dataPagamento:today()});
               var cs=(state.contas||[]).map(function(x){return x.id===upd.id?upd:x;});
-              setState({contas:cs,modal:null,comprovanteModal:{conta:upd,tipo:'despesa'}});
-              scheduleSave();
+              var bs=state.bancos||[];
+              if(cc.banco){bs=bs.map(function(b){return b.id===cc.banco?Object.assign({},b,{saldo:Math.round(((b.saldo||0)-(cc.valor||0))*100)/100}):b;});}
+              lsSet('contas',cs);lsSet('bancos',bs);
+              setState({contas:cs,bancos:bs,modal:null,comprovanteModal:{conta:upd,tipo:'despesa'}});
+              saveNow();
             }
           };})(c)},'✓'):null,
           el('button',{class:'btn-icon edit',onclick:function(){setState({modal:{tipo:'pagar',editItem:c}});}}, '✏️'),
@@ -2944,8 +2950,7 @@ function renderPagarAtrasadoModal(){
   var actions=el('div',{class:'modal-actions'});
   actions.appendChild(btn('btn-secondary','Cancelar',function(){setState({pagarAtrasadoModal:null});}));
   actions.appendChild(btn('btn-primary','✓ Confirmar pagamento',function(){
-    var raw=valorPagoInp.value.replace(/[^\d,\.]/g,'').replace(',','.');
-    var vPago=parseFloat(raw)||c.valor;
+    var vPago=_parseMoney(valorPagoInp.value)||c.valor;
     var juros=parseFloat((vPago-c.valor).toFixed(2));
     var dataPag=dataPagInp.value||today();
     var updated=Object.assign({},c,{
@@ -2955,8 +2960,11 @@ function renderPagarAtrasadoModal(){
       dataPagamento:dataPag,
     });
     var contas=state.contas.map(function(x){return x.id===c.id?updated:x;});
-    setState({contas:contas,pagarAtrasadoModal:null,comprovanteModal:{conta:updated,tipo:'despesa'}});
-    scheduleSave();
+    var bs=state.bancos||[];
+    if(c.banco){bs=bs.map(function(b){return b.id===c.banco?Object.assign({},b,{saldo:Math.round(((b.saldo||0)-vPago)*100)/100}):b;});}
+    lsSet('contas',contas);lsSet('bancos',bs);
+    setState({contas:contas,bancos:bs,pagarAtrasadoModal:null,comprovanteModal:{conta:updated,tipo:'despesa'}});
+    saveNow();
     if(typeof logAudit==='function')logAudit('pagamento em atraso',c.descricao+' · '+diasAtr+'d atraso · juros: '+fmtMoney(juros));
   }));
   modal.appendChild(actions);

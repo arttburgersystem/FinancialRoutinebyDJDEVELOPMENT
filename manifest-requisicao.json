@@ -1,7 +1,7 @@
 {
-  "name": "Requisição de Estoque",
-  "short_name": "Req. Estoque",
-  "description": "Tablet de requisição de estoque — Financial Routine",
+  "name": "Transferência entre Estoques",
+  "short_name": "Transf. Estoque",
+  "description": "Transferência entre estoques — Financial Routine",
   "start_url": "index.html#requisicao",
   "scope": ".",
   "display": "standalone",

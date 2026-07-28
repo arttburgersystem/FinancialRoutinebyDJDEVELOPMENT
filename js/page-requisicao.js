@@ -31,10 +31,10 @@ function renderRequisicao() {
     padding:'14px 20px',background:'#1e293b',
     borderBottom:'2px solid #334155',flexShrink:'0',
   }});
-  hdr.appendChild(el('div',{style:{
-    fontSize:'18px',fontWeight:'800',color:'#38bdf8',flex:'1',
-    display:'flex',alignItems:'center',gap:'8px',
-  }},'🔄 Transferência entre Estoques'));
+  hdr.appendChild(el('div',{style:{flex:'1'}},[
+    el('div',{style:{fontSize:'18px',fontWeight:'800',color:'#38bdf8'}},'🔄 Transferência entre Estoques'),
+    el('div',{style:{fontSize:'11px',color:'#475569',marginTop:'2px',fontWeight:'600',letterSpacing:'.03em'}},'📦 Estoque Estacionado  →  🔁 Estoque Rotativo'),
+  ]));
 
   if (session) {
     hdr.appendChild(el('div',{style:{
@@ -86,11 +86,8 @@ function renderRequisicao() {
 
     loginWrap.appendChild(el('div',{style:{
       fontSize:'18px',fontWeight:'700',color:'#94a3b8',
-      marginBottom:'4px',textAlign:'center',letterSpacing:'-.01em',
+      marginBottom:'36px',textAlign:'center',letterSpacing:'-.01em',
     }},'🔐  Selecione seu nome para continuar'));
-    loginWrap.appendChild(el('div',{style:{
-      fontSize:'13px',color:'#475569',marginBottom:'32px',textAlign:'center',
-    }},'Estoque Estacionado → Estoque Rotativo'));
 
     if (funcs.length === 0) {
       loginWrap.appendChild(el('div',{style:{
@@ -268,6 +265,11 @@ function renderRequisicao() {
     return (x.nome||'').toLowerCase().indexOf(buscaLow)>=0
         || (x.categoria||'').toLowerCase().indexOf(buscaLow)>=0;
   });
+
+  mainArea.appendChild(el('div',{style:{
+    fontSize:'11px',fontWeight:'700',color:'#475569',letterSpacing:'.08em',
+    textTransform:'uppercase',marginBottom:'12px',
+  }},'📦 Itens disponíveis no Estoque Estacionado — selecione para enviar ao Rotativo'));
 
   if(itensFilt.length===0){
     mainArea.appendChild(el('div',{style:{

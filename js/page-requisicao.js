@@ -74,6 +74,14 @@ function renderRequisicao() {
       setState({reqMode:false,reqSession:null,reqCarrinho:[],reqPin:null,reqBusca:'',reqQtdModal:null});
     }
   };
+  // Botão do painel do desenvolvedor (sempre visível, exige PIN ao clicar)
+  var devBtn=el('button',{title:'Painel do desenvolvedor',style:{
+    background:'none',border:'1px solid var(--k-border)',borderRadius:'8px',
+    color:'var(--k-text3)',cursor:'pointer',padding:'7px 10px',fontSize:'16px',
+    flexShrink:'0',lineHeight:'1',
+  }},'🔑');
+  devBtn.onclick=function(){setState({reqDevModal:{step:'pin',pinVal:'',pinErro:false}});};
+  hdr.appendChild(devBtn);
   if(typeof _kioskThemeBtn==='function')hdr.appendChild(_kioskThemeBtn());
   hdr.appendChild(exitBtn);
   root.appendChild(hdr);
@@ -511,7 +519,299 @@ function renderRequisicao() {
     setTimeout(function(){qOv.focus();},0);
   }
 
+  // Painel do desenvolvedor
+  var devMdl=renderReqDevModal();
+  if(devMdl)root.appendChild(devMdl);
+
   return root;
+}
+
+// ── PAINEL DO DESENVOLVEDOR — Gerenciar acesso ao kiosk ──────────────────────
+function renderReqDevModal(){
+  var m=state.reqDevModal; if(!m)return null;
+  var pf=state.profile;
+
+  // Usuários com papel dev/admin que possuem pinCaixa configurado
+  var devUsers=(state.usuarios||[]).filter(function(u){
+    return u.ativo!==false&&(u.papel==='desenvolvedor'||u.papel==='administrador')&&u.pinCaixa;
+  });
+
+  var ov=el('div',{tabIndex:'-1',style:{
+    position:'absolute',inset:'0',background:'var(--k-overlay)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:'300',outline:'none',
+  }});
+  setTimeout(function(){ov.focus();},0);
+
+  function fechar(){setState({reqDevModal:null});}
+
+  // ── STEP: PIN de autenticação ────────────────────────────────────────────
+  if(m.step==='pin'){
+    if(devUsers.length===0){
+      var noPin=el('div',{style:{
+        background:'var(--k-bg2)',borderRadius:'20px',padding:'32px 28px',
+        maxWidth:'340px',width:'90vw',border:'2px solid var(--k-border)',textAlign:'center',
+      }});
+      noPin.appendChild(el('div',{style:{fontSize:'40px',marginBottom:'16px'}},'⚠️'));
+      noPin.appendChild(el('div',{style:{fontWeight:'700',fontSize:'16px',color:'var(--k-text)',marginBottom:'10px'}},'Nenhum PIN configurado'));
+      noPin.appendChild(el('div',{style:{fontSize:'13px',color:'var(--k-text2)',lineHeight:'1.7',marginBottom:'20px'}},
+        'Configure o PIN do Caixa Diário para um usuário Desenvolvedor ou Administrador no painel principal.'));
+      var okBtn=el('button',{style:{
+        width:'100%',background:'var(--k-border)',color:'var(--k-text)',border:'none',
+        borderRadius:'10px',padding:'14px',cursor:'pointer',fontSize:'15px',fontWeight:'700',
+      }},'Fechar');
+      okBtn.onclick=fechar;
+      noPin.appendChild(okBtn);
+      ov.appendChild(noPin);
+      return ov;
+    }
+
+    var box=el('div',{style:{
+      background:'var(--k-bg2)',borderRadius:'22px',padding:'32px 28px',
+      width:'300px',maxWidth:'90vw',border:'2px solid var(--k-border)',
+      boxShadow:'0 30px 80px var(--k-overlay)',
+    }});
+    box.appendChild(el('div',{style:{textAlign:'center',marginBottom:'22px'}},[
+      el('div',{style:{fontSize:'40px',lineHeight:'1'}},'🔑'),
+      el('div',{style:{fontWeight:'800',fontSize:'18px',color:'var(--k-text)',marginTop:'10px'}},'Painel do Desenvolvedor'),
+      el('div',{style:{fontSize:'12px',color:'var(--k-text2)',marginTop:'6px'}},'Digite o PIN do Caixa Diário para continuar'),
+    ]));
+
+    var dotsEl=el('div',{style:{display:'flex',gap:'14px',justifyContent:'center',marginBottom:'8px'}});
+    for(var d=0;d<4;d++){
+      dotsEl.appendChild(el('div',{style:{
+        width:'20px',height:'20px',borderRadius:'50%',transition:'all .12s',
+        background:d<m.pinVal.length?'var(--k-accent)':'transparent',
+        border:'2px solid '+(d<m.pinVal.length?'var(--k-accent)':'var(--k-border)'),
+      }}));
+    }
+    box.appendChild(dotsEl);
+    box.appendChild(el('div',{style:{
+      textAlign:'center',minHeight:'22px',fontSize:'13px',fontWeight:'700',
+      color:'#f87171',marginBottom:'14px',
+    }},m.pinErro?'❌ PIN incorreto — tente novamente':''));
+
+    function pressDevPin(key){
+      var cur=(state.reqDevModal||{}).pinVal||'';
+      if(key==='←'){
+        setState({reqDevModal:{step:'pin',pinVal:cur.slice(0,-1),pinErro:false}});
+      } else {
+        var nova=cur+key;
+        setState({reqDevModal:{step:'pin',pinVal:nova,pinErro:false}});
+        if(nova.length===4){
+          setTimeout(function(){
+            var ok=devUsers.some(function(u){return u.pinCaixa===nova;});
+            if(ok){setState({reqDevModal:{step:'list'}});}
+            else{setState({reqDevModal:{step:'pin',pinVal:'',pinErro:true}});}
+          },300);
+        }
+      }
+    }
+    ov.onkeydown=function(ev){
+      var k=ev.key;
+      if(k>='0'&&k<='9'){ev.preventDefault();pressDevPin(k);}
+      else if(k==='Backspace'){ev.preventDefault();pressDevPin('←');}
+      else if(k==='Escape'){ev.preventDefault();fechar();}
+    };
+
+    var kpad=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'9px'}});
+    ['1','2','3','4','5','6','7','8','9','←','0','✕'].forEach(function(k){
+      var kb=el('button',{style:{
+        background:k==='✕'?'#dc2626':k==='←'?'var(--k-btn-back)':'var(--k-border)',
+        color:k==='✕'?'#fff':'var(--k-text)',border:'none',borderRadius:'12px',
+        padding:'19px 10px',fontSize:'22px',fontWeight:'700',cursor:'pointer',lineHeight:'1',
+      }},k);
+      kb.onmouseenter=function(){kb.style.opacity='.8';};
+      kb.onmouseleave=function(){kb.style.opacity='1';};
+      !function(key){
+        kb.onclick=function(){key==='✕'?fechar():pressDevPin(key);};
+      }(k);
+      kpad.appendChild(kb);
+    });
+    box.appendChild(kpad);
+    ov.appendChild(box);
+    return ov;
+  }
+
+  // ── STEP: lista de funcionários ──────────────────────────────────────────
+  if(m.step==='list'){
+    var funcs=(state.funcionarios||[])
+      .filter(function(f){return (f.profile===pf||!f.profile)&&f.status==='ativo';})
+      .sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+
+    var panel=el('div',{style:{
+      background:'var(--k-bg2)',borderRadius:'22px',padding:'0',
+      width:'480px',maxWidth:'92vw',maxHeight:'80vh',
+      border:'2px solid var(--k-border)',display:'flex',flexDirection:'column',
+      boxShadow:'0 30px 80px var(--k-overlay)',overflow:'hidden',
+    }});
+
+    // Header do painel
+    var panHdr=el('div',{style:{
+      display:'flex',alignItems:'center',justifyContent:'space-between',
+      padding:'18px 20px',borderBottom:'1px solid var(--k-border)',flexShrink:'0',
+    }});
+    panHdr.appendChild(el('div',{},[
+      el('div',{style:{fontWeight:'800',fontSize:'16px',color:'var(--k-text)'}},'👥 Acesso — Transferência entre Estoques'),
+      el('div',{style:{fontSize:'12px',color:'var(--k-text2)',marginTop:'3px'}},
+        funcs.length+' funcionário'+(funcs.length!==1?'s':'')+' ativo'+(funcs.length!==1?'s':'')),
+    ]));
+    var closeListBtn=el('button',{style:{
+      background:'#dc2626',color:'#fff',border:'none',borderRadius:'8px',
+      padding:'8px 14px',cursor:'pointer',fontSize:'13px',fontWeight:'700',
+    }},'✕ Fechar');
+    closeListBtn.onclick=fechar;
+    panHdr.appendChild(closeListBtn);
+    panel.appendChild(panHdr);
+
+    // Lista
+    var lista=el('div',{style:{overflowY:'auto',padding:'14px 16px',flex:'1'}});
+    if(funcs.length===0){
+      lista.appendChild(el('div',{style:{textAlign:'center',padding:'40px 20px',color:'var(--k-text2)',fontSize:'14px'}},
+        'Nenhum funcionário ativo cadastrado.'));
+    } else {
+      funcs.forEach(function(f){
+        var habilitado=!!f.senhaRequisicao;
+        var row=el('div',{style:{
+          display:'flex',alignItems:'center',gap:'14px',
+          padding:'12px 14px',marginBottom:'8px',borderRadius:'12px',
+          background:'var(--k-bg)',border:'1px solid var(--k-border)',
+        }});
+        var avatar=el('div',{style:{
+          width:'44px',height:'44px',borderRadius:'50%',
+          background:habilitado?'rgba(74,222,128,.15)':'rgba(248,113,113,.10)',
+          display:'flex',alignItems:'center',justifyContent:'center',
+          fontSize:'22px',flexShrink:'0',
+        }},habilitado?'✅':'🚫');
+        row.appendChild(avatar);
+        var info=el('div',{style:{flex:'1',minWidth:'0'}});
+        info.appendChild(el('div',{style:{fontWeight:'700',fontSize:'14px',color:'var(--k-text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},f.nome));
+        info.appendChild(el('div',{style:{fontSize:'12px',color:'var(--k-text2)',marginTop:'2px'}},
+          (f.cargo||'Funcionário')+' · '+(habilitado?'✅ Habilitado':'⭕ Sem acesso')));
+        row.appendChild(info);
+
+        if(habilitado){
+          var remBtn=el('button',{style:{
+            background:'rgba(248,113,113,.12)',color:'#f87171',border:'1px solid rgba(248,113,113,.3)',
+            borderRadius:'8px',padding:'8px 14px',cursor:'pointer',fontSize:'12px',fontWeight:'700',flexShrink:'0',
+          }},'🚫 Remover');
+          !function(fn){
+            remBtn.onclick=function(){
+              if(!confirm('Remover acesso de "'+fn.nome+'"?\nEle não poderá mais usar o kiosk até ser habilitado novamente.'))return;
+              var novos=(state.funcionarios||[]).map(function(x){
+                return x.id===fn.id?Object.assign({},x,{senhaRequisicao:''}):x;
+              });
+              lsSet('funcionarios',novos);setState({funcionarios:novos});saveNow();
+              showToast&&showToast('Acesso de '+fn.nome+' removido','error');
+            };
+          }(f);
+          row.appendChild(remBtn);
+        } else {
+          var habBtn=el('button',{style:{
+            background:'rgba(74,222,128,.12)',color:'#4ade80',border:'1px solid rgba(74,222,128,.3)',
+            borderRadius:'8px',padding:'8px 14px',cursor:'pointer',fontSize:'12px',fontWeight:'700',flexShrink:'0',
+          }},'✅ Habilitar');
+          !function(fn){
+            habBtn.onclick=function(){
+              setState({reqDevModal:{step:'setPin',funcId:fn.id,funcNome:fn.nome,pinVal:'',pinErro:false}});
+            };
+          }(f);
+          row.appendChild(habBtn);
+        }
+        lista.appendChild(row);
+      });
+    }
+    panel.appendChild(lista);
+    ov.appendChild(panel);
+    return ov;
+  }
+
+  // ── STEP: definir PIN para funcionário ───────────────────────────────────
+  if(m.step==='setPin'){
+    var sBox=el('div',{style:{
+      background:'var(--k-bg2)',borderRadius:'22px',padding:'28px 24px',
+      width:'310px',maxWidth:'92vw',border:'2px solid var(--k-border)',
+      boxShadow:'0 30px 80px var(--k-overlay)',
+    }});
+    sBox.appendChild(el('div',{style:{textAlign:'center',marginBottom:'20px'}},[
+      el('div',{style:{fontSize:'40px'}},'👤'),
+      el('div',{style:{fontWeight:'800',fontSize:'17px',color:'var(--k-text)',marginTop:'8px'}},m.funcNome),
+      el('div',{style:{fontSize:'12px',color:'var(--k-text2)',marginTop:'6px'}},'Digite o PIN de 4 dígitos para este funcionário'),
+    ]));
+
+    var sDots=el('div',{style:{display:'flex',gap:'14px',justifyContent:'center',marginBottom:'8px'}});
+    for(var sd=0;sd<4;sd++){
+      sDots.appendChild(el('div',{style:{
+        width:'20px',height:'20px',borderRadius:'50%',transition:'all .12s',
+        background:sd<m.pinVal.length?'#4ade80':'transparent',
+        border:'2px solid '+(sd<m.pinVal.length?'#4ade80':'var(--k-border)'),
+      }}));
+    }
+    sBox.appendChild(sDots);
+    sBox.appendChild(el('div',{style:{
+      textAlign:'center',minHeight:'22px',fontSize:'13px',fontWeight:'700',
+      color:'#f87171',marginBottom:'14px',
+    }},m.pinErro?'❌ PIN já em uso por outro funcionário':''));
+
+    function pressSetPin(key){
+      var cur=(state.reqDevModal||{}).pinVal||'';
+      var fId=(state.reqDevModal||{}).funcId;
+      var fNm=(state.reqDevModal||{}).funcNome;
+      if(key==='←'){
+        setState({reqDevModal:{step:'setPin',funcId:fId,funcNome:fNm,pinVal:cur.slice(0,-1),pinErro:false}});
+      } else if(key==='✕'){
+        setState({reqDevModal:{step:'list'}});
+      } else {
+        var nova=cur+key;
+        setState({reqDevModal:{step:'setPin',funcId:fId,funcNome:fNm,pinVal:nova,pinErro:false}});
+        if(nova.length===4){
+          setTimeout(function(){
+            var st=state.reqDevModal;
+            if(!st||st.step!=='setPin'||st.funcId!==fId)return;
+            // Verifica conflito com outro funcionário
+            var conflito=(state.funcionarios||[]).some(function(x){
+              return x.id!==fId&&x.senhaRequisicao===nova;
+            });
+            if(conflito){
+              setState({reqDevModal:{step:'setPin',funcId:fId,funcNome:fNm,pinVal:'',pinErro:true}});
+              return;
+            }
+            var novos=(state.funcionarios||[]).map(function(x){
+              return x.id===fId?Object.assign({},x,{senhaRequisicao:nova}):x;
+            });
+            lsSet('funcionarios',novos);setState({funcionarios:novos,reqDevModal:{step:'list'}});
+            saveNow();
+            showToast&&showToast(fNm+' habilitado com PIN ****');
+          },300);
+        }
+      }
+    }
+    ov.onkeydown=function(ev){
+      var k=ev.key;
+      if(k>='0'&&k<='9'){ev.preventDefault();pressSetPin(k);}
+      else if(k==='Backspace'){ev.preventDefault();pressSetPin('←');}
+      else if(k==='Escape'){ev.preventDefault();setState({reqDevModal:{step:'list'}});}
+    };
+
+    var sKpad=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'8px',marginBottom:'14px'}});
+    ['1','2','3','4','5','6','7','8','9','←','0','✕'].forEach(function(k){
+      var kb=el('button',{style:{
+        background:k==='✕'?'var(--k-btn-back)':k==='←'?'var(--k-btn-back)':'var(--k-border)',
+        color:'var(--k-text)',border:'none',borderRadius:'11px',
+        padding:'18px 10px',fontSize:'21px',fontWeight:'700',cursor:'pointer',lineHeight:'1',
+      }},k);
+      kb.onmouseenter=function(){kb.style.opacity='.8';};
+      kb.onmouseleave=function(){kb.style.opacity='1';};
+      !function(key){kb.onclick=function(){pressSetPin(key);};} (k);
+      sKpad.appendChild(kb);
+    });
+    sBox.appendChild(sKpad);
+    sBox.appendChild(el('div',{style:{fontSize:'11px',color:'var(--k-text3)',textAlign:'center',lineHeight:'1.6'}},
+      '⬅ Voltar → tecle ✕  ·  PIN deve ser único entre os funcionários'));
+    ov.appendChild(sBox);
+    return ov;
+  }
+
+  return null;
 }
 
 // ── REGISTRA A TRANSFERÊNCIA (Estacionado → Rotativo) ───────────────────────

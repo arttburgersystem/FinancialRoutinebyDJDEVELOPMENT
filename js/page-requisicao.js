@@ -1,6 +1,6 @@
-// ── TELA DE REQUISIÇÃO DE ESTOQUE (Tablet Kiosk) ─────────────────────────────
+// ── TELA DE TRANSFERÊNCIA ENTRE ESTOQUES (Tablet Kiosk) ──────────────────────
 // Acessível via state.reqMode = true
-// Usa state.estoqueItens + state.estoqueMovs do módulo Estoque Insumos
+// Retira itens do Estoque Estacionado (estoqueItens) e envia para o Estoque Rotativo
 
 function renderRequisicao() {
   var pf = state.profile;
@@ -34,7 +34,7 @@ function renderRequisicao() {
   hdr.appendChild(el('div',{style:{
     fontSize:'18px',fontWeight:'800',color:'#38bdf8',flex:'1',
     display:'flex',alignItems:'center',gap:'8px',
-  }},'📦 Requisição de Estoque'));
+  }},'🔄 Transferência entre Estoques'));
 
   if (session) {
     hdr.appendChild(el('div',{style:{
@@ -86,8 +86,11 @@ function renderRequisicao() {
 
     loginWrap.appendChild(el('div',{style:{
       fontSize:'18px',fontWeight:'700',color:'#94a3b8',
-      marginBottom:'36px',textAlign:'center',letterSpacing:'-.01em',
+      marginBottom:'4px',textAlign:'center',letterSpacing:'-.01em',
     }},'🔐  Selecione seu nome para continuar'));
+    loginWrap.appendChild(el('div',{style:{
+      fontSize:'13px',color:'#475569',marginBottom:'32px',textAlign:'center',
+    }},'Estoque Estacionado → Estoque Rotativo'));
 
     if (funcs.length === 0) {
       loginWrap.appendChild(el('div',{style:{
@@ -239,7 +242,7 @@ function renderRequisicao() {
   }});
   var searchInp = el('input',{
     id:'req-busca-inp',
-    type:'text',placeholder:'🔍 Buscar produto por nome ou categoria...',
+    type:'text',placeholder:'🔍 Buscar item no Estoque Estacionado...',
     style:{
       width:'100%',background:'#0f172a',border:'2px solid #334155',
       borderRadius:'12px',padding:'12px 18px',fontSize:'16px',
@@ -269,7 +272,7 @@ function renderRequisicao() {
   if(itensFilt.length===0){
     mainArea.appendChild(el('div',{style:{
       textAlign:'center',color:'#64748b',padding:'60px 20px',fontSize:'16px',
-    }},busca?'Nenhum produto encontrado para "'+busca+'"':'Nenhum produto cadastrado no estoque de insumos.'));
+    }},busca?'Nenhum item encontrado para "'+busca+'"':'Nenhum item cadastrado no Estoque Estacionado.'));
   } else {
     var prodGrid = el('div',{style:{
       display:'grid',
@@ -523,10 +526,10 @@ function _reqConfirmar() {
   }
 
   var linhas=carrinho.map(function(c){return {itemId:c.insumoId,qtd:c.qtd,nome:c.nome};});
-  var res=_erTransferirLote(linhas,session.funcId,session.funcNome,'Requisição tablet — '+session.funcNome);
+  var res=_erTransferirLote(linhas,session.funcId,session.funcNome,'Transf. Estacionado→Rotativo — '+session.funcNome);
 
   if(res.erros.length>0){alert('Erros ao registrar:\n'+res.erros.join('\n'));return;}
 
   setState({reqSession:null,reqCarrinho:[],reqQtdModal:null,reqBusca:''});
-  if(typeof showToast==='function')showToast(res.count+' item(ns) enviados para o Estoque Rotativo!');
+  if(typeof showToast==='function')showToast(res.count+' item(ns) transferido(s): Estacionado → Rotativo!');
 }
